@@ -12,10 +12,9 @@ enum Error {
 
 struct Authority {
 	offset: usize,
-	userinfo_len: usize,
-	host_offset: usize, // relative to offset
-	host_len: usize,
-	port_len: usize
+	userinfo_len: Option<usize>,
+	host_len: Option<usize>,
+	port_len: Option<usize>
 }
 
 struct Iri<'a> {
@@ -201,36 +200,284 @@ pub fn parse_userinfo(buffer, &[u8], mut i: usize) -> Result<Option<usize>, Erro
 	Ok(None)
 }
 
-pub fn parse_host(buffer: &[u8], i: usize) -> Result<usize, Error> {
-	// TODO
+pub fn parse_dec_octet(buffer: &[u8], i: usize) -> Result<Option<(u32, usize)>, Error> {
+	let octet = 0u32;
+	let len = 0;
+
+	loop {
+		match get_char(buffer, i + len)? {
+			Some((c, 1)) => {
+				if let Some(d) = c.to_digit(10) {
+					if octet == 25 && d > 5 {
+						return Ok(None);
+					} else {
+						octet = octet * 10 + d
+					}
+
+					len += 1;
+
+					if len >= 3 || octet > 25 {
+						break
+					}
+				} else {
+					break
+				}
+			},
+			_ => break
+		}
+	}
+
+	if len == 0 {
+		Ok(None)
+	} else {
+		Ok(Some((octet, len)))
+	}
 }
 
-pub fn parse_port(buffer: &[u8], i: usize) -> Result<usize, Error> {
-	// TODO
+/// Parse an IPv4 literal.
+pub fn parse_ipv4_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u32, usize)>> {
+	let offset = i;
+	if let Some((a, olen)) = parse_dec_octet(buffer, i)? {
+		i += olen;
+		if let Some(('.', 1)) = get_char(buffer, i)? {
+			i += 1;
+			if let Some((a, olen)) = parse_dec_octet(buffer, i)? {
+				i += olen;
+				if let Some(('.', 1)) = get_char(buffer, i)? {
+					i += 1;
+					if let Some((a, olen)) = parse_dec_octet(buffer, i)? {
+						i += olen;
+						if let Some(('.', 1)) = get_char(buffer, i)? {
+							i += 1;
+							if let Some((a, olen)) = parse_dec_octet(buffer, i)? {
+								i += olen;
+								let ipv4 = (a << 24) | (b << 16) | (c << 8) | d
+								let len = i - offset;
+								return Ok(Some((ipv4, len)))
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	Ok(None)
+}
+
+pub fn parse_h16(buffer: &[u8], mut i: usize) -> Result<Option<(u16, usize)>, Error> {
+	let len = 0;
+	let h16 = 0;
+
+	loop {
+		match get_char(buffer, i + len)? {
+			Some((c, 1)) => {
+				if let Some(d) = c.to_digit(16) {
+					h16 = (h16 << 4) | d;
+					len += 1;
+					if len >= 4 {
+						break
+					}
+				} else {
+					break
+				}
+			},
+			_ => break
+		}
+	}
+
+	Ok(Some((h16, len)))
+}
+
+/// Parse an IPv6 literal.
+/// Return the IPv6 and the string length.
+pub fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize)>, Error> {
+	let mut lhs = 0u128;
+	let mut lhs_count = 0;
+
+	let mut lit = 0u128;
+	let mut lit_count = 0;
+
+	let is_lhs = true;
+	let offset = i;
+
+	loop {
+		if lhs_count + lit_count >= 8 {
+			return Ok(None);
+		}
+
+		if is_lhs {
+			if let Some((':', 1)) = get_char(buffer, i) {
+				i += 1;
+
+				if lhs_count == 0 {
+					if let Some((':', 1)) = get_char(buffer, i) {
+						i += 1;
+					} else {
+						return Ok(None); // Invalid IPv6 (unexpected char)
+					}
+				}
+
+				lhs = lit;
+				lhs_count += lit_count;
+
+				is_lhs = false;
+
+				lit = 0;
+				lit_count = 1;
+				continue;
+			}
+		}
+
+		if lhs_count + lit_count <= 6 {
+			if let Some((ipv4, len)) = parse_ipv4_literal(buffer, i) {
+				lit = (lit << 32) | n;
+				lit_count += 2;
+				i += len;
+				break
+			}
+		}
+
+		if let Some((n, len)) = parse_h16(buffer, i) {
+			lit = (lit << 16) | n;
+			lit_count += 1;
+			i += len;
+
+			match get_char(buffer, i) {
+				Some((']', 1)) => {
+					break
+				},
+				Some((':', 1)) => {
+					i += 1
+				},
+				_ => {
+					return Ok(None); // Invalid IPv6 (unexpected char)
+				}
+			}
+		} else {
+			return Ok(None); // Invalid IPv6 (unexpected char)
+		}
+	}
+
+	i += 1;
+	lit = lit | (lhs << (16 * (8 - lhs_count)));
+	let len = i - offset;
+	Ok(Some((lit, len)))
+}
+
+pub fn parse_ip_literal(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
+	let offset = i;
+	if let Some(('[', 1)) = get_char(buffer, i)? {
+		i += 1;
+		if let Some((_, l)) = parse_ipv6_literal(buffer, i)? {
+			i += l;
+		} else {
+			return Ok(None) // TODO Ipv future
+		}
+
+		if let Some((']', 1)) = get_char(buffer, i)? {
+			i += 1;
+			let len = i - offset;
+			return Ok(Some(len))
+		}
+	}
+
+	Ok(None)
+}
+
+pub fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
+	let offset = i;
+	loop {
+		match get_char(buffer, i)? {
+			Some(('%', 1)) => {
+				if let Some(len) = parse_pct_encoded(buffer, i)? {
+					i += len
+				} else {
+					break
+				}
+			},
+			Some((c, len)) if is_subdelim(c) || is_unreserved(c) => {
+				i += len
+			},
+			_ => break
+		}
+	}
+
+	let len = i - offset;
+
+	if len > 0 {
+		Ok(Some(len))
+	} else {
+		Ok(None)
+	}
+}
+
+pub fn parse_host(buffer: &[u8], i: usize) -> Result<usize, Error> {
+	if let Some(len) = parse_ip_literal(buffer, i) {
+		Ok(len)
+	} else if let Some(len) = parse_ipv4_literal(buffer, i) {
+		Ok(len)
+	} else {
+		parse_ireg_name(buffer, i)
+	}
+}
+
+pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+	let offset = i;
+	loop {
+		match get_char(buffer, i)? {
+			Some((c, 1)) => {
+				if let Some(d) = c.to_digit(10) {
+					i += len
+				} else {
+					break
+				}
+			},
+			_ => break
+		}
+	}
+
+	let len = i - offset;
+
+	if len > 0 {
+		Ok(Some(len))
+	} else {
+		Ok(None)
+	}
 }
 
 /// Parse the IRI authority.
-pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<(usize, usize, usize, usize), Error> {
+pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<Authority, Error> {
 	let offset = i;
-	let mut userinfo_len = 0;
-	let mut host_offset = i;
-	let mut host_len;
-	let mut port_len = 0;
+	let mut userinfo_len = None;
+	let mut host_len = None;
+	let mut port_len;
 
 	if let Some(len) = parse_userinfo(buffer, i)? {
-		userinfo_len = len;
-		host_offset = len + 1;
-		i += host_offset
+		userinfo_len = Some(len);
+		i += len + 1;
 	}
 
-	host_len = parse_host(buffer, i)?;
-	port_len = match get_char(buffer, i + host_len)? {
-		Some((':', 1)) => parse_port(buffer, i + host_len + 1)?,
-		_ => 0
+	if let Some(len) = parse_host(buffer, i)? {
+		host_len = Some(len);
+		i += len;
+	}
+
+	port_len = match get_char(buffer, i)? {
+		Some((':', 1)) => {
+			i += 1;
+			if let Some(len) = parse_port(buffer, i)? {
+				i += len;
+				Some(len)
+			} else {
+				Some(0)
+			}
+		},
+		_ => None
 	}
 
 	Ok(Authority {
-		offset, userinfo_len, host_offset, host_len, port_len
+		offset, userinfo_len, host_len, port_len
 	})
 }
 
