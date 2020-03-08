@@ -19,13 +19,13 @@ pub enum Error {
 pub struct ParsedAuthority {
 	pub offset: usize,
 	pub userinfo_len: Option<usize>,
-	pub host_len: Option<usize>,
+	pub host_len: usize,
 	pub port_len: Option<usize>
 }
 
 impl ParsedAuthority {
 	pub fn is_empty(&self) -> bool {
-		self.userinfo_len.is_none() && self.host_len.is_none() && self.port_len.is_none()
+		self.userinfo_len.is_none() && self.host_len == 0 && self.port_len.is_none()
 	}
 
 	pub fn len(&self) -> usize {
@@ -35,9 +35,7 @@ impl ParsedAuthority {
 			len += l + 1;
 		}
 
-		if let Some(l) = self.host_len {
-			len += l;
-		}
+		len += self.host_len;
 
 		if let Some(l) = self.port_len {
 			len += 1 + l;
@@ -63,9 +61,7 @@ impl ParsedAuthority {
 			offset += l + 1;
 		}
 
-		if let Some(l) = self.host_len {
-			offset += l;
-		}
+		offset += self.host_len;
 
 		if let Some(_) = self.port_len {
 			offset += 1;
@@ -91,7 +87,7 @@ impl ParsedIri {
 		let mut authority = ParsedAuthority {
 			offset: 0,
 			userinfo_len: None,
-			host_len: None,
+			host_len: 0,
 			port_len: None
 		};
 		let path_len;
@@ -292,12 +288,14 @@ fn parse_pct_encoded(buffer: &[u8], i: usize) -> Result<Option<usize>, Error> {
 	}
 }
 
-fn parse_userinfo(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
+pub fn parse_userinfo(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+	let offset = i;
+
 	loop {
 		match get_char(buffer, i)? {
-			Some(('@', 1)) => {
-				return Ok(Some(i))
-			},
+			// Some(('@', 1)) => {
+			// 	return Ok(Some(i))
+			// },
 			Some(('%', 1)) => {
 				if let Some(len) = parse_pct_encoded(buffer, i)? {
 					i += len
@@ -312,7 +310,7 @@ fn parse_userinfo(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
 		}
 	}
 
-	Ok(None)
+	Ok(i - offset)
 }
 
 pub fn parse_query(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
@@ -547,7 +545,7 @@ fn parse_ip_literal(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error>
 	Ok(None)
 }
 
-fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
+fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 	loop {
 		match get_char(buffer, i)? {
@@ -565,26 +563,20 @@ fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> 
 		}
 	}
 
-	let len = i - offset;
-
-	if len > 0 {
-		Ok(Some(len))
-	} else {
-		Ok(None)
-	}
+	Ok(i - offset)
 }
 
-fn parse_host(buffer: &[u8], i: usize) -> Result<Option<usize>, Error> {
+pub fn parse_host(buffer: &[u8], i: usize) -> Result<usize, Error> {
 	if let Some(len) = parse_ip_literal(buffer, i)? {
-		Ok(Some(len))
+		Ok(len)
 	} else if let Some((_, len)) = parse_ipv4_literal(buffer, i)? {
-		Ok(Some(len))
+		Ok(len)
 	} else {
 		parse_ireg_name(buffer, i)
 	}
 }
 
-fn parse_port(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
+pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 	loop {
 		match get_char(buffer, i)? {
@@ -599,41 +591,29 @@ fn parse_port(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
 		}
 	}
 
-	let len = i - offset;
-
-	if len > 0 {
-		Ok(Some(len))
-	} else {
-		Ok(None)
-	}
+	Ok(i - offset)
 }
 
 /// Parse the IRI authority.
 pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error> {
 	let offset = i;
 	let mut userinfo_len = None;
-	let mut host_len = None;
+	let mut host_len;
 	let port_len;
 
-	if let Some(len) = parse_userinfo(buffer, i)? {
-		userinfo_len = Some(len);
-		i += len + 1;
+	let userinfo_tmp_len = parse_userinfo(buffer, i)?;
+	if let Some(('@', 1)) = get_char(buffer, i + userinfo_tmp_len)? {
+		userinfo_len = Some(userinfo_tmp_len);
+		i += userinfo_tmp_len + 1;
 	}
 
-	if let Some(len) = parse_host(buffer, i)? {
-		host_len = Some(len);
-		i += len;
-	}
+	host_len = parse_host(buffer, i)?;
+	i += host_len;
 
 	port_len = match get_char(buffer, i)? {
 		Some((':', 1)) => {
 			i += 1;
-			if let Some(len) = parse_port(buffer, i)? {
-				// i += len;
-				Some(len)
-			} else {
-				Some(0)
-			}
+			Some(parse_port(buffer, i)?)
 		},
 		_ => None
 	};

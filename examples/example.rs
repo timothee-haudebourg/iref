@@ -15,7 +15,7 @@ fn main() -> Result<(), iri::Error> {
 
 	println!("IRI: {}", iri.as_str());
 	println!("scheme: {}", iri.scheme());
-	println!("authority: {}", iri.authority().unwrap());
+	println!("authority: {}", iri.authority());
 	println!("path: {}", iri.path().unwrap());
 	println!("query: {}", iri.query().unwrap());
 	println!("fragment: {}", iri.fragment().unwrap());
@@ -24,13 +24,15 @@ fn main() -> Result<(), iri::Error> {
 
 	iri.set_scheme("scheme")?;
 	iri.set_authority("haudebourg.net")?;
+	iri.authority_mut().set_userinfo(None);
+	iri.authority_mut().set_port(Some("42"));
 	iri.set_path("/1/2")?;
 	iri.set_query(Some("foo=bar&hello=world"))?;
 	iri.set_fragment(Some("ninja"));
 
 	println!("IRI: {}", iri.as_str());
 	println!("scheme: {}", iri.scheme());
-	println!("authority: {}", iri.authority().unwrap());
+	println!("authority: {} (host: {})", iri.authority(), iri.authority().host());
 	println!("path: {}", iri.path().unwrap());
 	println!("query: {}", iri.query().unwrap());
 	println!("fragment: {}", iri.fragment().unwrap());
