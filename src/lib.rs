@@ -1,4 +1,5 @@
 mod utf8;
+pub mod parsing;
 mod iri;
 
-pub use iri::*;
+pub use crate::iri::*;
