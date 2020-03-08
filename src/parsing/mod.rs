@@ -1,4 +1,4 @@
-use crate::utf8;
+mod utf8;
 
 use std::{fmt, cmp};
 use log::*;
@@ -15,6 +15,7 @@ pub enum Error {
 	InvalidPCTEncoded
 }
 
+#[derive(Clone, Copy)]
 pub struct ParsedAuthority {
 	pub offset: usize,
 	pub userinfo_len: Option<usize>,
@@ -74,6 +75,7 @@ impl ParsedAuthority {
 	}
 }
 
+#[derive(Clone, Copy)]
 pub struct ParsedIri {
 	pub scheme_len: usize,
 	pub authority: ParsedAuthority,
@@ -153,6 +155,24 @@ impl ParsedIri {
 		})
 	}
 
+	pub fn len(&self) -> usize {
+		let mut offset = self.authority.offset + self.authority.len() + self.path_len;
+
+		if let Some(len) = self.query_len {
+			offset += 1 + len;
+		}
+
+		if let Some(len) = self.fragment_len {
+			offset += 1 + len;
+		}
+
+		offset
+	}
+
+	pub fn path_offset(&self) -> usize {
+		self.authority.offset + self.authority.len()
+	}
+
 	pub fn query_offset(&self) -> usize {
 		let mut offset = self.authority.offset + self.authority.len() + self.path_len;
 
@@ -178,7 +198,7 @@ impl ParsedIri {
 	}
 }
 
-fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error> {
+pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error> {
 	match utf8::get_char(buffer, i) {
 		Ok(None) => Ok(None),
 		Ok(Some((c, len))) => Ok(Some((c, len as usize))),
@@ -200,7 +220,7 @@ fn expect(buffer: &[u8], c: char, i: usize) -> Result<(), Error> {
 }
 
 /// Parse the IRI scheme.
-fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+pub fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	loop {
 		match get_char(buffer, i)? {
 			Some((c, len)) if (i == 0 && c.is_alphabetic()) || (i > 0 && (c.is_alphanumeric() || c == '+' || c == '-' || c == '.')) => {
@@ -295,7 +315,7 @@ fn parse_userinfo(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
 	Ok(None)
 }
 
-fn parse_query(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+pub fn parse_query(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 
 	loop {
@@ -589,7 +609,7 @@ fn parse_port(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
 }
 
 /// Parse the IRI authority.
-fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error> {
+pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error> {
 	let offset = i;
 	let mut userinfo_len = None;
 	let mut host_len = None;
@@ -624,7 +644,7 @@ fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error
 }
 
 /// Parse IRI path.
-fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+pub fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let start = i;
 	let mut absolute = false;
 
