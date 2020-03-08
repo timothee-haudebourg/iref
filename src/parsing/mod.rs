@@ -337,7 +337,7 @@ pub fn parse_query(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	Ok(i - offset)
 }
 
-fn parse_fragment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+pub fn parse_fragment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 
 	loop {

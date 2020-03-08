@@ -20,12 +20,13 @@ fn main() -> Result<(), iri::Error> {
 	println!("query: {}", iri.query().unwrap());
 	println!("fragment: {}", iri.fragment().unwrap());
 
-	let mut iri = IriBuf::new("https://www.rust-lang.org/foo/bar?query#frag")?;
+	let mut iri = IriBuf::new("https://www.rust-lang.org/foo/bar")?;
 
-	iri.set_scheme("scheme");
-	iri.set_authority("haudebourg.net");
-	iri.set_path("/1/2");
-	iri.set_query(Some("foo=bar&hello=world"));
+	iri.set_scheme("scheme")?;
+	iri.set_authority("haudebourg.net")?;
+	iri.set_path("/1/2")?;
+	iri.set_query(Some("foo=bar&hello=world"))?;
+	iri.set_fragment(Some("ninja"));
 
 	println!("IRI: {}", iri.as_str());
 	println!("scheme: {}", iri.scheme());

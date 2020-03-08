@@ -200,7 +200,6 @@ impl IriBuf {
 			let new_end = range.start + content.len();
 
 			if range_len > content.len() { // shrink
-				debug!("shrink");
 				for i in 0..tail_len {
 					self.data[new_end + i] = self.data[range.end + i];
 				}
@@ -212,7 +211,6 @@ impl IriBuf {
 					self.p.authority.offset -= delta;
 				}
 			} else { // grow
-				debug!("grow");
 				let tail_len = self.data.len() - range.end;
 
 				self.data.resize(new_end + tail_len, 0);
@@ -315,7 +313,7 @@ impl IriBuf {
 		}
 	}
 
-	pub fn set_query<S: AsRef<[u8]> + ?Sized>(&mut self, query: Option<&S>) -> Result<(), Error> {
+	pub fn set_raw_query<S: AsRef<[u8]> + ?Sized>(&mut self, query: Option<&S>) -> Result<(), Error> {
 		let offset = self.p.query_offset();
 
 		if query.is_none() || query.unwrap().as_ref().is_empty() {
@@ -334,18 +332,18 @@ impl IriBuf {
 			if let Some(query_len) = self.p.query_len {
 				self.replace(offset..(offset+query_len), new_query);
 			} else {
-				if let Some(0x3f) = self.data.get(offset-1) {
-					self.replace(offset..offset, new_query);
-				} else {
-					self.replace(offset..offset, &[0x3f]);
-					self.replace((offset+1)..(offset+1), new_query);
-				}
+				self.replace(offset..offset, &[0x3f]);
+				self.replace((offset+1)..(offset+1), new_query);
 			}
 
 			self.p.query_len = Some(new_query_len);
 		}
 
 		Ok(())
+	}
+
+	pub fn set_query(&mut self, query: Option<&str>) -> Result<(), Error> {
+		self.set_raw_query(query)
 	}
 
 	pub fn fragment(&self) -> Option<&str> {
@@ -361,5 +359,38 @@ impl IriBuf {
 		} else {
 			None
 		}
+	}
+
+	pub fn set_raw_fragment<S: AsRef<[u8]> + ?Sized>(&mut self, fragment: Option<&S>) -> Result<(), Error> {
+		let offset = self.p.fragment_offset();
+
+		if fragment.is_none() || fragment.unwrap().as_ref().is_empty() {
+			if let Some(fragment_len) = self.p.fragment_len {
+				self.replace((offset-1)..(offset+fragment_len), &[]);
+			}
+
+			self.p.fragment_len = None;
+		} else {
+			let new_fragment = fragment.unwrap().as_ref();
+			let mut new_fragment_len = parsing::parse_fragment(new_fragment, 0)?;
+			if new_fragment_len != new_fragment.len() {
+				return Err(Error::Invalid);
+			}
+
+			if let Some(fragment_len) = self.p.fragment_len {
+				self.replace(offset..(offset+fragment_len), new_fragment);
+			} else {
+				self.replace(offset..offset, &[0x23]);
+				self.replace((offset+1)..(offset+1), new_fragment);
+			}
+
+			self.p.fragment_len = Some(new_fragment_len);
+		}
+
+		Ok(())
+	}
+
+	pub fn set_fragment(&mut self, fragment: Option<&str>) -> Result<(), Error> {
+		self.set_raw_fragment(fragment)
 	}
 }
