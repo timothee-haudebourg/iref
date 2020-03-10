@@ -8,4 +8,7 @@ edition = "2018"
 
 [dependencies]
 log = "*"
+pct-str = "*"
+
+[dev-dependencies]
 stderrlog = "*"
