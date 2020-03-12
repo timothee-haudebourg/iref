@@ -301,3 +301,34 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::{Iri, IriBuf};
+
+	#[test]
+	fn explicit_empty_with_authority_alike_path() {
+		let iri = Iri::new("scheme:////").unwrap();
+		let authority = iri.authority();
+
+		assert!(authority.is_empty());
+		assert!(authority.is_explicit());
+	}
+
+	#[test]
+	fn make_implicit() {
+		let mut iri = IriBuf::new("scheme:///path").unwrap();
+		let mut authority = iri.authority_mut();
+
+		assert!(authority.make_implicit());
+		assert_eq!(iri.as_str(), "scheme:/path");
+	}
+
+	#[test]
+	fn make_implicit_edge_case() {
+		let mut iri = IriBuf::new("scheme:////").unwrap();
+		let mut authority = iri.authority_mut();
+
+		assert!(!authority.make_implicit());
+	}
+}
