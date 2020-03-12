@@ -1,7 +1,12 @@
+use std::ops::Range;
+use pct_str::PctStr;
+use crate::parsing::{self, ParsedIri};
+use super::{Iri, Error, Authority, AuthorityMut, Path, PathMut};
+
 /// Owned IRI.
 pub struct IriBuf {
-	p: ParsedIri,
-	data: Vec<u8>,
+	pub(crate) p: ParsedIri,
+	pub(crate) data: Vec<u8>,
 }
 
 impl IriBuf {
@@ -128,20 +133,22 @@ impl IriBuf {
 		Ok(())
 	}
 
-	pub fn path(&self) -> Option<&str> {
-		if self.p.path_len > 0 {
-			unsafe {
-				let offset = self.p.authority.offset + self.p.authority.len();
-				Some(std::str::from_utf8_unchecked(&self.data[offset..(offset+self.p.path_len)]))
-			}
-		} else {
-			None
+	pub fn path<'a>(&'a self) -> Path<'a> {
+		let offset = self.p.authority.offset + self.p.authority.len();
+		Path {
+			data: &self.data[offset..(offset+self.p.path_len)]
+		}
+	}
+
+	pub fn path_mut<'a>(&'a mut self) -> PathMut<'a> {
+		PathMut {
+			buffer: self
 		}
 	}
 
 	pub fn set_path<S: AsRef<[u8]> + ?Sized>(&mut self, path: &S) -> Result<(), Error> {
 		let new_path = path.as_ref();
-		let mut new_path_len = parsing::parse_path(new_path, 0)?;
+		let new_path_len = parsing::parse_path(new_path, 0)?;
 		if new_path_len != new_path.len() {
 			return Err(Error::Invalid);
 		}
@@ -177,7 +184,7 @@ impl IriBuf {
 			self.p.query_len = None;
 		} else {
 			let new_query = query.unwrap().as_ref();
-			let mut new_query_len = parsing::parse_query(new_query, 0)?;
+			let new_query_len = parsing::parse_query(new_query, 0)?;
 			if new_query_len != new_query.len() {
 				return Err(Error::Invalid);
 			}
@@ -225,7 +232,7 @@ impl IriBuf {
 			self.p.fragment_len = None;
 		} else {
 			let new_fragment = fragment.unwrap().as_ref();
-			let mut new_fragment_len = parsing::parse_fragment(new_fragment, 0)?;
+			let new_fragment_len = parsing::parse_fragment(new_fragment, 0)?;
 			if new_fragment_len != new_fragment.len() {
 				return Err(Error::Invalid);
 			}

@@ -1,4 +1,4 @@
-#[macro_use]
+// #[macro_use]
 extern crate log;
 extern crate stderrlog;
 
@@ -12,8 +12,8 @@ fn test1() {
 	let iri = Iri::new(buffer).expect("parsing failed");
 
 	assert_eq!(iri.scheme(), "https");
-	assert_eq!(iri.authority().expect("no authority"), "www.rust-lang.org");
-	assert_eq!(iri.path(), Some("/foo/bar"));
+	assert_eq!(iri.authority(), "www.rust-lang.org");
+	assert_eq!(iri.path(), "/foo/bar");
 }
 
 #[test]
@@ -22,8 +22,8 @@ fn test2() {
 	let iri = Iri::new(buffer).expect("parsing failed");
 
 	assert_eq!(iri.scheme(), "https");
-	assert_eq!(iri.authority().expect("no authority"), "[::]");
-	assert_eq!(iri.path(), Some("/foo/bar"));
+	assert_eq!(iri.authority(), "[::]");
+	assert_eq!(iri.path(), "/foo/bar");
 }
 
 #[test]
@@ -32,15 +32,15 @@ fn test3() {
 	let iri = Iri::new(buffer).expect("parsing failed");
 
 	assert_eq!(iri.scheme(), "https");
-	assert_eq!(iri.authority().expect("no authority"), "[::192.128.0.1]");
-	assert_eq!(iri.path(), Some("/foo/bar"));
+	assert_eq!(iri.authority(), "[::192.128.0.1]");
+	assert_eq!(iri.path(), "/foo/bar");
 }
 
 #[test]
 #[should_panic]
 fn test4() {
 	let buffer = "https://[::256.128.0.1]/foo/bar#frag"; // 256.128.0.1 is not a valid IPv4
-	let iri = Iri::new(buffer).expect("parsing failed");
+	Iri::new(buffer).expect("parsing failed");
 }
 
 #[test]
@@ -49,8 +49,8 @@ fn test5() {
 	let iri = Iri::new(buffer).expect("parsing failed");
 
 	assert_eq!(iri.scheme(), "https");
-	assert!(iri.authority().is_none());
-	assert_eq!(iri.path(), Some("/foo/bar"));
+	assert!(iri.authority().is_empty());
+	assert_eq!(iri.path(), "/foo/bar");
 }
 
 #[test]
@@ -59,8 +59,8 @@ fn test6() {
 	let iri = Iri::new(buffer).expect("parsing failed");
 
 	assert_eq!(iri.scheme(), "https");
-	assert!(iri.authority().is_none());
-	assert_eq!(iri.path(), Some("/foo/bar"));
+	assert!(iri.authority().is_empty());
+	assert_eq!(iri.path(), "/foo/bar");
 }
 
 #[test]
@@ -69,6 +69,6 @@ fn test7() {
 	let iri = Iri::new(buffer).expect("parsing failed");
 
 	assert_eq!(iri.scheme(), "https");
-	assert!(iri.authority().is_none());
-	assert_eq!(iri.path(), Some("foo/bar"));
+	assert!(iri.authority().is_empty());
+	assert_eq!(iri.path(), "foo/bar");
 }

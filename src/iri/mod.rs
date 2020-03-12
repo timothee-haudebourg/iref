@@ -1,10 +1,17 @@
-use crate::parsing::{self, ParsedIri, ParsedAuthority};
+mod authority;
+mod path;
+mod buffer;
 
 use std::{fmt, cmp};
 use std::hash::{Hash, Hasher};
-use std::ops::Range;
-use log::*;
+// use log::*;
 use pct_str::PctStr;
+
+use crate::parsing::ParsedIri;
+
+pub use self::authority::*;
+pub use self::path::*;
+pub use self::buffer::*;
 
 pub type Error = crate::parsing::Error;
 
@@ -56,14 +63,6 @@ impl<'a> Iri<'a> {
 	}
 
 	pub fn path(&self) -> Path<'a> {
-		// if self.p.path_len > 0 {
-		// 	unsafe {
-		// 		let offset = self.p.authority.offset + self.p.authority.len();
-		// 		Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+self.p.path_len)])))
-		// 	}
-		// } else {
-		// 	None
-		// }
 		let offset = self.p.authority.offset + self.p.authority.len();
 		Path {
 			data: &self.data[offset..(offset+self.p.path_len)]

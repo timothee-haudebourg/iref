@@ -1,6 +1,5 @@
 mod utf8;
 
-use std::{fmt, cmp};
 use log::*;
 
 #[derive(Debug)]
@@ -102,26 +101,22 @@ impl ParsedIri {
 						authority.offset = scheme_len + 3;
 						authority = parse_authority(buffer, authority.offset)?;
 						let authority_end = authority.offset + authority.len();
-						let path_end = if let Some(('/', 1)) = get_char(buffer, authority_end)? {
+						// path must be absolute.
+						path_len = if let Some(('/', 1)) = get_char(buffer, authority_end)? {
 							parse_path(buffer, authority_end)?
 						} else {
-							authority_end
+							0
 						};
-
-						// let authority_len = authority_end - authority.offset;
-						path_len = path_end - authority_end;
 					},
 					_ => {
 						authority.offset = scheme_len + 1;
-						let path_end = parse_path(buffer, authority.offset)?;
-						path_len = path_end - authority.offset;
+						path_len = parse_path(buffer, authority.offset)?;
 					}
 				}
 			},
 			_ => {
 				authority.offset = scheme_len + 1;
-				let path_end = parse_path(buffer, authority.offset)?;
-				path_len = path_end - authority.offset;
+				path_len = parse_path(buffer, authority.offset)?;
 			}
 		}
 
@@ -598,7 +593,7 @@ pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error> {
 	let offset = i;
 	let mut userinfo_len = None;
-	let mut host_len;
+	let host_len;
 	let port_len;
 
 	let userinfo_tmp_len = parse_userinfo(buffer, i)?;
@@ -626,25 +621,31 @@ pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, E
 /// Parse IRI path.
 pub fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let start = i;
-	let mut absolute = false;
 
 	loop {
 		match get_char(buffer, i)? {
 			None | Some(('?', _)) | Some(('#', _)) => break,
-			Some(('/', len)) if i == start => {
-				if absolute {
-					return Err(Error::InvalidPath);
-				} else {
-					absolute = true;
-				}
-
-				i += len
-			},
 			Some((_, len)) => {
 				i += len
 			}
 		}
 	}
 
-	Ok(i)
+	Ok(i - start)
+}
+
+/// Parse IRI path component.
+pub fn parse_path_component(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+	let start = i;
+
+	loop {
+		match get_char(buffer, i)? {
+			None | Some(('?', _)) | Some(('#', _)) | Some(('/', _)) => break,
+			Some((_, len)) => {
+				i += len
+			}
+		}
+	}
+
+	Ok(i - start)
 }

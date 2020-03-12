@@ -1,6 +1,19 @@
+use std::{fmt, cmp};
+use std::hash::{Hash, Hasher};
+use pct_str::PctStr;
+
+use crate::parsing::{self, ParsedAuthority};
+use super::{Error, IriBuf};
+
 pub struct Authority<'a> {
-	data: &'a [u8],
-	authority: &'a ParsedAuthority
+	/// IRI data.
+	///
+	/// Note that this not only includes the authority slice,
+	/// but the whole IRI slice.
+	pub(crate) data: &'a [u8],
+
+	/// Authority positions.
+	pub(crate) authority: &'a ParsedAuthority
 }
 
 impl<'a> Hash for Authority<'a> {
@@ -12,6 +25,15 @@ impl<'a> Hash for Authority<'a> {
 }
 
 impl<'a> Authority<'a> {
+	/// Checks if the authority is empty.
+	///
+	/// It is empty if it has no user info, an empty host string, and no port.
+	/// Note that empty user info or port is different from no user info and port.
+	/// For instance, the authorities `@`, `:` and `@:` are not empty.
+	pub fn is_empty(&self) -> bool {
+		self.authority.userinfo_len.is_none() && self.authority.host_len == 0 && self.authority.port_len.is_none()
+	}
+
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			let offset = self.authority.offset;
@@ -52,6 +74,22 @@ impl<'a> Authority<'a> {
 			None
 		}
 	}
+
+	/// Checks if there is an explicit authority delimiter `//` in the IRI.
+	#[inline]
+	pub fn is_explicit(&self) -> bool {
+		if self.authority.offset >= 2 {
+			let end = self.authority.offset;
+			let start = end - 2;
+			&self.data[start..end] == &[0x2f, 0x2f]
+		} else {
+			false
+		}
+	}
+
+	pub fn is_implicit(&self) -> bool {
+		!self.is_explicit()
+	}
 }
 
 impl<'a> fmt::Display for Authority<'a> {
@@ -81,10 +119,14 @@ impl<'a> cmp::PartialEq<&'a str> for Authority<'a> {
 }
 
 pub struct AuthorityMut<'a> {
-	buffer: &'a mut IriBuf
+	pub(crate) buffer: &'a mut IriBuf
 }
 
 impl<'a> AuthorityMut<'a> {
+	pub fn is_empty(&self) -> bool {
+		self.buffer.authority().is_empty()
+	}
+
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			let offset = self.buffer.p.authority.offset;
@@ -120,9 +162,11 @@ impl<'a> AuthorityMut<'a> {
 			}
 
 			self.authority_mut().userinfo_len = None;
+			// Make the authority part implicit, if we can.
+			self.make_implicit();
 		} else {
 			let new_userinfo = userinfo.unwrap().as_ref();
-			let mut new_userinfo_len = parsing::parse_userinfo(new_userinfo, 0)?;
+			let new_userinfo_len = parsing::parse_userinfo(new_userinfo, 0)?;
 			if new_userinfo_len != new_userinfo.len() {
 				return Err(Error::Invalid);
 			}
@@ -155,13 +199,18 @@ impl<'a> AuthorityMut<'a> {
 	pub fn set_host<S: AsRef<[u8]> + ?Sized>(&mut self, host: &S) -> Result<(), Error> {
 		let offset = self.authority().host_offset();
 		let new_host = host.as_ref();
-		let mut new_host_len = parsing::parse_host(new_host, 0)?;
+		let new_host_len = parsing::parse_host(new_host, 0)?;
 		if new_host_len != new_host.len() {
 			return Err(Error::Invalid);
 		}
 
 		self.buffer.replace(offset..(offset+self.authority().host_len), new_host);
 		self.authority_mut().host_len = new_host_len;
+
+		if new_host_len == 0 {
+			// Make the authority part implicit, if we can.
+			self.make_implicit();
+		}
 
 		Ok(())
 	}
@@ -186,9 +235,11 @@ impl<'a> AuthorityMut<'a> {
 			}
 
 			self.authority_mut().port_len = None;
+			// Make the authority part implicit, if we can.
+			self.make_implicit();
 		} else {
 			let new_port = port.unwrap().as_ref();
-			let mut new_port_len = parsing::parse_port(new_port, 0)?;
+			let new_port_len = parsing::parse_port(new_port, 0)?;
 			if new_port_len != new_port.len() {
 				return Err(Error::Invalid);
 			}
@@ -208,5 +259,45 @@ impl<'a> AuthorityMut<'a> {
 
 	pub fn set_port(&mut self, port: Option<&str>) -> Result<(), Error> {
 		self.set_raw_port(port)
+	}
+
+	/// Checks if there is an explicit authority delimiter `//` in the IRI.
+	pub fn is_explicit(&self) -> bool {
+		self.buffer.authority().is_explicit()
+	}
+
+	pub fn is_implicit(&self) -> bool {
+		self.buffer.authority().is_implicit()
+	}
+
+	/// Make sure there is an explicit authority delimiter `//` in the IRI.
+	pub fn make_explicit(&mut self) {
+		if !self.is_explicit() {
+			let offset = self.buffer.p.scheme_len + 1;
+			self.buffer.replace(offset..offset, &[0x2f, 0x2f]);
+			self.buffer.p.authority.offset += 2;
+		}
+	}
+
+	/// If possible, remove the authority delimiter `//`.
+	///
+	/// It has no effect if the authority is not empty,
+	/// or if the path starts with `//`.
+	/// Returns `true` if the authority is implicit after the method call,
+	/// `false` otherwise.
+	pub fn make_implicit(&mut self) -> bool {
+		if self.is_explicit() {
+			if self.is_empty() && !self.buffer.path().is_authority_alike() {
+				let start = self.buffer.p.scheme_len + 1;
+				let end = start + 2;
+				self.buffer.replace(start..end, &[]);
+				self.buffer.p.authority.offset -= 2;
+				true
+			} else {
+				false
+			}
+		} else {
+			true
+		}
 	}
 }
