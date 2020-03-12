@@ -71,18 +71,18 @@ impl ParsedAuthority {
 }
 
 #[derive(Clone, Copy)]
-pub struct ParsedIri {
-	pub scheme_len: usize,
+pub struct ParsedIriRef {
+	pub scheme_len: Option<usize>,
 	pub authority: ParsedAuthority,
 	pub path_len: usize,
 	pub query_len: Option<usize>,
 	pub fragment_len: Option<usize>
 }
 
-impl ParsedIri {
-	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<ParsedIri, Error> {
+impl ParsedIriRef {
+	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<ParsedIriRef, Error> {
 		let buffer = buffer.as_ref();
-		let scheme_len = parse_scheme(buffer, 0)?;
+		let mut scheme_len = None;
 		let mut authority = ParsedAuthority {
 			offset: 0,
 			userinfo_len: None,
@@ -92,13 +92,24 @@ impl ParsedIri {
 		let path_len;
 		let mut query_len = None;
 		let mut fragment_len = None;
-		expect(buffer, ':', scheme_len)?;
 
-		match get_char(buffer, scheme_len + 1)? {
+		let scheme_len_tmp = parse_scheme(buffer, 0)?;
+		let scheme_end = if let Some((':', 1)) = get_char(buffer, scheme_len_tmp)? {
+			if scheme_len_tmp == 0 {
+				return Err(Error::Invalid)
+			}
+
+			scheme_len = Some(scheme_len_tmp);
+			scheme_len_tmp + 1
+		} else {
+			0
+		};
+
+		match get_char(buffer, scheme_end)? {
 			Some(('/', 1)) => {
-				match get_char(buffer, scheme_len + 2)? {
+				match get_char(buffer, scheme_end + 1)? {
 					Some(('/', 1)) => {
-						authority.offset = scheme_len + 3;
+						authority.offset = scheme_end + 2;
 						authority = parse_authority(buffer, authority.offset)?;
 						let authority_end = authority.offset + authority.len();
 						// path must be absolute.
@@ -109,13 +120,13 @@ impl ParsedIri {
 						};
 					},
 					_ => {
-						authority.offset = scheme_len + 1;
+						authority.offset = scheme_end;
 						path_len = parse_path(buffer, authority.offset)?;
 					}
 				}
 			},
 			_ => {
-				authority.offset = scheme_len + 1;
+				authority.offset = scheme_end;
 				path_len = parse_path(buffer, authority.offset)?;
 			}
 		}
@@ -141,7 +152,7 @@ impl ParsedIri {
 			None => (),
 		}
 
-		Ok(ParsedIri {
+		Ok(ParsedIriRef {
 			scheme_len, authority, path_len, query_len, fragment_len
 		})
 	}
@@ -194,19 +205,6 @@ pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error>
 		Ok(None) => Ok(None),
 		Ok(Some((c, len))) => Ok(Some((c, len as usize))),
 		Err(_) => Err(Error::InvalidEncoding)
-	}
-}
-
-fn expect(buffer: &[u8], c: char, i: usize) -> Result<(), Error> {
-	match get_char(buffer, i)? {
-		Some((found_c, 1)) => {
-			if found_c == c {
-				Ok(())
-			} else {
-				Err(Error::Invalid)
-			}
-		},
-		_ => Err(Error::Invalid)
 	}
 }
 

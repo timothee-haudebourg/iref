@@ -1,8 +1,8 @@
 use std::{fmt, cmp};
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
-use crate::parsing;
-use super::{Error, IriBuf};
+use crate::{parsing, IriRefBuf};
+use super::Error;
 
 pub struct Path<'a> {
 	/// The path slice.
@@ -157,7 +157,7 @@ impl<'a> Hash for Path<'a> {
 }
 
 pub struct PathMut<'a> {
-	pub(crate) buffer: &'a mut IriBuf
+	pub(crate) buffer: &'a mut IriRefBuf
 }
 
 impl<'a> PathMut<'a> {
