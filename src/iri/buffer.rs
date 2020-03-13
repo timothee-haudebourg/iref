@@ -43,7 +43,7 @@ impl IriBuf {
 		self.0.set_authority(authority)
 	}
 
-	pub fn path_mut<'a>(&'a mut self) -> PathMut<'a> {
+	pub fn path_mut(&mut self) -> PathMut {
 		self.0.path_mut()
 	}
 

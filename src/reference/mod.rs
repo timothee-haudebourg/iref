@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 
 use crate::parsing::ParsedIriRef;
-use crate::{Authority, Path, Error, Iri};
+use crate::{Scheme, Authority, Path, Query, Fragment, Error, Iri};
 
 pub use self::buffer::*;
 
@@ -44,97 +44,95 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
-	pub fn scheme(&self) -> Option<&PctStr> {
+	pub fn scheme(&self) -> Option<Scheme> {
 		if let Some(scheme_len) = self.p.scheme_len {
-			if scheme_len > 0 {
-				unsafe {
-					Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[0..scheme_len])))
-				}
-			} else {
-				None
-			}
+			Some(Scheme {
+				data: &self.data[0..scheme_len]
+			})
 		} else {
 			None
 		}
 	}
 
-	pub fn authority(&'a self) -> Authority<'a> {
+	pub fn authority(&self) -> Authority {
 		Authority {
 			data: &self.data[self.p.authority.offset..(self.p.authority.offset+self.p.authority.len())],
 			p: self.p.authority
 		}
 	}
 
-	pub fn path(&self) -> Path<'a> {
+	pub fn path(&self) -> Path {
 		let offset = self.p.authority.offset + self.p.authority.len();
 		Path {
 			data: &self.data[offset..(offset+self.p.path_len)]
 		}
 	}
 
-	pub fn query(&self) -> Option<&PctStr> {
+	pub fn query(&self) -> Option<Query> {
 		if let Some(len) = self.p.query_len {
-			if len > 0 {
-				unsafe {
-					let offset = self.p.query_offset();
-					Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
-				}
-			} else {
-				None
-			}
+			let offset = self.p.query_offset();
+			Some(Query {
+				data: &self.data[offset..(offset+len)]
+			})
 		} else {
 			None
 		}
 	}
 
-	pub fn fragment(&self) -> Option<&PctStr> {
+	pub fn fragment(&self) -> Option<Fragment> {
 		if let Some(len) = self.p.fragment_len {
-			if len > 0 {
-				unsafe {
-					let offset = self.p.fragment_offset();
-					Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
-				}
-			} else {
-				None
-			}
+			let offset = self.p.fragment_offset();
+			Some(Fragment {
+				data: &self.data[offset..(offset+len)]
+			})
 		} else {
 			None
 		}
 	}
 
-	// /// Resolve the IRI reference against the given base IRI.
-	// pub fn resolve<'a, Base: Into<Iri<'a>>>(&self, base_iri: Base) -> IriBuf {
-	// 	let base_iri: Iri<'a> = base_iri.into();
-	// 	let mut resolved;
-	//
-	// 	if let Some(scheme) = self.scheme() {
-	// 		resolved = IriBuf::from_scheme(scheme);
-	// 		resolved.set_authority(self.authority()).unwrap();
-	// 		resolved.path_mut().symbolic_append(self.path().components());
-	// 		resolved.set_query(self.query()).unwrap();
-	// 	} else {
-	// 		resolved = IriBuf::from_scheme(base_iri.scheme());
-	// 		if self.authority().is_empty() {
-	// 			if self.path().is_relative() && self.path().is_empty() {
-	// 				resolved.set_path(base_iri.path()).unwrap();
-	// 				if let Some(query) = self.query() {
-	// 					resolved.set_query(query)
-	// 				} else {
-	// 					// ...
-	// 				}
-	// 			} else {
-	// 				// ...
-	// 			}
-	// 			resolved.set_authority(base_iri.authority()).unwrap();
-	// 		} else {
-	// 			resolved.set_authority(self.authority()).unwrap();
-	// 			resolved.path_mut().symbolic_append(self.path().components());
-	// 			resolved.set_raw_query(self.query()).unwrap();
-	// 		}
-	// 	}
-	//
-	// 	resolved.set_raw_fragment(resolved.fragment()).unwrap();
-	// }
+	/// Resolve the IRI reference against the given base IRI.
+	pub fn resolve<'a, Base: Into<Iri<'a>>>(&self, base_iri: Base) -> IriBuf {
+		let base_iri: Iri<'a> = base_iri.into();
+		let mut resolved;
+
+		if let Some(scheme) = self.scheme() {
+			resolved = IriBuf::from_scheme(scheme);
+			resolved.set_authority(self.authority());
+			resolved.path_mut().symbolic_append(self.path());
+			resolved.set_query(self.query());
+		} else {
+			resolved = IriBuf::from_scheme(base_iri.scheme());
+			if self.authority().is_empty() {
+				if self.path().is_relative() && self.path().is_empty() {
+					resolved.set_path(base_iri.path());
+					if let Some(query) = self.query() {
+						resolved.set_query(query);
+					} else {
+						resolved.set_query(base_iri.query());
+					}
+				} else {
+					if self.path.is_absolute() {
+						resolved.path_mut().symbolic_append(self.path());
+					} else {
+						if !base_iri.authority().is_empty() && base_iri.path().is_empty() {
+							resolved.set_path("/".try_into());
+						} else {
+							resolved.set_path(base_iri.path().directory());
+						}
+						resolved.path_mut().symbolic_append(self.path());
+					}
+					resolved.set_query(query);
+				}
+				resolved.set_authority(base_iri.authority());
+			} else {
+				resolved.set_authority(self.authority());
+				resolved.path_mut().symbolic_append(self.path());
+				resolved.set_query(self.query());
+			}
+		}
+
+		resolved.set_fragment(resolved.fragment());
+	}
 }
 
 impl<'a> fmt::Display for IriRef<'a> {

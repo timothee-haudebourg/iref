@@ -70,6 +70,12 @@ impl<'a> cmp::PartialEq for Query<'a> {
 
 impl<'a> Eq for Query<'a> { }
 
+impl<'a> cmp::PartialEq<&'a str> for Query<'a> {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_str() == *other
+	}
+}
+
 impl<'a> Hash for Query<'a> {
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_pct_str().hash(hasher)

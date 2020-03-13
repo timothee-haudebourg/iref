@@ -62,11 +62,8 @@ impl<'a> Path<'a> {
 		!self.is_open()
 	}
 
-	/// Checks if the path starts with `//`.
-	///
-	/// This is used to check if the path part can be confused with the authority part.
-	pub fn is_authority_alike(&self) -> bool {
-		self.data.len() >= 2 && self.data[0] == 0x2f && self.data[1] == 0x2f
+	pub fn directory(&self) -> Path {
+		let last = self.buffer.len();
 	}
 
 	/// Produces an iterator over the components of the IRI path.

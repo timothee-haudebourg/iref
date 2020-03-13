@@ -102,14 +102,14 @@ impl IriRefBuf {
 		self.p.authority = new_parsed_authority
 	}
 
-	pub fn path<'a>(&'a self) -> Path<'a> {
+	pub fn path(&self) -> Path {
 		let offset = self.p.authority.offset + self.p.authority.len();
 		Path {
 			data: &self.data[offset..(offset+self.p.path_len)]
 		}
 	}
 
-	pub fn path_mut<'a>(&'a mut self) -> PathMut<'a> {
+	pub fn path_mut(&mut self) -> PathMut {
 		PathMut {
 			buffer: self
 		}

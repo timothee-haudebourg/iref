@@ -40,7 +40,7 @@ impl<'a> Iri<'a> {
 		&self.0
 	}
 
-	pub fn scheme(&self) -> &PctStr {
+	pub fn scheme(&self) -> Scheme {
 		self.0.scheme().unwrap()
 	}
 }

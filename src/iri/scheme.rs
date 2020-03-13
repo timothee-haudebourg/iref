@@ -63,6 +63,12 @@ impl<'a> cmp::PartialEq for Scheme<'a> {
 
 impl<'a> Eq for Scheme<'a> { }
 
+impl<'a> cmp::PartialEq<&'a str> for Scheme<'a> {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_str() == *other
+	}
+}
+
 impl<'a> Hash for Scheme<'a> {
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_str().hash(hasher)

@@ -70,6 +70,12 @@ impl<'a> cmp::PartialEq for Fragment<'a> {
 
 impl<'a> Eq for Fragment<'a> { }
 
+impl<'a> cmp::PartialEq<&'a str> for Fragment<'a> {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_str() == *other
+	}
+}
+
 impl<'a> Hash for Fragment<'a> {
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_pct_str().hash(hasher)
