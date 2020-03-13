@@ -1,28 +1,9 @@
 mod utf8;
 
 use log::*;
+use super::Error;
 
-#[derive(Debug)]
-pub enum Error {
-	/// The input data is not a valid UTF-8 encoded string.
-	InvalidEncoding,
-
-	Invalid,
-
-	InvalidScheme,
-
-	InvalidAuthority,
-
-	InvalidPath,
-
-	InvalidQuery,
-
-	InvalidFragment,
-
-	InvalidPCTEncoded
-}
-
-#[derive(Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct ParsedAuthority {
 	pub offset: usize,
 	pub userinfo_len: Option<usize>,
@@ -78,7 +59,7 @@ impl ParsedAuthority {
 	}
 }
 
-#[derive(Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct ParsedIriRef {
 	pub scheme_len: Option<usize>,
 	pub authority: ParsedAuthority,
@@ -640,8 +621,8 @@ pub fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	Ok(i - start)
 }
 
-/// Parse IRI path component.
-pub fn parse_path_component(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
+/// Parse IRI path segment.
+pub fn parse_path_segment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let start = i;
 
 	loop {

@@ -1,5 +1,6 @@
 mod scheme;
 mod authority;
+mod segment;
 mod path;
 mod buffer;
 mod query;
@@ -12,12 +13,35 @@ use crate::IriRef;
 
 pub use self::scheme::*;
 pub use self::authority::*;
+pub use self::segment::*;
 pub use self::path::*;
 pub use self::buffer::*;
 pub use self::query::*;
 pub use self::fragment::*;
 
-pub type Error = crate::parsing::Error;
+#[derive(Debug)]
+pub enum Error {
+	/// The input data is not a valid UTF-8 encoded string.
+	InvalidEncoding,
+
+	Invalid,
+
+	InvalidScheme,
+
+	InvalidAuthority,
+
+	InvalidSegment,
+
+	InvalidPath,
+
+	InvalidQuery,
+
+	InvalidFragment,
+
+	InvalidPCTEncoded,
+
+	EmptyPath
+}
 
 /// IRI slice.
 ///

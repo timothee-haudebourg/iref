@@ -5,6 +5,7 @@ use crate::{Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragme
 use super::IriRef;
 
 /// Owned IRI reference.
+#[derive(Default, Clone)]
 pub struct IriRefBuf {
 	pub(crate) p: ParsedIriRef,
 	pub(crate) data: Vec<u8>,

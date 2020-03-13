@@ -18,6 +18,12 @@ impl IriBuf {
 		}
 	}
 
+	pub fn from_scheme(scheme: Scheme) -> IriBuf {
+		let mut iri_ref = IriRefBuf::default();
+		iri_ref.set_scheme(Some(scheme));
+		IriBuf(iri_ref)
+	}
+
 	pub fn as_iri(&self) -> Iri {
 		Iri(self.0.as_iri_ref())
 	}

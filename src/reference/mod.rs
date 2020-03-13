@@ -2,11 +2,12 @@ mod buffer;
 
 use std::{fmt, cmp};
 use std::hash::{Hash, Hasher};
+use std::convert::TryInto;
 // use log::*;
 use pct_str::PctStr;
 
 use crate::parsing::ParsedIriRef;
-use crate::{Scheme, Authority, Path, Query, Fragment, Error, Iri};
+use crate::{Scheme, Authority, Path, Query, Fragment, Error, Iri, IriBuf};
 
 pub use self::buffer::*;
 
@@ -14,6 +15,7 @@ pub use self::buffer::*;
 ///
 /// Note that in future versions, this will most likely become a custom dynamic sized type,
 /// similar to `str`.
+#[derive(Clone, Copy)]
 pub struct IriRef<'a> {
 	p: ParsedIriRef,
 	data: &'a [u8],
@@ -61,7 +63,7 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
-	pub fn path(&self) -> Path {
+	pub fn path(&'a self) -> Path<'a> {
 		let offset = self.p.authority.offset + self.p.authority.len();
 		Path {
 			data: &self.data[offset..(offset+self.p.path_len)]
@@ -91,14 +93,14 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Resolve the IRI reference against the given base IRI.
-	pub fn resolve<'a, Base: Into<Iri<'a>>>(&self, base_iri: Base) -> IriBuf {
-		let base_iri: Iri<'a> = base_iri.into();
+	pub fn resolve<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> Result<IriBuf, Error> {
+		let base_iri: Iri<'b> = base_iri.into();
 		let mut resolved;
 
 		if let Some(scheme) = self.scheme() {
 			resolved = IriBuf::from_scheme(scheme);
 			resolved.set_authority(self.authority());
-			resolved.path_mut().symbolic_append(self.path());
+			resolved.path_mut().symbolic_append(self.path())?;
 			resolved.set_query(self.query());
 		} else {
 			resolved = IriBuf::from_scheme(base_iri.scheme());
@@ -106,32 +108,33 @@ impl<'a> IriRef<'a> {
 				if self.path().is_relative() && self.path().is_empty() {
 					resolved.set_path(base_iri.path());
 					if let Some(query) = self.query() {
-						resolved.set_query(query);
+						resolved.set_query(Some(query));
 					} else {
 						resolved.set_query(base_iri.query());
 					}
 				} else {
-					if self.path.is_absolute() {
-						resolved.path_mut().symbolic_append(self.path());
+					if self.path().is_absolute() {
+						resolved.path_mut().symbolic_append(self.path())?;
 					} else {
 						if !base_iri.authority().is_empty() && base_iri.path().is_empty() {
-							resolved.set_path("/".try_into());
+							resolved.set_path("/".try_into().unwrap());
 						} else {
 							resolved.set_path(base_iri.path().directory());
 						}
-						resolved.path_mut().symbolic_append(self.path());
+						resolved.path_mut().symbolic_append(self.path())?;
 					}
-					resolved.set_query(query);
+					resolved.set_query(self.query());
 				}
 				resolved.set_authority(base_iri.authority());
 			} else {
 				resolved.set_authority(self.authority());
-				resolved.path_mut().symbolic_append(self.path());
+				resolved.path_mut().symbolic_append(self.path())?;
 				resolved.set_query(self.query());
 			}
 		}
 
-		resolved.set_fragment(resolved.fragment());
+		resolved.set_fragment(self.fragment());
+		Ok(resolved)
 	}
 }
 

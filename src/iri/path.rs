@@ -1,9 +1,10 @@
 use std::{fmt, cmp};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
+use std::iter::IntoIterator;
 use pct_str::PctStr;
 use crate::{parsing, IriRefBuf};
-use super::Error;
+use super::{Error, Segment};
 
 pub struct Path<'a> {
 	/// The path slice.
@@ -62,20 +63,47 @@ impl<'a> Path<'a> {
 		!self.is_open()
 	}
 
+	/// Return the path directory part.
+	///
+	/// This correspond to the path without everything after the right most `/`.
 	pub fn directory(&self) -> Path {
-		let last = self.buffer.len();
+		if self.data.is_empty() {
+			Path {
+				data: &[]
+			}
+		} else {
+			let mut last = self.data.len() - 1;
+
+			loop {
+				if self.data[last] == 0x2f {
+					break;
+				}
+
+				if last == 0 {
+					return Path {
+						data: &[]
+					}
+				}
+
+				last -= 1;
+			}
+
+			Path {
+				data: &self.data[0..(last + 1)]
+			}
+		}
 	}
 
-	/// Produces an iterator over the components of the IRI path.
+	/// Produces an iterator over the segments of the IRI path.
 	///
 	/// Note that this is an IRI path, not an IRI reference path: no normalization occurs with
-	/// `.` and `..` components. This is done by the IRI reference resolution function.
+	/// `.` and `..` segments. This is done by the IRI reference resolution function.
 	///
-	/// Empty components are preserved: the path `a//b` will raise the three components `a`, `` and
+	/// Empty segments are preserved: the path `a//b` will raise the three segments `a`, `` and
 	/// `b`.
-	/// The absolute path `/` has no components, but the path `/a/` has two components, `a` and ``.
-	pub fn components(&self) -> Components<'a> {
-		Components {
+	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
+	pub fn segments(&self) -> Segments {
+		Segments {
 			data: &self.data,
 			offset: 0
 		}
@@ -97,15 +125,27 @@ impl<'a> TryFrom<&'a str> for Path<'a> {
 	}
 }
 
-pub struct Components<'a> {
+impl<'a> IntoIterator for Path<'a> {
+	type Item = Segment<'a>;
+	type IntoIter = Segments<'a>;
+
+	fn into_iter(self) -> Segments<'a> {
+		Segments {
+			data: self.data,
+			offset: 0
+		}
+	}
+}
+
+pub struct Segments<'a> {
 	data: &'a [u8],
 	offset: usize
 }
 
-impl<'a> Iterator for Components<'a> {
-	type Item = &'a PctStr;
+impl<'a> Iterator for Segments<'a> {
+	type Item = Segment<'a>;
 
-	fn next(&mut self) -> Option<&'a PctStr> {
+	fn next(&mut self) -> Option<Segment<'a>> {
 		let mut start = self.offset;
 		let mut end = self.offset;
 
@@ -129,9 +169,9 @@ impl<'a> Iterator for Components<'a> {
 		self.offset = end;
 
 		if end > start {
-			unsafe {
-				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[start..end])))
-			}
+			Some(Segment {
+				data: &self.data[start..end]
+			})
 		} else {
 			None
 		}
@@ -208,7 +248,7 @@ impl<'a> PathMut<'a> {
 		self.buffer.path().is_closed()
 	}
 
-	/// Make sure the last component is followed by a `/`.
+	/// Make sure the last segment is followed by a `/`.
 	///
 	/// This has no effect if the path is empty.
 	pub fn open(&mut self) {
@@ -220,28 +260,22 @@ impl<'a> PathMut<'a> {
 		}
 	}
 
-	/// Produces an iterator over the components of the IRI path.
+	/// Produces an iterator over the segments of the IRI path.
 	///
 	/// Note that this is an IRI path, not an IRI reference path: no normalization occurs with
-	/// `.` and `..` components. This is done by the IRI reference resolution function.
+	/// `.` and `..` segments. This is done by the IRI reference resolution function.
 	///
-	/// Empty components are preserved: the path `a//b` will raise the three components `a`, `` and
+	/// Empty segments are preserved: the path `a//b` will raise the three segments `a`, `` and
 	/// `b`.
-	/// The absolute path `/` has no components, but the path `/a/` has two components, `a` and ``.
-	pub fn components(&'a self) -> Components<'a> {
-		self.buffer.path().components()
+	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
+	pub fn segments(&self) -> Segments {
+		self.buffer.path().into_iter()
 	}
 
-	/// Add a component at the end of the path.
-	pub fn push<S: AsRef<[u8]> + ?Sized>(&mut self, component: &S) -> Result<(), Error> {
-		let component = component.as_ref();
-
-		let component_len = parsing::parse_path_component(component, 0)?;
-		if component_len != component.len() {
-			return Err(Error::Invalid);
-		}
-
-		if component.is_empty() {
+	/// Add a segment at the end of the path.
+	pub fn push(&mut self, segment: Segment) {
+		let segment = segment.as_ref();
+		if segment.is_empty() {
 			if self.buffer.path().as_str() == "/" {
 				// This is the edge case!
 				// We can't have the path starting with `//` without an explicit authority part.
@@ -258,17 +292,17 @@ impl<'a> PathMut<'a> {
 			self.buffer.p.path_len += 1;
 		} else {
 			self.open();
-			// add the component at the end.
+			// add the segment at the end.
 			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			self.buffer.replace(offset..offset, component);
-			self.buffer.p.path_len += component.len();
+			self.buffer.replace(offset..offset, segment);
+			self.buffer.p.path_len += segment.len();
 		}
-
-		Ok(())
 	}
 
 	pub fn pop(&mut self) -> Result<(), Error> {
-		if !self.is_empty() {
+		if self.is_empty() {
+			Err(Error::EmptyPath)
+		} else {
 			let end = self.buffer.p.path_offset() + self.buffer.p.path_len;
 			let mut start = end - 1;
 
@@ -277,7 +311,7 @@ impl<'a> PathMut<'a> {
 				start -= 1;
 			}
 
-			// Find the last component start position.
+			// Find the last segment start position.
 			while self.buffer.data[start] != 0x2f {
 				start -= 1;
 			}
@@ -289,6 +323,18 @@ impl<'a> PathMut<'a> {
 
 			self.buffer.replace(start..end, &[]);
 			self.buffer.p.path_len -= end - start;
+
+			Ok(())
+		}
+	}
+
+	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) -> Result<(), Error> {
+		for segment in path {
+			match segment.as_str() {
+				"." => (),
+				".." => self.pop()?,
+				_ => self.push(segment)
+			}
 		}
 
 		Ok(())
@@ -297,6 +343,7 @@ impl<'a> PathMut<'a> {
 
 #[cfg(test)]
 mod tests {
+	use std::convert::TryInto;
 	use crate::{Iri, IriBuf};
 
 	#[test]
@@ -307,7 +354,7 @@ mod tests {
 		assert!(path.is_empty());
 		assert!(!path.is_absolute());
 		assert!(path.is_closed());
-		assert!(path.components().next().is_none());
+		assert!(path.segments().next().is_none());
 	}
 
 	#[test]
@@ -318,7 +365,7 @@ mod tests {
 		assert!(path.is_empty());
 		assert!(path.is_absolute());
 		assert!(path.is_closed());
-		assert!(path.components().next().is_none());
+		assert!(path.segments().next().is_none());
 	}
 
 	#[test]
@@ -330,10 +377,10 @@ mod tests {
 		assert!(!path.is_absolute());
 		assert!(path.is_closed());
 
-		let mut components = path.components();
-		assert!(components.next().unwrap() == "a");
-		assert!(components.next().unwrap() == "b");
-		assert!(components.next().is_none());
+		let mut segments = path.segments();
+		assert!(segments.next().unwrap() == "a");
+		assert!(segments.next().unwrap() == "b");
+		assert!(segments.next().is_none());
 	}
 
 	#[test]
@@ -345,10 +392,10 @@ mod tests {
 		assert!(path.is_absolute());
 		assert!(path.is_closed());
 
-		let mut components = path.components();
-		assert!(components.next().unwrap() == "foo");
-		assert!(components.next().unwrap() == "bar");
-		assert!(components.next().is_none());
+		let mut segments = path.segments();
+		assert!(segments.next().unwrap() == "foo");
+		assert!(segments.next().unwrap() == "bar");
+		assert!(segments.next().is_none());
 	}
 
 	#[test]
@@ -360,11 +407,11 @@ mod tests {
 		assert!(path.is_absolute());
 		assert!(path.is_open());
 
-		let mut components = path.components();
-		assert!(components.next().unwrap() == "red");
-		assert!(components.next().unwrap() == "green");
-		assert!(components.next().unwrap() == "blue");
-		assert!(components.next().is_none());
+		let mut segments = path.segments();
+		assert!(segments.next().unwrap() == "red");
+		assert!(segments.next().unwrap() == "green");
+		assert!(segments.next().unwrap() == "blue");
+		assert!(segments.next().is_none());
 	}
 
 	#[test]
@@ -372,27 +419,27 @@ mod tests {
 		let mut iri = IriBuf::new("scheme:foo").unwrap();
 		let mut path = iri.path_mut();
 
-		path.push("bar").unwrap();
+		path.push("bar".try_into().unwrap());
 
 		assert_eq!(iri.as_str(), "scheme:foo/bar");
 	}
 
 	#[test]
-	fn push_empty_component() {
+	fn push_empty_segment() {
 		let mut iri = IriBuf::new("scheme:foo/bar").unwrap();
 		let mut path = iri.path_mut();
 
-		path.push("").unwrap();
+		path.push("".try_into().unwrap());
 
 		assert_eq!(iri.as_str(), "scheme:foo/bar//");
 	}
 
 	#[test]
-	fn push_empty_component_edge_case() {
+	fn push_empty_segment_edge_case() {
 		let mut iri = IriBuf::new("scheme:/").unwrap();
 		let mut path = iri.path_mut();
 
-		path.push("").unwrap();
+		path.push("".try_into().unwrap());
 
 		assert_eq!(iri.as_str(), "scheme:////");
 	}
@@ -418,7 +465,7 @@ mod tests {
 	}
 
 	#[test]
-	fn pop_open_empty_component() {
+	fn pop_open_empty_segment() {
 		let mut iri = IriBuf::new("scheme:foo//").unwrap();
 		let mut path = iri.path_mut();
 
@@ -428,7 +475,7 @@ mod tests {
 	}
 
 	#[test]
-	fn pop_open_empty_component_edge_case() {
+	fn pop_open_empty_segment_edge_case() {
 		let mut iri = IriBuf::new("scheme:////").unwrap();
 		let mut path = iri.path_mut();
 
