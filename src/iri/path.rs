@@ -215,6 +215,16 @@ pub struct PathMut<'a> {
 }
 
 impl<'a> PathMut<'a> {
+	pub fn as_path(&self) -> Path {
+		self.buffer.path()
+	}
+
+	pub fn as_ref(&self) -> &[u8] {
+		let offset = self.buffer.p.path_offset();
+		let len = self.buffer.path().as_ref().len();
+		&self.buffer.data[offset..(offset+len)]
+	}
+
 	/// Checks if the path is empty.
 	///
 	/// Returns `true` if the path is `` or `/`.
@@ -335,6 +345,22 @@ impl<'a> PathMut<'a> {
 				".." => self.pop()?,
 				_ => self.push(segment)
 			}
+		}
+
+		Ok(())
+	}
+
+	pub fn remove_dot_segments(&mut self) -> Result<(), Error> {
+		let mut path_buffer = IriRefBuf::default();
+		path_buffer.path_mut().symbolic_append(self.as_path())?;
+
+		let offset = self.buffer.p.path_offset();
+		let end = offset + self.as_ref().len();
+		self.buffer.replace(offset..end, path_buffer.path().as_ref());
+
+		// Make the authority explicit if we need to.
+		if self.buffer.data.len() >= offset + 2 && self.buffer.data[offset] == 0x2f && self.buffer.data[offset + 1] == 0x2f {
+			self.buffer.authority_mut().make_explicit();
 		}
 
 		Ok(())

@@ -7,6 +7,7 @@ mod query;
 mod fragment;
 
 use std::ops::Deref;
+use std::convert::TryFrom;
 use pct_str::PctStr;
 use crate::parsing;
 use crate::IriRef;

@@ -1,7 +1,8 @@
 use std::ops::Range;
 use pct_str::PctStr;
+use std::convert::TryInto;
 use crate::parsing::{self, ParsedIriRef};
-use crate::{Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
+use crate::{Error, Iri, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 use super::IriRef;
 
 /// Owned IRI reference.
@@ -184,5 +185,42 @@ impl IriRefBuf {
 
 			self.p.fragment_len = None;
 		}
+	}
+
+	/// Resolve the IRI reference.
+	pub fn resolve<'b, Base: Into<Iri<'b>>>(&mut self, base_iri: Base) -> Result<(), Error> {
+		let base_iri: Iri<'b> = base_iri.into();
+
+		if self.scheme().is_some() {
+			self.path_mut().remove_dot_segments();
+		} else {
+			self.set_scheme(Some(base_iri.scheme()));
+			if self.authority().is_empty() {
+				if self.path().is_relative() && self.path().is_empty() {
+					self.set_path(base_iri.path());
+					if self.query().is_none() {
+						self.set_query(base_iri.query());
+					}
+				} else {
+					if self.path().is_absolute() {
+						self.path_mut().remove_dot_segments();
+					} else {
+						let mut path_buffer = IriRefBuf::default();
+						if !base_iri.authority().is_empty() && base_iri.path().is_empty() {
+							path_buffer.set_path("/".try_into().unwrap());
+						} else {
+							path_buffer.set_path(base_iri.path().directory());
+						}
+						path_buffer.path_mut().symbolic_append(self.path())?;
+						self.set_path(path_buffer.path());
+					}
+				}
+				self.set_authority(base_iri.authority());
+			} else {
+				self.path_mut().remove_dot_segments();
+			}
+		}
+
+		Ok(())
 	}
 }
