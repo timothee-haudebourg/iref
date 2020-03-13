@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 
 use crate::parsing::ParsedIriRef;
-use crate::{Authority, Path, Error};
+use crate::{Authority, Path, Error, Iri};
 
 pub use self::buffer::*;
 
@@ -60,8 +60,8 @@ impl<'a> IriRef<'a> {
 
 	pub fn authority(&'a self) -> Authority<'a> {
 		Authority {
-			data: self.data,
-			authority: &self.p.authority
+			data: &self.data[self.p.authority.offset..(self.p.authority.offset+self.p.authority.len())],
+			p: self.p.authority
 		}
 	}
 
@@ -102,14 +102,39 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
-	/// Resolve the IRI reference against the given base IRI.
-	pub fn resolve(&self, base_iri: &Iri) {
-		if let Some(scheme) = self.scheme() {
-			// ...
-		} else {
-			//
-		}
-	}
+	// /// Resolve the IRI reference against the given base IRI.
+	// pub fn resolve<'a, Base: Into<Iri<'a>>>(&self, base_iri: Base) -> IriBuf {
+	// 	let base_iri: Iri<'a> = base_iri.into();
+	// 	let mut resolved;
+	//
+	// 	if let Some(scheme) = self.scheme() {
+	// 		resolved = IriBuf::from_scheme(scheme);
+	// 		resolved.set_authority(self.authority()).unwrap();
+	// 		resolved.path_mut().symbolic_append(self.path().components());
+	// 		resolved.set_query(self.query()).unwrap();
+	// 	} else {
+	// 		resolved = IriBuf::from_scheme(base_iri.scheme());
+	// 		if self.authority().is_empty() {
+	// 			if self.path().is_relative() && self.path().is_empty() {
+	// 				resolved.set_path(base_iri.path()).unwrap();
+	// 				if let Some(query) = self.query() {
+	// 					resolved.set_query(query)
+	// 				} else {
+	// 					// ...
+	// 				}
+	// 			} else {
+	// 				// ...
+	// 			}
+	// 			resolved.set_authority(base_iri.authority()).unwrap();
+	// 		} else {
+	// 			resolved.set_authority(self.authority()).unwrap();
+	// 			resolved.path_mut().symbolic_append(self.path().components());
+	// 			resolved.set_raw_query(self.query()).unwrap();
+	// 		}
+	// 	}
+	//
+	// 	resolved.set_raw_fragment(resolved.fragment()).unwrap();
+	// }
 }
 
 impl<'a> fmt::Display for IriRef<'a> {

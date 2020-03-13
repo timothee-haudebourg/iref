@@ -3,6 +3,7 @@ extern crate stderrlog;
 
 extern crate iri;
 
+use std::convert::TryInto;
 use iri::{Iri, IriBuf};
 
 fn main() -> Result<(), iri::Error> {
@@ -23,13 +24,13 @@ fn main() -> Result<(), iri::Error> {
 
 	let mut iri = IriBuf::new("https://www.rust-lang.org/foo/bar")?;
 
-	iri.set_scheme("scheme")?;
-	iri.set_authority("haudebourg%2enet")?;
+	iri.set_scheme("scheme".try_into()?);
+	iri.set_authority("haudebourg%2enet".try_into()?);
 	iri.authority_mut().set_userinfo(None)?;
 	iri.authority_mut().set_port(Some("42"))?;
-	iri.set_path("/1/2")?;
-	iri.set_query(Some("foo=bar&hello=world"))?;
-	iri.set_fragment(Some("ninja"))?;
+	iri.set_path("/1/2".try_into()?);
+	iri.set_query(Some("foo=bar&hello=world".try_into()?));
+	iri.set_fragment(Some("ninja".try_into()?));
 
 	println!("IRI: {}", iri.as_str());
 	println!("scheme: {}", iri.scheme());

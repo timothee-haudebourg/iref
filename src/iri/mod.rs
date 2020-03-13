@@ -1,14 +1,21 @@
+mod scheme;
 mod authority;
 mod path;
 mod buffer;
+mod query;
+mod fragment;
 
 use std::ops::Deref;
 use pct_str::PctStr;
+use crate::parsing;
 use crate::IriRef;
 
+pub use self::scheme::*;
 pub use self::authority::*;
 pub use self::path::*;
 pub use self::buffer::*;
+pub use self::query::*;
+pub use self::fragment::*;
 
 pub type Error = crate::parsing::Error;
 
@@ -43,5 +50,11 @@ impl<'a> Deref for Iri<'a> {
 
 	fn deref(&self) -> &IriRef<'a> {
 		self.as_iri_ref()
+	}
+}
+
+impl<'a> From<&'a IriBuf> for Iri<'a> {
+	fn from(buffer: &'a IriBuf) -> Iri<'a> {
+		buffer.as_iri()
 	}
 }

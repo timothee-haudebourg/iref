@@ -3,7 +3,7 @@ use std::{fmt, cmp};
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 use crate::IriRefBuf;
-use super::{Iri, Error, AuthorityMut, PathMut};
+use super::{Iri, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 
 /// Owned IRI.
 pub struct IriBuf(IriRefBuf);
@@ -18,16 +18,17 @@ impl IriBuf {
 		}
 	}
 
-	pub fn scheme(&self) -> &PctStr {
+	pub fn as_iri(&self) -> Iri {
+		Iri(self.0.as_iri_ref())
+	}
+
+	pub fn scheme(&self) -> Scheme {
 		self.0.scheme().unwrap()
 	}
 
 	/// Set the scheme of the IRI.
-	///
-	/// It must be a syntactically correct scheme. If not,
-	/// this method returns an error, and the IRI is unchanged.
-	pub fn set_scheme<S: AsRef<[u8]> + ?Sized>(&mut self, scheme: &S) -> Result<(), Error> {
-		self.0.set_raw_scheme(Some(scheme))
+	pub fn set_scheme(&mut self, scheme: Scheme) {
+		self.0.set_scheme(Some(scheme))
 	}
 
 	pub fn authority_mut(&mut self) -> AuthorityMut {
@@ -38,7 +39,7 @@ impl IriBuf {
 	///
 	/// It must be a syntactically correct authority. If not,
 	/// this method returns an error, and the IRI is unchanged.
-	pub fn set_authority<S: AsRef<[u8]> + ?Sized>(&mut self, authority: &S) -> Result<(), Error> {
+	pub fn set_authority(&mut self, authority: Authority) {
 		self.0.set_authority(authority)
 	}
 
@@ -46,23 +47,16 @@ impl IriBuf {
 		self.0.path_mut()
 	}
 
-	pub fn set_path<S: AsRef<[u8]> + ?Sized>(&mut self, path: &S) -> Result<(), Error> {
+	/// Set the IRI path.
+	pub fn set_path(&mut self, path: Path) {
 		self.0.set_path(path)
 	}
 
-	pub fn set_raw_query<S: AsRef<[u8]> + ?Sized>(&mut self, query: Option<&S>) -> Result<(), Error> {
-		self.0.set_raw_query(query)
-	}
-
-	pub fn set_query(&mut self, query: Option<&str>) -> Result<(), Error> {
+	pub fn set_query(&mut self, query: Option<Query>) {
 		self.0.set_query(query)
 	}
 
-	pub fn set_raw_fragment<S: AsRef<[u8]> + ?Sized>(&mut self, fragment: Option<&S>) -> Result<(), Error> {
-		self.0.set_raw_fragment(fragment)
-	}
-
-	pub fn set_fragment(&mut self, fragment: Option<&str>) -> Result<(), Error> {
+	pub fn set_fragment(&mut self, fragment: Option<Fragment>) {
 		self.0.set_fragment(fragment)
 	}
 }
@@ -104,5 +98,11 @@ impl<'a> cmp::PartialEq<&'a str> for Iri<'a> {
 impl<'a> Hash for Iri<'a> {
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_iri_ref().hash(hasher)
+	}
+}
+
+impl<'a> From<Iri<'a>> for IriBuf {
+	fn from(iri: Iri<'a>) -> IriBuf {
+		IriBuf::new(iri.as_str()).unwrap()
 	}
 }

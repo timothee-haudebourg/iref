@@ -1,18 +1,20 @@
 use std::{fmt, cmp};
 use std::hash::{Hash, Hasher};
+use std::convert::TryFrom;
 use pct_str::PctStr;
 use crate::{parsing, IriRefBuf};
 use super::Error;
 
 pub struct Path<'a> {
 	/// The path slice.
-	///
-	/// Note that contrarily to the [`Authority`] struct,
-	/// this only contains the path slice, and NOT the whole IRI.
 	pub(crate) data: &'a [u8]
 }
 
 impl<'a> Path<'a> {
+	pub fn as_ref(&self) -> &[u8] {
+		self.data
+	}
+
 	/// Get the underlying path slice as a string slice.
 	pub fn as_str(&self) -> &str {
 		unsafe {
@@ -79,6 +81,21 @@ impl<'a> Path<'a> {
 		Components {
 			data: &self.data,
 			offset: 0
+		}
+	}
+}
+
+impl<'a> TryFrom<&'a str> for Path<'a> {
+	type Error = Error;
+
+	fn try_from(str: &'a str) -> Result<Path<'a>, Error> {
+		let path_len = parsing::parse_path(str.as_ref(), 0)?;
+		if path_len < str.len() {
+			Err(Error::InvalidPath)
+		} else {
+			Ok(Path {
+				data: str.as_ref()
+			})
 		}
 	}
 }

@@ -1,5 +1,6 @@
 use std::ops::Range;
 use std::{fmt, cmp};
+use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 
@@ -7,14 +8,11 @@ use crate::parsing::{self, ParsedAuthority};
 use super::Error;
 
 pub struct Authority<'a> {
-	/// IRI data.
-	///
-	/// Note that this not only includes the authority slice,
-	/// but the whole IRI slice.
+	/// Authority slice.
 	pub(crate) data: &'a [u8],
 
 	/// Authority positions.
-	pub(crate) authority: &'a ParsedAuthority
+	pub(crate) p: ParsedAuthority
 }
 
 impl<'a> Hash for Authority<'a> {
@@ -26,19 +24,22 @@ impl<'a> Hash for Authority<'a> {
 }
 
 impl<'a> Authority<'a> {
+	pub fn as_ref(&self) -> &[u8] {
+		self.data
+	}
+
 	/// Checks if the authority is empty.
 	///
 	/// It is empty if it has no user info, an empty host string, and no port.
 	/// Note that empty user info or port is different from no user info and port.
 	/// For instance, the authorities `@`, `:` and `@:` are not empty.
 	pub fn is_empty(&self) -> bool {
-		self.authority.userinfo_len.is_none() && self.authority.host_len == 0 && self.authority.port_len.is_none()
+		self.p.userinfo_len.is_none() && self.p.host_len == 0 && self.p.port_len.is_none()
 	}
 
 	pub fn as_str(&self) -> &str {
 		unsafe {
-			let offset = self.authority.offset;
-			std::str::from_utf8_unchecked(&self.data[offset..(offset+self.authority.len())])
+			std::str::from_utf8_unchecked(&self.data[0..self.p.len()])
 		}
 	}
 
@@ -47,10 +48,9 @@ impl<'a> Authority<'a> {
 	}
 
 	pub fn userinfo(&self) -> Option<&PctStr> {
-		if let Some(len) = self.authority.userinfo_len {
+		if let Some(len) = self.p.userinfo_len {
 			unsafe {
-				let offset = self.authority.offset;
-				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
+				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[0..len])))
 			}
 		} else {
 			None
@@ -59,37 +59,35 @@ impl<'a> Authority<'a> {
 
 	pub fn host(&self) -> &PctStr {
 		unsafe {
-			let offset = self.authority.host_offset();
-			let len = self.authority.host_len;
-			PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)]))
+			let len = self.p.host_len;
+			PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[0..len]))
 		}
 	}
 
 	pub fn port(&self) -> Option<&PctStr> {
-		if let Some(len) = self.authority.port_len {
+		if let Some(len) = self.p.port_len {
 			unsafe {
-				let offset = self.authority.port_offset();
-				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
+				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[0..len])))
 			}
 		} else {
 			None
 		}
 	}
+}
 
-	/// Checks if there is an explicit authority delimiter `//` in the IRI.
-	#[inline]
-	pub fn is_explicit(&self) -> bool {
-		if self.authority.offset >= 2 {
-			let end = self.authority.offset;
-			let start = end - 2;
-			&self.data[start..end] == &[0x2f, 0x2f]
+impl<'a> TryFrom<&'a str> for Authority<'a> {
+	type Error = Error;
+
+	fn try_from(str: &'a str) -> Result<Authority<'a>, Error> {
+		let parsed_authority = parsing::parse_authority(str.as_ref(), 0)?;
+		if parsed_authority.len() < str.len() {
+			Err(Error::InvalidAuthority)
 		} else {
-			false
+			Ok(Authority {
+				data: str.as_ref(),
+				p: parsed_authority
+			})
 		}
-	}
-
-	pub fn is_implicit(&self) -> bool {
-		!self.is_explicit()
 	}
 }
 
@@ -124,14 +122,14 @@ pub struct AuthorityMut<'a> {
 	pub(crate) data: &'a mut Vec<u8>,
 
 	/// Authority positions.
-	pub(crate) authority: &'a mut ParsedAuthority
+	pub(crate) p: &'a mut ParsedAuthority
 }
 
 impl<'a> AuthorityMut<'a> {
 	pub fn as_authority(&'a self) -> Authority<'a> {
 		Authority {
 			data: self.data.as_slice(),
-			authority: self.authority
+			p: *self.p
 		}
 	}
 
@@ -141,15 +139,15 @@ impl<'a> AuthorityMut<'a> {
 
 	pub fn as_str(&self) -> &str {
 		unsafe {
-			let offset = self.authority.offset;
-			std::str::from_utf8_unchecked(&self.data[offset..(offset+self.authority.len())])
+			let offset = self.p.offset;
+			std::str::from_utf8_unchecked(&self.data[offset..(offset+self.p.len())])
 		}
 	}
 
 	pub fn userinfo(&self) -> Option<&PctStr> {
-		if let Some(len) = self.authority.userinfo_len {
+		if let Some(len) = self.p.userinfo_len {
 			unsafe {
-				let offset = self.authority.offset;
+				let offset = self.p.offset;
 				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
 			}
 		} else {
@@ -158,18 +156,18 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	fn replace(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(self.data, self.authority, range, content)
+		crate::replace(self.data, self.p, range, content)
 	}
 
 	pub fn set_raw_userinfo<S: AsRef<[u8]> + ?Sized>(&mut self, userinfo: Option<&S>) -> Result<(), Error> {
-		let offset = self.authority.offset;
+		let offset = self.p.offset;
 
 		if userinfo.is_none() || userinfo.unwrap().as_ref().is_empty() {
-			if let Some(userinfo_len) = self.authority.userinfo_len {
+			if let Some(userinfo_len) = self.p.userinfo_len {
 				self.replace(offset..(offset+userinfo_len+1), &[]);
 			}
 
-			self.authority.userinfo_len = None;
+			self.p.userinfo_len = None;
 			// Make the authority part implicit, if we can.
 			self.make_implicit();
 		} else {
@@ -179,14 +177,14 @@ impl<'a> AuthorityMut<'a> {
 				return Err(Error::Invalid);
 			}
 
-			if let Some(userinfo_len) = self.authority.userinfo_len {
+			if let Some(userinfo_len) = self.p.userinfo_len {
 				self.replace(offset..(offset+userinfo_len), new_userinfo);
 			} else {
 				self.replace(offset..offset, &[0x40]);
 				self.replace(offset..offset, new_userinfo);
 			}
 
-			self.authority.userinfo_len = Some(new_userinfo_len);
+			self.p.userinfo_len = Some(new_userinfo_len);
 		}
 
 		Ok(())
@@ -198,22 +196,22 @@ impl<'a> AuthorityMut<'a> {
 
 	pub fn host(&self) -> &PctStr {
 		unsafe {
-			let offset = self.authority.host_offset();
-			let len = self.authority.host_len;
+			let offset = self.p.host_offset();
+			let len = self.p.host_len;
 			PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)]))
 		}
 	}
 
 	pub fn set_host<S: AsRef<[u8]> + ?Sized>(&mut self, host: &S) -> Result<(), Error> {
-		let offset = self.authority.host_offset();
+		let offset = self.p.host_offset();
 		let new_host = host.as_ref();
 		let new_host_len = parsing::parse_host(new_host, 0)?;
 		if new_host_len != new_host.len() {
 			return Err(Error::Invalid);
 		}
 
-		self.replace(offset..(offset+self.authority.host_len), new_host);
-		self.authority.host_len = new_host_len;
+		self.replace(offset..(offset+self.p.host_len), new_host);
+		self.p.host_len = new_host_len;
 
 		if new_host_len == 0 {
 			// Make the authority part implicit, if we can.
@@ -224,9 +222,9 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	pub fn port(&self) -> Option<&PctStr> {
-		if let Some(len) = self.authority.port_len {
+		if let Some(len) = self.p.port_len {
 			unsafe {
-				let offset = self.authority.port_offset();
+				let offset = self.p.port_offset();
 				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
 			}
 		} else {
@@ -235,14 +233,14 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	pub fn set_raw_port<S: AsRef<[u8]> + ?Sized>(&mut self, port: Option<&S>) -> Result<(), Error> {
-		let offset = self.authority.port_offset();
+		let offset = self.p.port_offset();
 
 		if port.is_none() || port.unwrap().as_ref().is_empty() {
-			if let Some(port_len) = self.authority.port_len {
+			if let Some(port_len) = self.p.port_len {
 				self.replace((offset-1)..(offset+port_len), &[]);
 			}
 
-			self.authority.port_len = None;
+			self.p.port_len = None;
 			// Make the authority part implicit, if we can.
 			self.make_implicit();
 		} else {
@@ -252,14 +250,14 @@ impl<'a> AuthorityMut<'a> {
 				return Err(Error::Invalid);
 			}
 
-			if let Some(port_len) = self.authority.port_len {
+			if let Some(port_len) = self.p.port_len {
 				self.replace(offset..(offset+port_len), new_port);
 			} else {
 				self.replace(offset..offset, &[0x3a]);
 				self.replace((offset+1)..(offset+1), new_port);
 			}
 
-			self.authority.port_len = Some(new_port_len);
+			self.p.port_len = Some(new_port_len);
 		}
 
 		Ok(())
@@ -270,20 +268,27 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	/// Checks if there is an explicit authority delimiter `//` in the IRI.
+	#[inline]
 	pub fn is_explicit(&self) -> bool {
-		self.as_authority().is_explicit()
+		if self.p.offset >= 2 {
+			let end = self.p.offset;
+			let start = end - 2;
+			&self.data[start..end] == &[0x2f, 0x2f]
+		} else {
+			false
+		}
 	}
 
 	pub fn is_implicit(&self) -> bool {
-		self.as_authority().is_implicit()
+		!self.is_explicit()
 	}
 
 	/// Make sure there is an explicit authority delimiter `//` in the IRI.
 	pub fn make_explicit(&mut self) {
 		if !self.is_explicit() {
-			let offset = self.authority.offset;
+			let offset = self.p.offset;
 			self.replace(offset..offset, &[0x2f, 0x2f]);
-			self.authority.offset += 2;
+			self.p.offset += 2;
 		}
 	}
 
@@ -296,15 +301,15 @@ impl<'a> AuthorityMut<'a> {
 	pub fn make_implicit(&mut self) -> bool {
 		if self.is_explicit() {
 			let is_path_authority_alike = {
-				let path_offset = self.authority.offset + self.authority.len();
+				let path_offset = self.p.offset + self.p.len();
 				self.data.len() >= path_offset + 2 && self.data[path_offset] == 0x2f && self.data[path_offset + 1] == 0x2f
 			};
 
 			if self.is_empty() && !is_path_authority_alike {
-				let end = self.authority.offset;
+				let end = self.p.offset;
 				let start = end - 2;
 				self.replace(start..end, &[]);
-				self.authority.offset = start;
+				self.p.offset = start;
 				true
 			} else {
 				false
@@ -325,7 +330,6 @@ mod tests {
 		let authority = iri.authority();
 
 		assert!(authority.is_empty());
-		assert!(authority.is_explicit());
 	}
 
 	#[test]

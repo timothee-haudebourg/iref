@@ -9,7 +9,15 @@ pub enum Error {
 
 	Invalid,
 
+	InvalidScheme,
+
+	InvalidAuthority,
+
 	InvalidPath,
+
+	InvalidQuery,
+
+	InvalidFragment,
 
 	InvalidPCTEncoded
 }
