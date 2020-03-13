@@ -321,7 +321,7 @@ mod tests {
 		];
 
 		for (relative, absolute) in &tests {
-			println!("{} => {}", relative, absolute);
+			// println!("{} => {}", relative, absolute);
 			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
 		}
 	}
@@ -354,7 +354,7 @@ mod tests {
 		];
 
 		for (relative, absolute) in &tests {
-			println!("{} => {}", relative, absolute);
+			// println!("{} => {}", relative, absolute);
 			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
 		}
 	}
