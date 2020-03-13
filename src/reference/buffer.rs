@@ -1,6 +1,7 @@
 use std::ops::Range;
-use pct_str::PctStr;
 use std::convert::TryInto;
+use std::fmt;
+use pct_str::PctStr;
 use crate::parsing::{self, ParsedIriRef};
 use crate::{Error, Iri, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 use super::IriRef;
@@ -45,7 +46,11 @@ impl IriRefBuf {
 	}
 
 	pub(crate) fn replace(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(&mut self.data, &mut self.p.authority, range, content)
+		crate::replace(&mut self.data, &mut self.p.authority, false, range, content)
+	}
+
+	pub(crate) fn replace_before_authority(&mut self, range: Range<usize>, content: &[u8]) {
+		crate::replace(&mut self.data, &mut self.p.authority, true, range, content)
 	}
 
 	pub fn scheme(&self) -> Option<Scheme> {
@@ -62,16 +67,16 @@ impl IriRefBuf {
 	pub fn set_scheme(&mut self, scheme: Option<Scheme>) {
 		if let Some(new_scheme) = scheme {
 			if let Some(scheme_len) = self.p.scheme_len {
-				self.replace(0..scheme_len, new_scheme.as_ref());
+				self.replace_before_authority(0..scheme_len, new_scheme.as_ref());
 			} else {
-				self.replace(0..0, &[0x3a]);
-				self.replace(0..0, new_scheme.as_ref());
+				self.replace_before_authority(0..0, &[0x3a]);
+				self.replace_before_authority(0..0, new_scheme.as_ref());
 			}
 
 			self.p.scheme_len = Some(new_scheme.as_ref().len());
 		} else {
 			if let Some(scheme_len) = self.p.scheme_len {
-				self.replace(0..(scheme_len+1), &[]);
+				self.replace_before_authority(0..(scheme_len+1), &[]);
 			}
 
 			self.p.scheme_len = None;
@@ -101,7 +106,13 @@ impl IriRefBuf {
 		let mut new_parsed_authority = authority.p;
 		new_parsed_authority.offset = offset;
 		self.replace(offset..(offset+self.p.authority.len()), authority.as_ref());
-		self.p.authority = new_parsed_authority
+		self.p.authority = new_parsed_authority;
+
+		if authority.is_empty() {
+			self.authority_mut().make_implicit();
+		} else {
+			self.authority_mut().make_explicit();
+		}
 	}
 
 	pub fn path(&self) -> Path {
@@ -188,7 +199,7 @@ impl IriRefBuf {
 	}
 
 	/// Resolve the IRI reference.
-	pub fn resolve<'b, Base: Into<Iri<'b>>>(&mut self, base_iri: Base) -> Result<(), Error> {
+	pub fn resolve<'b, Base: Into<Iri<'b>>>(&mut self, base_iri: Base) {
 		let base_iri: Iri<'b> = base_iri.into();
 
 		if self.scheme().is_some() {
@@ -211,7 +222,10 @@ impl IriRefBuf {
 						} else {
 							path_buffer.set_path(base_iri.path().directory());
 						}
-						path_buffer.path_mut().symbolic_append(self.path())?;
+						path_buffer.path_mut().symbolic_append(self.path());
+						if self.path().is_open() {
+							path_buffer.path_mut().open();
+						}
 						self.set_path(path_buffer.path());
 					}
 				}
@@ -220,7 +234,128 @@ impl IriRefBuf {
 				self.path_mut().remove_dot_segments();
 			}
 		}
+	}
+}
 
-		Ok(())
+impl fmt::Display for IriRefBuf {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_iri_ref().fmt(f)
+	}
+}
+
+impl fmt::Debug for IriRefBuf {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_iri_ref().fmt(f)
+	}
+}
+
+impl<'a> From<IriRef<'a>> for IriRefBuf {
+	fn from(iri_ref: IriRef<'a>) -> IriRefBuf {
+		let mut data = Vec::new();
+		data.resize(iri_ref.as_ref().len(), 0);
+		data.copy_from_slice(iri_ref.as_ref());
+
+		IriRefBuf {
+			p: iri_ref.p, data
+		}
+	}
+}
+
+impl<'a> From<&'a IriRef<'a>> for IriRefBuf {
+	fn from(iri_ref: &'a IriRef<'a>) -> IriRefBuf {
+		let mut data = Vec::new();
+		data.resize(iri_ref.as_ref().len(), 0);
+		data.copy_from_slice(iri_ref.as_ref());
+
+		IriRefBuf {
+			p: iri_ref.p, data
+		}
+	}
+}
+
+impl<'a> From<Iri<'a>> for IriRefBuf {
+	fn from(iri: Iri<'a>) -> IriRefBuf {
+		iri.as_iri_ref().into()
+	}
+}
+
+impl<'a> From<&'a Iri<'a>> for IriRefBuf {
+	fn from(iri: &'a Iri<'a>) -> IriRefBuf {
+		iri.as_iri_ref().into()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{Iri, IriRef};
+
+	#[test]
+	fn resolution_normal() {
+		// https://www.w3.org/2004/04/uri-rel-test.html
+		let base_iri = Iri::new("http://a/b/c/d;p?q").unwrap();
+
+		let tests = [
+			("g:h", "g:h"),
+			("g", "http://a/b/c/g"),
+			("./g", "http://a/b/c/g"),
+			("g/", "http://a/b/c/g/"),
+			("/g", "http://a/g"),
+			("//g", "http://g"),
+			("?y", "http://a/b/c/d;p?y"),
+			("g?y", "http://a/b/c/g?y"),
+			("#s", "http://a/b/c/d;p?q#s"),
+			("g#s", "http://a/b/c/g#s"),
+			("g?y#s", "http://a/b/c/g?y#s"),
+			(";x", "http://a/b/c/;x"),
+			("g;x", "http://a/b/c/g;x"),
+			("g;x?y#s", "http://a/b/c/g;x?y#s"),
+			("", "http://a/b/c/d;p?q"),
+			(".", "http://a/b/c/"),
+			("./", "http://a/b/c/"),
+			("..", "http://a/b/"),
+			("../", "http://a/b/"),
+			("../g", "http://a/b/g"),
+			("../..", "http://a/"),
+			("../../", "http://a/"),
+			("../../g", "http://a/g")
+		];
+
+		for (relative, absolute) in &tests {
+			println!("{} => {}", relative, absolute);
+			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+		}
+	}
+
+	#[test]
+	fn resolution_abnormal() {
+		// https://www.w3.org/2004/04/uri-rel-test.html
+		let base_iri = Iri::new("http://a/b/c/d;p?q").unwrap();
+
+		let tests = [
+			("../../../g", "http://a/g"),
+			("../../../../g", "http://a/g"),
+			("/./g", "http://a/g"),
+			("/../g", "http://a/g"),
+			("g.", "http://a/b/c/g."),
+			(".g", "http://a/b/c/.g"),
+			("g..", "http://a/b/c/g.."),
+			("..g", "http://a/b/c/..g"),
+			("./../g", "http://a/b/g"),
+			("./g/.", "http://a/b/c/g/"),
+			("g/./h", "http://a/b/c/g/h"),
+			("g/../h", "http://a/b/c/h"),
+			("g;x=1/./y", "http://a/b/c/g;x=1/y"),
+			("g;x=1/../y", "http://a/b/c/y"),
+			("g?y/./x", "http://a/b/c/g?y/./x"),
+			("g?y/../x", "http://a/b/c/g?y/../x"),
+			("g#s/./x", "http://a/b/c/g#s/./x"),
+			("g#s/../x", "http://a/b/c/g#s/../x"),
+			("http:g", "http:g")
+		];
+
+		for (relative, absolute) in &tests {
+			println!("{} => {}", relative, absolute);
+			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+		}
 	}
 }

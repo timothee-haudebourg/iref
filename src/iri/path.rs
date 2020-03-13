@@ -309,10 +309,8 @@ impl<'a> PathMut<'a> {
 		}
 	}
 
-	pub fn pop(&mut self) -> Result<(), Error> {
-		if self.is_empty() {
-			Err(Error::EmptyPath)
-		} else {
+	pub fn pop(&mut self) {
+		if !self.is_empty() {
 			let end = self.buffer.p.path_offset() + self.buffer.p.path_len;
 			let mut start = end - 1;
 
@@ -322,48 +320,50 @@ impl<'a> PathMut<'a> {
 			}
 
 			// Find the last segment start position.
-			while self.buffer.data[start] != 0x2f {
+			while start > 0 && self.buffer.data[start] != 0x2f {
 				start -= 1;
 			}
 
-			// Do not remove the root `/`.
-			if start == self.buffer.p.path_offset() {
+			if start > 0 || self.buffer.data[start] == 0x2f {
 				start += 1;
 			}
 
 			self.buffer.replace(start..end, &[]);
 			self.buffer.p.path_len -= end - start;
-
-			Ok(())
 		}
 	}
 
-	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) -> Result<(), Error> {
+	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) {
 		for segment in path {
 			match segment.as_str() {
-				"." => (),
-				".." => self.pop()?,
+				"." => self.open(),
+				".." => self.pop(),
 				_ => self.push(segment)
 			}
 		}
-
-		Ok(())
 	}
 
-	pub fn remove_dot_segments(&mut self) -> Result<(), Error> {
-		let mut path_buffer = IriRefBuf::default();
-		path_buffer.path_mut().symbolic_append(self.as_path())?;
+	pub fn remove_dot_segments(&mut self) {
+		let mut path_buffer = if self.is_absolute() {
+			IriRefBuf::new("/").unwrap()
+		} else {
+			IriRefBuf::default()
+		};
+
+		path_buffer.path_mut().symbolic_append(self.as_path());
+		if self.as_path().is_open() {
+			path_buffer.path_mut().open();
+		}
 
 		let offset = self.buffer.p.path_offset();
 		let end = offset + self.as_ref().len();
 		self.buffer.replace(offset..end, path_buffer.path().as_ref());
+		self.buffer.p.path_len = path_buffer.len();
 
 		// Make the authority explicit if we need to.
 		if self.buffer.data.len() >= offset + 2 && self.buffer.data[offset] == 0x2f && self.buffer.data[offset + 1] == 0x2f {
 			self.buffer.authority_mut().make_explicit();
 		}
-
-		Ok(())
 	}
 }
 
@@ -475,9 +475,9 @@ mod tests {
 		let mut iri = IriBuf::new("scheme:foo/bar").unwrap();
 		let mut path = iri.path_mut();
 
-		path.pop().unwrap();
+		path.pop();
 
-		assert_eq!(iri.as_str(), "scheme:foo");
+		assert_eq!(iri.as_str(), "scheme:foo/");
 	}
 
 	#[test]
@@ -485,9 +485,9 @@ mod tests {
 		let mut iri = IriBuf::new("scheme:foo/bar/").unwrap();
 		let mut path = iri.path_mut();
 
-		path.pop().unwrap();
+		path.pop();
 
-		assert_eq!(iri.as_str(), "scheme:foo");
+		assert_eq!(iri.as_str(), "scheme:foo/");
 	}
 
 	#[test]
@@ -495,9 +495,9 @@ mod tests {
 		let mut iri = IriBuf::new("scheme:foo//").unwrap();
 		let mut path = iri.path_mut();
 
-		path.pop().unwrap();
+		path.pop();
 
-		assert_eq!(iri.as_str(), "scheme:foo");
+		assert_eq!(iri.as_str(), "scheme:foo/");
 	}
 
 	#[test]
@@ -505,7 +505,7 @@ mod tests {
 		let mut iri = IriBuf::new("scheme:////").unwrap();
 		let mut path = iri.path_mut();
 
-		path.pop().unwrap();
+		path.pop();
 
 		assert_eq!(iri.as_str(), "scheme:///");
 	}

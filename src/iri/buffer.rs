@@ -1,6 +1,7 @@
 use std::ops::Deref;
 use std::{fmt, cmp};
 use std::hash::{Hash, Hasher};
+use std::convert::TryFrom;
 use pct_str::PctStr;
 use crate::IriRefBuf;
 use super::{Iri, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
@@ -75,40 +76,56 @@ impl Deref for IriBuf {
 	}
 }
 
-impl<'a> fmt::Display for Iri<'a> {
+impl fmt::Display for IriBuf {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_iri_ref().fmt(f)
+		self.as_iri().fmt(f)
 	}
 }
 
-impl<'a> fmt::Debug for Iri<'a> {
+impl fmt::Debug for IriBuf {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_iri_ref().fmt(f)
-	}
-}
-
-impl<'a> cmp::PartialEq for Iri<'a> {
-	fn eq(&self, other: &Iri) -> bool {
-		self.as_iri_ref().eq(other.as_iri_ref())
-	}
-}
-
-impl<'a> Eq for Iri<'a> { }
-
-impl<'a> cmp::PartialEq<&'a str> for Iri<'a> {
-	fn eq(&self, other: &&'a str) -> bool {
-		self.as_iri_ref().eq(other)
-	}
-}
-
-impl<'a> Hash for Iri<'a> {
-	fn hash<H: Hasher>(&self, hasher: &mut H) {
-		self.as_iri_ref().hash(hasher)
+		self.as_iri().fmt(f)
 	}
 }
 
 impl<'a> From<Iri<'a>> for IriBuf {
 	fn from(iri: Iri<'a>) -> IriBuf {
-		IriBuf::new(iri.as_str()).unwrap()
+		let iri_ref_buf = iri.into();
+		IriBuf(iri_ref_buf)
+	}
+}
+
+impl<'a> From<&'a Iri<'a>> for IriBuf {
+	fn from(iri: &'a Iri<'a>) -> IriBuf {
+		let iri_ref_buf = iri.into();
+		IriBuf(iri_ref_buf)
+	}
+}
+
+impl TryFrom<IriRefBuf> for IriBuf {
+	type Error = IriRefBuf;
+
+	fn try_from(iri_ref: IriRefBuf) -> Result<IriBuf, IriRefBuf> {
+		if iri_ref.p.scheme_len.is_some() {
+			Ok(IriBuf(iri_ref))
+		} else {
+			Err(iri_ref)
+		}
+	}
+}
+
+impl<'a> cmp::PartialEq<Iri<'a>> for IriBuf {
+	fn eq(&self, other: &Iri<'a>) -> bool {
+		self.as_iri() == *other
+	}
+}
+
+impl<'a> cmp::PartialEq<&'a str> for IriBuf {
+	fn eq(&self, other: &&'a str) -> bool {
+		if let Ok(other) = Iri::new(other) {
+			self == &other
+		} else {
+			false
+		}
 	}
 }

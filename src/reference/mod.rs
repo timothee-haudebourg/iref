@@ -17,8 +17,8 @@ pub use self::buffer::*;
 /// similar to `str`.
 #[derive(Clone, Copy)]
 pub struct IriRef<'a> {
-	p: ParsedIriRef,
-	data: &'a [u8],
+	pub(crate) p: ParsedIriRef,
+	pub(crate) data: &'a [u8],
 }
 
 impl<'a> IriRef<'a> {
@@ -31,12 +31,16 @@ impl<'a> IriRef<'a> {
 
 	/// Length in bytes.
 	pub fn len(&self) -> usize {
-		self.p.len()
+		self.data.len()
+	}
+
+	pub fn as_ref(&self) -> &[u8] {
+		self.data
 	}
 
 	pub fn as_str(&self) -> &str {
 		unsafe {
-			std::str::from_utf8_unchecked(&self.data[0..self.len()])
+			std::str::from_utf8_unchecked(self.data)
 		}
 	}
 
@@ -92,13 +96,18 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
-	// /// Resolve the IRI reference against the given base IRI.
-	// ///
-	// /// Return the resolved IRI.
-	// pub fn resolved<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> Result<IriBuf, Error> {
-	// 	let mut iri_ref = self.into();
-	// 	iri_ref.
-	// }
+	pub fn into_iri(self) -> Result<Iri<'a>, IriRef<'a>> {
+		self.try_into()
+	}
+
+	/// Resolve the IRI reference against the given base IRI.
+	///
+	/// Return the resolved IRI.
+	pub fn resolved<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> IriBuf {
+		let mut iri_ref: IriRefBuf = self.into();
+		iri_ref.resolve(base_iri);
+		iri_ref.try_into().unwrap()
+	}
 }
 
 impl<'a> fmt::Display for IriRef<'a> {

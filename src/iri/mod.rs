@@ -8,6 +8,8 @@ mod fragment;
 
 use std::ops::Deref;
 use std::convert::TryFrom;
+use std::{fmt, cmp};
+use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 use crate::parsing;
 use crate::IriRef;
@@ -48,6 +50,7 @@ pub enum Error {
 ///
 /// Note that in future versions, this will most likely become a custom dynamic sized type,
 /// similar to `str`.
+#[derive(Clone, Copy)]
 pub struct Iri<'a>(IriRef<'a>);
 
 impl<'a> Iri<'a> {
@@ -78,8 +81,52 @@ impl<'a> Deref for Iri<'a> {
 	}
 }
 
+impl<'a> fmt::Display for Iri<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_iri_ref().fmt(f)
+	}
+}
+
+impl<'a> fmt::Debug for Iri<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_iri_ref().fmt(f)
+	}
+}
+
+impl<'a> cmp::PartialEq for Iri<'a> {
+	fn eq(&self, other: &Iri) -> bool {
+		self.as_iri_ref().eq(other.as_iri_ref())
+	}
+}
+
+impl<'a> Eq for Iri<'a> { }
+
+impl<'a> cmp::PartialEq<&'a str> for Iri<'a> {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_iri_ref().eq(other)
+	}
+}
+
+impl<'a> Hash for Iri<'a> {
+	fn hash<H: Hasher>(&self, hasher: &mut H) {
+		self.as_iri_ref().hash(hasher)
+	}
+}
+
 impl<'a> From<&'a IriBuf> for Iri<'a> {
 	fn from(buffer: &'a IriBuf) -> Iri<'a> {
 		buffer.as_iri()
+	}
+}
+
+impl<'a> TryFrom<IriRef<'a>> for Iri<'a> {
+	type Error = IriRef<'a>;
+
+	fn try_from(iri_ref: IriRef<'a>) -> Result<Iri<'a>, IriRef<'a>> {
+		if iri_ref.p.scheme_len.is_some() {
+			Ok(Iri(iri_ref))
+		} else {
+			Err(iri_ref)
+		}
 	}
 }

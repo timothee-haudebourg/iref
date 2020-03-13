@@ -156,7 +156,11 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	fn replace(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(self.data, self.p, range, content)
+		crate::replace(self.data, self.p, false, range, content)
+	}
+
+	fn replace_before_authority(&mut self, range: Range<usize>, content: &[u8]) {
+		crate::replace(self.data, self.p, true, range, content)
 	}
 
 	pub fn set_raw_userinfo<S: AsRef<[u8]> + ?Sized>(&mut self, userinfo: Option<&S>) -> Result<(), Error> {
@@ -287,8 +291,7 @@ impl<'a> AuthorityMut<'a> {
 	pub fn make_explicit(&mut self) {
 		if !self.is_explicit() {
 			let offset = self.p.offset;
-			self.replace(offset..offset, &[0x2f, 0x2f]);
-			self.p.offset += 2;
+			self.replace_before_authority(offset..offset, &[0x2f, 0x2f]);
 		}
 	}
 
@@ -308,8 +311,7 @@ impl<'a> AuthorityMut<'a> {
 			if self.is_empty() && !is_path_authority_alike {
 				let end = self.p.offset;
 				let start = end - 2;
-				self.replace(start..end, &[]);
-				self.p.offset = start;
+				self.replace_before_authority(start..end, &[]);
 				true
 			} else {
 				false
