@@ -64,8 +64,8 @@ impl<'a> Iri<'a> {
 	}
 
 	#[inline]
-	pub fn as_iri_ref(&self) -> &IriRef<'a> {
-		&self.0
+	pub fn as_iri_ref(&self) -> IriRef<'a> {
+		self.0
 	}
 
 	pub fn scheme(&self) -> Scheme {
@@ -77,7 +77,7 @@ impl<'a> Deref for Iri<'a> {
 	type Target = IriRef<'a>;
 
 	fn deref(&self) -> &IriRef<'a> {
-		self.as_iri_ref()
+		&self.0
 	}
 }
 
@@ -95,21 +95,21 @@ impl<'a> fmt::Debug for Iri<'a> {
 
 impl<'a> cmp::PartialEq for Iri<'a> {
 	fn eq(&self, other: &Iri) -> bool {
-		self.as_iri_ref().eq(other.as_iri_ref())
+		self.as_iri_ref() == other.as_iri_ref()
 	}
 }
 
 impl<'a> Eq for Iri<'a> { }
 
-impl<'a> cmp::PartialEq<&'a str> for Iri<'a> {
-	fn eq(&self, other: &&'a str) -> bool {
-		self.as_iri_ref().eq(other)
-	}
-}
-
 impl<'a> Hash for Iri<'a> {
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_iri_ref().hash(hasher)
+	}
+}
+
+impl<'a> cmp::PartialEq<&'a str> for Iri<'a> {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_iri_ref().eq(other)
 	}
 }
 

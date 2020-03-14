@@ -1,5 +1,6 @@
 use std::ops::Range;
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
@@ -106,6 +107,18 @@ impl<'a> fmt::Debug for Authority<'a> {
 impl<'a> cmp::PartialEq for Authority<'a> {
 	fn eq(&self, other: &Authority) -> bool {
 		self.userinfo() == other.userinfo() && self.port() == other.port() && self.host() == other.host()
+	}
+}
+
+impl<'a> PartialOrd for Authority<'a> {
+	fn partial_cmp(&self, other: &Authority<'a>) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<'a> Ord for Authority<'a> {
+	fn cmp(&self, other: &Authority<'a>) -> Ordering {
+		self.as_pct_str().cmp(other.as_pct_str())
 	}
 }
 

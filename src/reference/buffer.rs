@@ -1,9 +1,10 @@
 use std::ops::Range;
 use std::convert::TryInto;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 use crate::parsing::{self, ParsedIriRef};
-use crate::{Error, Iri, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
+use crate::{Error, Iri, IriBuf, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 use super::IriRef;
 
 /// Owned IRI reference.
@@ -249,6 +250,20 @@ impl fmt::Debug for IriRefBuf {
 	}
 }
 
+impl PartialEq for IriRefBuf {
+	fn eq(&self, other: &IriRefBuf) -> bool {
+		self.as_iri_ref() == other.as_iri_ref()
+	}
+}
+
+impl Eq for IriRefBuf { }
+
+impl Hash for IriRefBuf {
+	fn hash<H: Hasher>(&self, hasher: &mut H) {
+		self.as_iri_ref().hash(hasher)
+	}
+}
+
 impl<'a> From<IriRef<'a>> for IriRefBuf {
 	fn from(iri_ref: IriRef<'a>) -> IriRefBuf {
 		let mut data = Vec::new();
@@ -263,13 +278,13 @@ impl<'a> From<IriRef<'a>> for IriRefBuf {
 
 impl<'a> From<&'a IriRef<'a>> for IriRefBuf {
 	fn from(iri_ref: &'a IriRef<'a>) -> IriRefBuf {
-		let mut data = Vec::new();
-		data.resize(iri_ref.as_ref().len(), 0);
-		data.copy_from_slice(iri_ref.as_ref());
+		(*iri_ref).into()
+	}
+}
 
-		IriRefBuf {
-			p: iri_ref.p, data
-		}
+impl<'a> PartialEq<IriRef<'a>> for IriRefBuf {
+	fn eq(&self, iri_ref: &IriRef<'a>) -> bool {
+		&self.as_iri_ref() == iri_ref
 	}
 }
 
@@ -281,7 +296,13 @@ impl<'a> From<Iri<'a>> for IriRefBuf {
 
 impl<'a> From<&'a Iri<'a>> for IriRefBuf {
 	fn from(iri: &'a Iri<'a>) -> IriRefBuf {
-		iri.as_iri_ref().into()
+		(*iri).into()
+	}
+}
+
+impl From<IriBuf> for IriRefBuf {
+	fn from(iri: IriBuf) -> IriRefBuf {
+		iri.0
 	}
 }
 

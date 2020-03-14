@@ -4,10 +4,10 @@ use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use pct_str::PctStr;
 use crate::IriRefBuf;
-use super::{Iri, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
+use super::{Iri, IriRef, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 
 /// Owned IRI.
-pub struct IriBuf(IriRefBuf);
+pub struct IriBuf(pub(crate) IriRefBuf);
 
 impl IriBuf {
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<IriBuf, Error> {
@@ -27,6 +27,10 @@ impl IriBuf {
 
 	pub fn as_iri(&self) -> Iri {
 		Iri(self.0.as_iri_ref())
+	}
+
+	pub fn as_iri_ref(&self) -> IriRef {
+		self.0.as_iri_ref()
 	}
 
 	pub fn scheme(&self) -> Scheme {

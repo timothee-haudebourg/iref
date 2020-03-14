@@ -1,6 +1,7 @@
 mod buffer;
 
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::{TryFrom, TryInto};
 // use log::*;
@@ -129,6 +130,71 @@ impl<'a> cmp::PartialEq for IriRef<'a> {
 }
 
 impl<'a> Eq for IriRef<'a> { }
+
+impl<'a> cmp::PartialEq<IriRefBuf> for IriRef<'a> {
+	fn eq(&self, other: &IriRefBuf) -> bool {
+		*self == other.as_iri_ref()
+	}
+}
+
+impl<'a> cmp::PartialEq<Iri<'a>> for IriRef<'a> {
+	fn eq(&self, other: &Iri<'a>) -> bool {
+		*self == other.as_iri_ref()
+	}
+}
+
+impl<'a> cmp::PartialEq<IriBuf> for IriRef<'a> {
+	fn eq(&self, other: &IriBuf) -> bool {
+		*self == other.as_iri_ref()
+	}
+}
+
+impl<'a> PartialOrd for IriRef<'a> {
+	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<'a> Ord for IriRef<'a> {
+	fn cmp(&self, other: &IriRef<'a>) -> Ordering {
+		if self.scheme() == other.scheme() {
+			// if self.authority() == other.authority() {
+			// 	if self.path() == other.path() {
+			// 		if self.query() == other.query() {
+			// 			self.fragment().cmp(&other.fragment())
+			// 		} else {
+			// 			self.query().cmp(&other.query())
+			// 		}
+			// 	} else {
+			// 		self.path().cmp(&other.path())
+			// 	}
+			// } else {
+			// 	self.authority().cmp(&other.authority())
+			// }
+			panic!("TODO")
+		} else {
+			self.scheme().cmp(&other.scheme())
+		}
+	}
+}
+
+impl<'a> PartialOrd<IriRefBuf> for IriRef<'a> {
+	fn partial_cmp(&self, other: &IriRefBuf) -> Option<Ordering> {
+		self.partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<Iri<'a>> for IriRef<'a> {
+	fn partial_cmp(&self, other: &Iri<'a>) -> Option<Ordering> {
+		self.partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<IriBuf> for IriRef<'a> {
+	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
+		self.partial_cmp(&other.as_iri_ref())
+	}
+}
 
 impl<'a> cmp::PartialEq<&'a str> for IriRef<'a> {
 	fn eq(&self, other: &&'a str) -> bool {

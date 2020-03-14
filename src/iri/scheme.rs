@@ -1,4 +1,5 @@
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use pct_str::PctStr;
@@ -62,6 +63,18 @@ impl<'a> cmp::PartialEq for Scheme<'a> {
 }
 
 impl<'a> Eq for Scheme<'a> { }
+
+impl<'a> PartialOrd for Scheme<'a> {
+	fn partial_cmp(&self, other: &Scheme<'a>) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<'a> Ord for Scheme<'a> {
+	fn cmp(&self, other: &Scheme<'a>) -> Ordering {
+		self.as_str().cmp(other.as_str())
+	}
+}
 
 impl<'a> cmp::PartialEq<&'a str> for Scheme<'a> {
 	fn eq(&self, other: &&'a str) -> bool {
