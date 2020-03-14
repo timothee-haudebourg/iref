@@ -1,4 +1,7 @@
 mod scheme;
+mod userinfo;
+mod host;
+mod port;
 mod authority;
 mod segment;
 mod path;
@@ -8,14 +11,15 @@ mod fragment;
 
 use std::ops::Deref;
 use std::convert::TryFrom;
-use std::{fmt, cmp};
+use std::fmt;
 use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
-use pct_str::PctStr;
-use crate::parsing;
 use crate::{IriRef, IriRefBuf};
 
 pub use self::scheme::*;
+pub use self::userinfo::*;
+pub use self::host::*;
+pub use self::port::*;
 pub use self::authority::*;
 pub use self::segment::*;
 pub use self::path::*;
@@ -33,6 +37,12 @@ pub enum Error {
 	InvalidScheme,
 
 	InvalidAuthority,
+
+	InvalidUserInfo,
+
+	InvalidHost,
+
+	InvalidPort,
 
 	InvalidSegment,
 
@@ -175,13 +185,13 @@ impl<'a> TryFrom<IriRef<'a>> for Iri<'a> {
 }
 
 impl<'a> TryFrom<&'a IriRefBuf> for Iri<'a> {
-	type Error = ();
+	type Error = Error;
 
-	fn try_from(buffer: &'a IriRefBuf) -> Result<Iri<'a>, ()> {
+	fn try_from(buffer: &'a IriRefBuf) -> Result<Iri<'a>, Error> {
 		if buffer.p.scheme_len.is_some() {
 			Ok(Iri(buffer.as_iri_ref()))
 		} else {
-			Err(())
+			Err(Error::InvalidScheme)
 		}
 	}
 }

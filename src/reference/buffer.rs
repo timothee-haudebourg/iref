@@ -4,7 +4,7 @@ use std::fmt;
 use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
-use crate::parsing::{self, ParsedIriRef};
+use crate::parsing::ParsedIriRef;
 use crate::{Error, Iri, IriBuf, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 use super::IriRef;
 
@@ -28,6 +28,10 @@ impl IriRefBuf {
 			data: self.data.as_ref(),
 			p: self.p
 		}
+	}
+
+	pub fn as_iri(&self) -> Result<Iri, Error> {
+		self.try_into()
 	}
 
 	/// Length in bytes.
@@ -86,8 +90,9 @@ impl IriRefBuf {
 	}
 
 	pub fn authority(&self) -> Authority {
+		let offset = self.p.authority.offset;
 		Authority {
-			data: self.data.as_ref(),
+			data: &self.data[offset..(offset+self.p.authority.len())],
 			p: self.p.authority
 		}
 	}
@@ -201,6 +206,10 @@ impl IriRefBuf {
 	}
 
 	/// Resolve the IRI reference.
+	///
+	/// ## Abnormal use of dot segments.
+	///
+	/// https://www.rfc-editor.org/errata/eid4547
 	pub fn resolve<'b, Base: Into<Iri<'b>>>(&mut self, base_iri: Base) {
 		let base_iri: Iri<'b> = base_iri.into();
 
@@ -236,6 +245,10 @@ impl IriRefBuf {
 				self.path_mut().remove_dot_segments();
 			}
 		}
+	}
+
+	pub fn resolved<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> IriBuf {
+		self.as_iri_ref().resolved(base_iri)
 	}
 }
 
@@ -274,6 +287,18 @@ impl<'a> PartialEq<Iri<'a>> for IriRefBuf {
 impl PartialEq<IriBuf> for IriRefBuf {
 	fn eq(&self, iri: &IriBuf) -> bool {
 		self.as_iri_ref() == iri.as_iri_ref()
+	}
+}
+
+impl PartialEq<str> for IriRefBuf {
+	fn eq(&self, other: &str) -> bool {
+		self.as_iri_ref() == other
+	}
+}
+
+impl<'a> PartialEq<&'a str> for IriRefBuf {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_iri_ref() == *other
 	}
 }
 

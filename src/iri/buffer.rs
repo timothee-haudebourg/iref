@@ -1,9 +1,8 @@
 use std::ops::Deref;
-use std::{fmt, cmp};
+use std::fmt;
 use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
-use pct_str::PctStr;
 use crate::IriRefBuf;
 use super::{Iri, IriRef, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 
@@ -175,13 +174,13 @@ impl<'a> From<&'a Iri<'a>> for IriBuf {
 }
 
 impl<'a> TryFrom<IriRef<'a>> for IriBuf {
-	type Error = ();
+	type Error = Error;
 
-	fn try_from(iri_ref: IriRef<'a>) -> Result<IriBuf, ()> {
+	fn try_from(iri_ref: IriRef<'a>) -> Result<IriBuf, Error> {
 		if iri_ref.p.scheme_len.is_some() {
 			Ok(IriBuf(iri_ref.into()))
 		} else {
-			Err(())
+			Err(Error::InvalidScheme)
 		}
 	}
 }

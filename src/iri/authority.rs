@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 
 use crate::parsing::{self, ParsedAuthority};
-use super::Error;
+use super::{Error, UserInfo, Host, Port};
 
 pub struct Authority<'a> {
 	/// Authority slice.
@@ -48,28 +48,30 @@ impl<'a> Authority<'a> {
 		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 
-	pub fn userinfo(&self) -> Option<&PctStr> {
+	pub fn userinfo(&self) -> Option<UserInfo> {
 		if let Some(len) = self.p.userinfo_len {
-			unsafe {
-				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[0..len])))
-			}
+			Some(UserInfo {
+				data: &self.data[0..len]
+			})
 		} else {
 			None
 		}
 	}
 
-	pub fn host(&self) -> &PctStr {
-		unsafe {
-			let len = self.p.host_len;
-			PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[0..len]))
+	pub fn host(&self) -> Host {
+		let len = self.p.host_len;
+		let offset = self.p.host_offset() - self.p.offset;
+		Host {
+			data: &self.data[offset..(offset+len)]
 		}
 	}
 
-	pub fn port(&self) -> Option<&PctStr> {
+	pub fn port(&self) -> Option<Port> {
 		if let Some(len) = self.p.port_len {
-			unsafe {
-				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[0..len])))
-			}
+			let offset = self.p.port_offset() - self.p.offset;
+			Some(Port {
+				data: &self.data[offset..(offset+len)]
+			})
 		} else {
 			None
 		}
@@ -157,17 +159,6 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
-	pub fn userinfo(&self) -> Option<&PctStr> {
-		if let Some(len) = self.p.userinfo_len {
-			unsafe {
-				let offset = self.p.offset;
-				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
-			}
-		} else {
-			None
-		}
-	}
-
 	fn replace(&mut self, range: Range<usize>, content: &[u8]) {
 		crate::replace(self.data, self.p, false, range, content)
 	}
@@ -176,10 +167,30 @@ impl<'a> AuthorityMut<'a> {
 		crate::replace(self.data, self.p, true, range, content)
 	}
 
-	pub fn set_raw_userinfo<S: AsRef<[u8]> + ?Sized>(&mut self, userinfo: Option<&S>) -> Result<(), Error> {
+	pub fn userinfo(&self) -> Option<UserInfo> {
+		if let Some(len) = self.p.userinfo_len {
+			let offset = self.p.offset;
+			Some(UserInfo {
+				data: &self.data[offset..(offset+len)]
+			})
+		} else {
+			None
+		}
+	}
+
+	pub fn set_userinfo(&mut self, userinfo: Option<UserInfo>) {
 		let offset = self.p.offset;
 
-		if userinfo.is_none() || userinfo.unwrap().as_ref().is_empty() {
+		if let Some(new_userinfo) = userinfo {
+			if let Some(userinfo_len) = self.p.userinfo_len {
+				self.replace(offset..(offset+userinfo_len), new_userinfo.as_ref());
+			} else {
+				self.replace(offset..offset, &[0x40]);
+				self.replace(offset..offset, new_userinfo.as_ref());
+			}
+
+			self.p.userinfo_len = Some(new_userinfo.as_ref().len());
+		} else {
 			if let Some(userinfo_len) = self.p.userinfo_len {
 				self.replace(offset..(offset+userinfo_len+1), &[]);
 			}
@@ -187,72 +198,56 @@ impl<'a> AuthorityMut<'a> {
 			self.p.userinfo_len = None;
 			// Make the authority part implicit, if we can.
 			self.make_implicit();
-		} else {
-			let new_userinfo = userinfo.unwrap().as_ref();
-			let new_userinfo_len = parsing::parse_userinfo(new_userinfo, 0)?;
-			if new_userinfo_len != new_userinfo.len() {
-				return Err(Error::Invalid);
-			}
-
-			if let Some(userinfo_len) = self.p.userinfo_len {
-				self.replace(offset..(offset+userinfo_len), new_userinfo);
-			} else {
-				self.replace(offset..offset, &[0x40]);
-				self.replace(offset..offset, new_userinfo);
-			}
-
-			self.p.userinfo_len = Some(new_userinfo_len);
-		}
-
-		Ok(())
-	}
-
-	pub fn set_userinfo(&mut self, userinfo: Option<&str>) -> Result<(), Error> {
-		self.set_raw_userinfo(userinfo)
-	}
-
-	pub fn host(&self) -> &PctStr {
-		unsafe {
-			let offset = self.p.host_offset();
-			let len = self.p.host_len;
-			PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)]))
 		}
 	}
 
-	pub fn set_host<S: AsRef<[u8]> + ?Sized>(&mut self, host: &S) -> Result<(), Error> {
+	pub fn host(&self) -> Host {
 		let offset = self.p.host_offset();
-		let new_host = host.as_ref();
-		let new_host_len = parsing::parse_host(new_host, 0)?;
-		if new_host_len != new_host.len() {
-			return Err(Error::Invalid);
+		let len = self.p.host_len;
+		Host {
+			data: &self.data[offset..(offset+len)]
 		}
+	}
 
-		self.replace(offset..(offset+self.p.host_len), new_host);
-		self.p.host_len = new_host_len;
+	pub fn set_host(&mut self, host: Host) {
+		let offset = self.p.host_offset();
+		self.replace(offset..(offset+self.p.host_len), host.as_ref());
+		self.p.host_len = host.as_ref().len();
 
-		if new_host_len == 0 {
+		if self.p.host_len == 0 {
 			// Make the authority part implicit, if we can.
 			self.make_implicit();
+		} else {
+			self.make_explicit();
 		}
-
-		Ok(())
 	}
 
-	pub fn port(&self) -> Option<&PctStr> {
+	pub fn port(&self) -> Option<Port> {
 		if let Some(len) = self.p.port_len {
-			unsafe {
-				let offset = self.p.port_offset();
-				Some(PctStr::new_unchecked(std::str::from_utf8_unchecked(&self.data[offset..(offset+len)])))
-			}
+			let offset = self.p.port_offset();
+			Some(Port {
+				data: &self.data[offset..(offset+len)]
+			})
 		} else {
 			None
 		}
 	}
 
-	pub fn set_raw_port<S: AsRef<[u8]> + ?Sized>(&mut self, port: Option<&S>) -> Result<(), Error> {
+	pub fn set_port(&mut self, port: Option<Port>) {
 		let offset = self.p.port_offset();
 
-		if port.is_none() || port.unwrap().as_ref().is_empty() {
+		if let Some(new_port) = port {
+			if let Some(port_len) = self.p.port_len {
+				self.replace(offset..(offset+port_len), new_port.as_ref());
+			} else {
+				self.replace(offset..offset, &[0x3a]);
+				self.replace((offset+1)..(offset+1), new_port.as_ref());
+			}
+
+			self.p.port_len = Some(new_port.as_ref().len());
+			// Make the authority part explicit.
+			self.make_explicit();
+		} else {
 			if let Some(port_len) = self.p.port_len {
 				self.replace((offset-1)..(offset+port_len), &[]);
 			}
@@ -260,28 +255,7 @@ impl<'a> AuthorityMut<'a> {
 			self.p.port_len = None;
 			// Make the authority part implicit, if we can.
 			self.make_implicit();
-		} else {
-			let new_port = port.unwrap().as_ref();
-			let new_port_len = parsing::parse_port(new_port, 0)?;
-			if new_port_len != new_port.len() {
-				return Err(Error::Invalid);
-			}
-
-			if let Some(port_len) = self.p.port_len {
-				self.replace(offset..(offset+port_len), new_port);
-			} else {
-				self.replace(offset..offset, &[0x3a]);
-				self.replace((offset+1)..(offset+1), new_port);
-			}
-
-			self.p.port_len = Some(new_port_len);
 		}
-
-		Ok(())
-	}
-
-	pub fn set_port(&mut self, port: Option<&str>) -> Result<(), Error> {
-		self.set_raw_port(port)
 	}
 
 	/// Checks if there is an explicit authority delimiter `//` in the IRI.

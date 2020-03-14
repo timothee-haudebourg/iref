@@ -1,6 +1,5 @@
 mod utf8;
 
-use log::*;
 use super::Error;
 
 #[derive(Default, Clone, Copy)]
@@ -519,7 +518,6 @@ fn parse_ip_literal(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error>
 		if let Some((']', 1)) = get_char(buffer, i)? {
 			i += 1;
 			let len = i - offset;
-			debug!("ip literal");
 			return Ok(Some(len))
 		}
 	}

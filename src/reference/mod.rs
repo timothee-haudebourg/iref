@@ -3,7 +3,7 @@ mod buffer;
 use std::{fmt, cmp};
 use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 // use log::*;
 use pct_str::PctStr;
 

@@ -2,7 +2,6 @@ use std::{fmt, cmp};
 use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
-use pct_str::PctStr;
 use crate::parsing;
 use super::Error;
 
