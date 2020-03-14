@@ -83,7 +83,7 @@ The `try_into` method is used to ensure that each string is syntactically correc
 
 ### Path manipulation
 
-The IRI path is access through the `path` or `path_mut` methods.
+The IRI path is accessed through the `path` or `path_mut` methods.
 It is possible to access the segments of a path using the iterator returned by the `segments` method.
 
 ```rust
@@ -108,7 +108,7 @@ assert_eq!(iri.path(), "/a/b/c")
 
 This crate provides the two types `IriRef` and `IriRefBuf` to represent
 IRI references. An IRI reference is either an IRI or a relative IRI.
-Contrarily to regular IRI, relative IRI references may have no scheme.
+Contrarily to regular IRIs, relative IRI references may have no scheme.
 
 ```rust
 let mut iri_ref = IriRefBuf::default(); // an IRI reference can be empty.
@@ -140,15 +140,30 @@ assert_eq!(iri_ref, "http://a/b/c/y");
 
 ### IRI comparison
 
-This implementation is protocol agnostic.
-For instance, even if the
+Here are the features of the IRI comparison method implemented in this crate.
+
+#### Protocol agnostic
+
+Even if the
 [HTTP protocol](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol)
 defines `80` as the default port,
 the two IRIs `http://example.org` and `http://example.org:80` are **not** equivalent.
-However the comparison algorithm is not just performing a string comparison.
+
+#### Every `/` counts
+
+The path `/foo/bar` is **not** equivalent to `/foo/bar/`.
+
+#### Percent-encoded characters
+
 Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
-the two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
-Also note that the path `/foo/bar` is **not** equivalent to `/foo/bar/`.
+percent encoded characters are correctly handled.
+The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
+
+#### Empty authorities
+
+The authority is compared without regard for the presence or absence of the `//`
+delimiter.
+The two IRIs `http:///foo/bar` and `http:/foo/bar` **are** equivalent.
 
 ## License
 
