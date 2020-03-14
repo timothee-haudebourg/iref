@@ -1,5 +1,6 @@
 use std::ops::Deref;
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use pct_str::PctStr;
@@ -7,6 +8,7 @@ use crate::IriRefBuf;
 use super::{Iri, IriRef, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 
 /// Owned IRI.
+#[derive(Clone)]
 pub struct IriBuf(pub(crate) IriRefBuf);
 
 impl IriBuf {
@@ -92,6 +94,72 @@ impl fmt::Debug for IriBuf {
 	}
 }
 
+impl PartialEq for IriBuf {
+	fn eq(&self, other: &IriBuf) -> bool {
+		self.as_iri_ref() == other.as_iri_ref()
+	}
+}
+
+impl Eq for IriBuf { }
+
+impl<'a> PartialEq<Iri<'a>> for IriBuf {
+	fn eq(&self, other: &Iri<'a>) -> bool {
+		self.as_iri_ref() == other.as_iri_ref()
+	}
+}
+
+impl<'a> PartialEq<IriRef<'a>> for IriBuf {
+	fn eq(&self, other: &IriRef<'a>) -> bool {
+		self.as_iri_ref() == *other
+	}
+}
+
+impl PartialEq<IriRefBuf> for IriBuf {
+	fn eq(&self, other: &IriRefBuf) -> bool {
+		self.as_iri_ref() == other.as_iri_ref()
+	}
+}
+
+impl<'a> PartialEq<&'a str> for IriBuf {
+	fn eq(&self, other: &&'a str) -> bool {
+		if let Ok(other) = Iri::new(other) {
+			self == &other
+		} else {
+			false
+		}
+	}
+}
+
+impl PartialOrd for IriBuf {
+	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl Ord for IriBuf {
+	fn cmp(&self, other: &IriBuf) -> Ordering {
+		self.as_iri_ref().cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<Iri<'a>> for IriBuf {
+	fn partial_cmp(&self, other: &Iri<'a>) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<IriRef<'a>> for IriBuf {
+	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(other)
+	}
+}
+
+impl PartialOrd<IriRefBuf> for IriBuf {
+	fn partial_cmp(&self, other: &IriRefBuf) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
 impl<'a> From<Iri<'a>> for IriBuf {
 	fn from(iri: Iri<'a>) -> IriBuf {
 		let iri_ref_buf = iri.into();
@@ -103,6 +171,18 @@ impl<'a> From<&'a Iri<'a>> for IriBuf {
 	fn from(iri: &'a Iri<'a>) -> IriBuf {
 		let iri_ref_buf = iri.into();
 		IriBuf(iri_ref_buf)
+	}
+}
+
+impl<'a> TryFrom<IriRef<'a>> for IriBuf {
+	type Error = ();
+
+	fn try_from(iri_ref: IriRef<'a>) -> Result<IriBuf, ()> {
+		if iri_ref.p.scheme_len.is_some() {
+			Ok(IriBuf(iri_ref.into()))
+		} else {
+			Err(())
+		}
 	}
 }
 
@@ -118,18 +198,8 @@ impl TryFrom<IriRefBuf> for IriBuf {
 	}
 }
 
-impl<'a> cmp::PartialEq<Iri<'a>> for IriBuf {
-	fn eq(&self, other: &Iri<'a>) -> bool {
-		self.as_iri() == *other
-	}
-}
-
-impl<'a> cmp::PartialEq<&'a str> for IriBuf {
-	fn eq(&self, other: &&'a str) -> bool {
-		if let Ok(other) = Iri::new(other) {
-			self == &other
-		} else {
-			false
-		}
+impl Hash for IriBuf {
+	fn hash<H: Hasher>(&self, hasher: &mut H) {
+		self.as_iri_ref().hash(hasher)
 	}
 }

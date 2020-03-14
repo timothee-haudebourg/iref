@@ -9,10 +9,11 @@ mod fragment;
 use std::ops::Deref;
 use std::convert::TryFrom;
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 use crate::parsing;
-use crate::IriRef;
+use crate::{IriRef, IriRefBuf};
 
 pub use self::scheme::*;
 pub use self::authority::*;
@@ -93,7 +94,7 @@ impl<'a> fmt::Debug for Iri<'a> {
 	}
 }
 
-impl<'a> cmp::PartialEq for Iri<'a> {
+impl<'a> PartialEq for Iri<'a> {
 	fn eq(&self, other: &Iri) -> bool {
 		self.as_iri_ref() == other.as_iri_ref()
 	}
@@ -101,15 +102,57 @@ impl<'a> cmp::PartialEq for Iri<'a> {
 
 impl<'a> Eq for Iri<'a> { }
 
-impl<'a> Hash for Iri<'a> {
-	fn hash<H: Hasher>(&self, hasher: &mut H) {
-		self.as_iri_ref().hash(hasher)
+impl<'a> PartialEq<IriRef<'a>> for Iri<'a> {
+	fn eq(&self, other: &IriRef<'a>) -> bool {
+		self.as_iri_ref() == *other
 	}
 }
 
-impl<'a> cmp::PartialEq<&'a str> for Iri<'a> {
+impl<'a> PartialEq<IriRefBuf> for Iri<'a> {
+	fn eq(&self, other: &IriRefBuf) -> bool {
+		self.as_iri_ref() == other.as_iri_ref()
+	}
+}
+
+impl<'a> PartialEq<IriBuf> for Iri<'a> {
+	fn eq(&self, other: &IriBuf) -> bool {
+		self.as_iri_ref() == other.as_iri_ref()
+	}
+}
+
+impl<'a> PartialEq<&'a str> for Iri<'a> {
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_iri_ref().eq(other)
+	}
+}
+
+impl<'a> PartialOrd for Iri<'a> {
+	fn partial_cmp(&self, other: &Iri<'a>) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> Ord for Iri<'a> {
+	fn cmp(&self, other: &Iri<'a>) -> Ordering {
+		self.as_iri_ref().cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<IriRef<'a>> for Iri<'a> {
+	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(other)
+	}
+}
+
+impl<'a> PartialOrd<IriRefBuf> for Iri<'a> {
+	fn partial_cmp(&self, other: &IriRefBuf) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<IriBuf> for Iri<'a> {
+	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
@@ -128,5 +171,23 @@ impl<'a> TryFrom<IriRef<'a>> for Iri<'a> {
 		} else {
 			Err(iri_ref)
 		}
+	}
+}
+
+impl<'a> TryFrom<&'a IriRefBuf> for Iri<'a> {
+	type Error = ();
+
+	fn try_from(buffer: &'a IriRefBuf) -> Result<Iri<'a>, ()> {
+		if buffer.p.scheme_len.is_some() {
+			Ok(Iri(buffer.as_iri_ref()))
+		} else {
+			Err(())
+		}
+	}
+}
+
+impl<'a> Hash for Iri<'a> {
+	fn hash<H: Hasher>(&self, hasher: &mut H) {
+		self.as_iri_ref().hash(hasher)
 	}
 }

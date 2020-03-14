@@ -149,6 +149,16 @@ impl<'a> cmp::PartialEq<IriBuf> for IriRef<'a> {
 	}
 }
 
+impl<'a> cmp::PartialEq<&'a str> for IriRef<'a> {
+	fn eq(&self, other: &&'a str) -> bool {
+		if let Ok(other) = IriRef::new(other) {
+			self == &other
+		} else {
+			false
+		}
+	}
+}
+
 impl<'a> PartialOrd for IriRef<'a> {
 	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
 		Some(self.cmp(other))
@@ -158,20 +168,19 @@ impl<'a> PartialOrd for IriRef<'a> {
 impl<'a> Ord for IriRef<'a> {
 	fn cmp(&self, other: &IriRef<'a>) -> Ordering {
 		if self.scheme() == other.scheme() {
-			// if self.authority() == other.authority() {
-			// 	if self.path() == other.path() {
-			// 		if self.query() == other.query() {
-			// 			self.fragment().cmp(&other.fragment())
-			// 		} else {
-			// 			self.query().cmp(&other.query())
-			// 		}
-			// 	} else {
-			// 		self.path().cmp(&other.path())
-			// 	}
-			// } else {
-			// 	self.authority().cmp(&other.authority())
-			// }
-			panic!("TODO")
+			if self.authority() == other.authority() {
+				if self.path() == other.path() {
+					if self.query() == other.query() {
+						self.fragment().cmp(&other.fragment())
+					} else {
+						self.query().cmp(&other.query())
+					}
+				} else {
+					self.path().cmp(&other.path())
+				}
+			} else {
+				self.authority().cmp(&other.authority())
+			}
 		} else {
 			self.scheme().cmp(&other.scheme())
 		}
@@ -196,13 +205,21 @@ impl<'a> PartialOrd<IriBuf> for IriRef<'a> {
 	}
 }
 
-impl<'a> cmp::PartialEq<&'a str> for IriRef<'a> {
-	fn eq(&self, other: &&'a str) -> bool {
-		if let Ok(other) = IriRef::new(other) {
-			self == &other
-		} else {
-			false
-		}
+impl<'a> From<&'a IriRefBuf> for IriRef<'a> {
+	fn from(iri_ref_buf: &'a IriRefBuf) -> IriRef<'a> {
+		iri_ref_buf.as_iri_ref()
+	}
+}
+
+impl<'a> From<Iri<'a>> for IriRef<'a> {
+	fn from(iri: Iri<'a>) -> IriRef<'a> {
+		iri.as_iri_ref()
+	}
+}
+
+impl<'a> From<&'a IriBuf> for IriRef<'a> {
+	fn from(iri_ref_buf: &'a IriBuf) -> IriRef<'a> {
+		iri_ref_buf.as_iri_ref()
 	}
 }
 

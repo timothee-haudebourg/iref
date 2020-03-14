@@ -1,4 +1,5 @@
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use pct_str::PctStr;
@@ -73,6 +74,18 @@ impl<'a> Eq for Query<'a> { }
 impl<'a> cmp::PartialEq<&'a str> for Query<'a> {
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_str() == *other
+	}
+}
+
+impl<'a> PartialOrd for Query<'a> {
+	fn partial_cmp(&self, other: &Query<'a>) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<'a> Ord for Query<'a> {
+	fn cmp(&self, other: &Query<'a>) -> Ordering {
+		self.as_pct_str().cmp(other.as_pct_str())
 	}
 }
 

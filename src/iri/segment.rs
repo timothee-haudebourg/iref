@@ -1,4 +1,5 @@
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use pct_str::PctStr;
@@ -73,6 +74,18 @@ impl<'a> Eq for Segment<'a> { }
 impl<'a> cmp::PartialEq<&'a str> for Segment<'a> {
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_str() == *other
+	}
+}
+
+impl<'a> PartialOrd for Segment<'a> {
+	fn partial_cmp(&self, other: &Segment<'a>) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<'a> Ord for Segment<'a> {
+	fn cmp(&self, other: &Segment<'a>) -> Ordering {
+		self.as_pct_str().cmp(other.as_pct_str())
 	}
 }
 

@@ -1,4 +1,5 @@
 use std::{fmt, cmp};
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use std::iter::IntoIterator;
@@ -201,6 +202,18 @@ impl<'a> Eq for Path<'a> { }
 impl<'a> cmp::PartialEq<&'a str> for Path<'a> {
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_pct_str() == *other
+	}
+}
+
+impl<'a> PartialOrd for Path<'a> {
+	fn partial_cmp(&self, other: &Path<'a>) -> Option<Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl<'a> Ord for Path<'a> {
+	fn cmp(&self, other: &Path<'a>) -> Ordering {
+		self.as_pct_str().cmp(other.as_pct_str())
 	}
 }
 

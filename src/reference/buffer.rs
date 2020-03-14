@@ -1,6 +1,7 @@
 use std::ops::Range;
 use std::convert::TryInto;
 use std::fmt;
+use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 use crate::parsing::{self, ParsedIriRef};
@@ -258,9 +259,51 @@ impl PartialEq for IriRefBuf {
 
 impl Eq for IriRefBuf { }
 
-impl Hash for IriRefBuf {
-	fn hash<H: Hasher>(&self, hasher: &mut H) {
-		self.as_iri_ref().hash(hasher)
+impl<'a> PartialEq<IriRef<'a>> for IriRefBuf {
+	fn eq(&self, iri_ref: &IriRef<'a>) -> bool {
+		self.as_iri_ref() == *iri_ref
+	}
+}
+
+impl<'a> PartialEq<Iri<'a>> for IriRefBuf {
+	fn eq(&self, iri: &Iri<'a>) -> bool {
+		self.as_iri_ref() == iri.as_iri_ref()
+	}
+}
+
+impl PartialEq<IriBuf> for IriRefBuf {
+	fn eq(&self, iri: &IriBuf) -> bool {
+		self.as_iri_ref() == iri.as_iri_ref()
+	}
+}
+
+impl PartialOrd for IriRefBuf {
+	fn partial_cmp(&self, other: &IriRefBuf) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl Ord for IriRefBuf {
+	fn cmp(&self, other: &IriRefBuf) -> Ordering {
+		self.as_iri_ref().cmp(&other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<IriRef<'a>> for IriRefBuf {
+	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(other)
+	}
+}
+
+impl<'a> PartialOrd<Iri<'a>> for IriRefBuf {
+	fn partial_cmp(&self, other: &Iri<'a>) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl PartialOrd<IriBuf> for IriRefBuf {
+	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
+		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
@@ -282,12 +325,6 @@ impl<'a> From<&'a IriRef<'a>> for IriRefBuf {
 	}
 }
 
-impl<'a> PartialEq<IriRef<'a>> for IriRefBuf {
-	fn eq(&self, iri_ref: &IriRef<'a>) -> bool {
-		&self.as_iri_ref() == iri_ref
-	}
-}
-
 impl<'a> From<Iri<'a>> for IriRefBuf {
 	fn from(iri: Iri<'a>) -> IriRefBuf {
 		iri.as_iri_ref().into()
@@ -303,6 +340,12 @@ impl<'a> From<&'a Iri<'a>> for IriRefBuf {
 impl From<IriBuf> for IriRefBuf {
 	fn from(iri: IriBuf) -> IriRefBuf {
 		iri.0
+	}
+}
+
+impl Hash for IriRefBuf {
+	fn hash<H: Hasher>(&self, hasher: &mut H) {
+		self.as_iri_ref().hash(hasher)
 	}
 }
 
