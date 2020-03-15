@@ -100,11 +100,11 @@ corresponding methods:
 let mut iri = IriBuf::new("https://rust-lang.org/a/c");
 let mut path = iri.path_mut();
 
-path.pop("c");
-path.push("b");
-path.push("c");
+path.pop();
+path.push("b".try_into()?);
+path.push("c/".try_into()?); // a `/` character is allowed at the end of a segment.
 
-assert_eq!(iri.path(), "/a/b/c")
+assert_eq!(iri.path(), "/a/b/c/")
 ```
 
 ### IRI references
