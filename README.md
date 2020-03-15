@@ -49,14 +49,14 @@ use iref::Iri;
 let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
 
 println!("scheme: {}", iri.scheme());
-println!("authority: {}", iri.authority());
+println!("authority: {}", iri.authority().unwrap());
 println!("path: {}", iri.path());
 println!("query: {}", iri.query().unwrap());
 println!("fragment: {}", iri.fragment().unwrap());
 ```
 
 IRIs can be created and modified using the `IriBuf` type.
-With this type, the IRI is hold in a single buffer,
+With this type, the IRI is held in a single buffer,
 modified in-place to reduce memory allocation and optimize memory accesses.
 This also allows the conversion from `IriBuf` into `Iri`.
 
@@ -68,7 +68,7 @@ use iref::IriBuf;
 
 let mut iri = IriBuf::new("https://www.rust-lang.org")?;
 
-iri.authority_mut().set_port(Some("40".try_into()?));
+iri.authority_mut().unwrap().set_port(Some("40".try_into()?));
 iri.set_path("/foo".try_into()?);
 iri.path_mut().push("bar".try_into()?);
 iri.set_query(Some("query".try_into()?));
@@ -92,7 +92,10 @@ for segment in iri.path().segments() {
 }
 ```
 
-It is possible to push or pop segments to a path using the corresponding methods:
+One can use the `normalized_segments` method to iterate over the normalized
+version of the path where dot segments (`.` and `..`) are removed.
+In addition, it is possible to push or pop segments to a path using the
+corresponding methods:
 ```rust
 let mut iri = IriBuf::new("https://rust-lang.org/a/c");
 let mut path = iri.path_mut();
@@ -138,6 +141,12 @@ iri_ref.resolve(base_iri);
 assert_eq!(iri_ref, "http://a/b/c/y");
 ```
 
+This crate implements
+[Errata 4547](https://www.rfc-editor.org/errata/eid4547) about the
+abnormal use of dot segments.
+This means that for instance, the path `a/b/../../../` is normalized into
+`../`.
+
 ### IRI comparison
 
 Here are the features of the IRI comparison method implemented in this crate.
@@ -154,26 +163,22 @@ the two IRIs `http://example.org` and `http://example.org:80` are **not** equiva
 
 The path `/foo/bar` is **not** equivalent to `/foo/bar/`.
 
-#### No dot segments normalization
+#### Path normalization
 
-Dot segments (`.` and `..`) are intended for use only in IRI references.
-Normalization occurs when using the Reference Resolution Algorithm through the
-`resolve` or `resolved` methods.
-Outside of this algorithm, dot segments are considered as regular segments and
-have no special meaning. As such, they are not normalized during IRI path
-comparison.
+Paths are normalized during comparison by removing dot segments (`.` and `..`).
+This means for instance that the paths `a/b/c` and `a/../a/./b/../b/c` **are**
+equivalent.
+Note however that this crate implements
+[Errata 4547](https://www.rfc-editor.org/errata/eid4547) about the
+abnormal use of dot segments.
+This means that for instance, the path `/a/b/../../../` is equivalent to
+`../` and **not** `/`.
 
 #### Percent-encoded characters
 
 Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 percent encoded characters are correctly handled.
 The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
-
-#### Empty authorities
-
-The authority is compared without regard for the presence or absence of the `//`
-delimiter.
-The two IRIs `http:///foo/bar` and `http:/foo/bar` **are** equivalent.
 
 ## License
 
