@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 use crate::parsing;
 use super::Error;
 
+#[derive(Clone, Copy)]
 pub struct Scheme<'a> {
 	/// The scheme slice.
 	pub(crate) data: &'a [u8]

@@ -52,11 +52,7 @@ impl IriRefBuf {
 	}
 
 	pub(crate) fn replace(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(&mut self.data, &mut self.p.authority, false, range, content)
-	}
-
-	pub(crate) fn replace_before_authority(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(&mut self.data, &mut self.p.authority, true, range, content)
+		crate::replace(&mut self.data, range, content)
 	}
 
 	pub fn scheme(&self) -> Option<Scheme> {
@@ -73,34 +69,44 @@ impl IriRefBuf {
 	pub fn set_scheme(&mut self, scheme: Option<Scheme>) {
 		if let Some(new_scheme) = scheme {
 			if let Some(scheme_len) = self.p.scheme_len {
-				self.replace_before_authority(0..scheme_len, new_scheme.as_ref());
+				self.replace(0..scheme_len, new_scheme.as_ref());
 			} else {
-				self.replace_before_authority(0..0, &[0x3a]);
-				self.replace_before_authority(0..0, new_scheme.as_ref());
+				self.replace(0..0, &[0x3a]);
+				self.replace(0..0, new_scheme.as_ref());
 			}
 
 			self.p.scheme_len = Some(new_scheme.as_ref().len());
 		} else {
 			if let Some(scheme_len) = self.p.scheme_len {
-				self.replace_before_authority(0..(scheme_len+1), &[]);
+				self.replace(0..(scheme_len+1), &[]);
 			}
 
 			self.p.scheme_len = None;
 		}
 	}
 
-	pub fn authority(&self) -> Authority {
-		let offset = self.p.authority.offset;
-		Authority {
-			data: &self.data[offset..(offset+self.p.authority.len())],
-			p: self.p.authority
+	pub fn authority(&self) -> Option<Authority> {
+		if let Some(authority) = self.p.authority {
+			let offset = self.p.authority_offset();
+			Some(Authority {
+				data: &self.data[offset..(offset+authority.len())],
+				p: authority
+			})
+		} else {
+			None
 		}
 	}
 
-	pub fn authority_mut(&mut self) -> AuthorityMut {
-		AuthorityMut {
-			data: &mut self.data,
-			p: &mut self.p.authority
+	pub fn authority_mut(&mut self) -> Option<AuthorityMut> {
+		let offset = self.p.authority_offset();
+		if let Some(authority) = self.p.authority.as_mut() {
+			Some(AuthorityMut {
+				data: &mut self.data,
+				offset: offset,
+				p: authority
+			})
+		} else {
+			None
 		}
 	}
 
@@ -108,22 +114,29 @@ impl IriRefBuf {
 	///
 	/// It must be a syntactically correct authority. If not,
 	/// this method returns an error, and the IRI is unchanged.
-	pub fn set_authority(&mut self, authority: Authority) {
-		let offset = self.p.authority.offset;
-		let mut new_parsed_authority = authority.p;
-		new_parsed_authority.offset = offset;
-		self.replace(offset..(offset+self.p.authority.len()), authority.as_ref());
-		self.p.authority = new_parsed_authority;
+	pub fn set_authority(&mut self, authority: Option<Authority>) {
+		let offset = self.p.authority_offset();
 
-		if authority.is_empty() {
-			self.authority_mut().make_implicit();
+		if let Some(new_authority) = authority {
+			if let Some(authority) = self.p.authority {
+				self.replace(offset..(offset+authority.len()), new_authority.as_ref());
+			} else {
+				self.replace(offset..offset, new_authority.as_ref());
+				self.replace(offset..offset, &[0x2f, 0x2f]);
+			}
+
+			self.p.authority = Some(new_authority.p);
 		} else {
-			self.authority_mut().make_explicit();
+			if let Some(authority) = self.p.authority {
+				self.replace((offset-2)..(offset+authority.len()), &[]);
+			}
+
+			self.p.query_len = None;
 		}
 	}
 
 	pub fn path(&self) -> Path {
-		let offset = self.p.authority.offset + self.p.authority.len();
+		let offset = self.p.path_offset();
 		Path {
 			data: &self.data[offset..(offset+self.p.path_len)]
 		}
@@ -214,10 +227,12 @@ impl IriRefBuf {
 		let base_iri: Iri<'b> = base_iri.into();
 
 		if self.scheme().is_some() {
-			self.path_mut().remove_dot_segments();
+			self.path_mut().normalize();
 		} else {
 			self.set_scheme(Some(base_iri.scheme()));
-			if self.authority().is_empty() {
+			if self.authority().is_some() {
+				self.path_mut().normalize();
+			} else {
 				if self.path().is_relative() && self.path().is_empty() {
 					self.set_path(base_iri.path());
 					if self.query().is_none() {
@@ -225,10 +240,10 @@ impl IriRefBuf {
 					}
 				} else {
 					if self.path().is_absolute() {
-						self.path_mut().remove_dot_segments();
+						self.path_mut().normalize();
 					} else {
 						let mut path_buffer = IriRefBuf::default();
-						if !base_iri.authority().is_empty() && base_iri.path().is_empty() {
+						if base_iri.authority().is_some() && base_iri.path().is_empty() {
 							path_buffer.set_path("/".try_into().unwrap());
 						} else {
 							path_buffer.set_path(base_iri.path().directory());
@@ -241,8 +256,6 @@ impl IriRefBuf {
 					}
 				}
 				self.set_authority(base_iri.authority());
-			} else {
-				self.path_mut().remove_dot_segments();
 			}
 		}
 	}
@@ -418,13 +431,14 @@ mod tests {
 	#[test]
 	fn resolution_abnormal() {
 		// https://www.w3.org/2004/04/uri-rel-test.html
+		// NOTE we implement [Errata 4547](https://www.rfc-editor.org/errata/eid4547)
 		let base_iri = Iri::new("http://a/b/c/d;p?q").unwrap();
 
 		let tests = [
-			("../../../g", "http://a/g"),
-			("../../../../g", "http://a/g"),
+			("../../../g", "http://a/../g"), // NOTE without Errata 4547: "http://a/g"
+			("../../../../g", "http://a/../../g"), // NOTE without Errata 4547: "http://a/g"
 			("/./g", "http://a/g"),
-			("/../g", "http://a/g"),
+			("/../g", "http://a/../g"), // NOTE without Errata 4547: "http://a/g"
 			("g.", "http://a/b/c/g."),
 			(".g", "http://a/b/c/.g"),
 			("g..", "http://a/b/c/g.."),
@@ -443,7 +457,7 @@ mod tests {
 		];
 
 		for (relative, absolute) in &tests {
-			// println!("{} => {}", relative, absolute);
+			println!("{} => {}", relative, absolute);
 			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
 		}
 	}

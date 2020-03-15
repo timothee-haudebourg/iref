@@ -4,7 +4,6 @@ use super::Error;
 
 #[derive(Default, Clone, Copy)]
 pub struct ParsedAuthority {
-	pub offset: usize,
 	pub userinfo_len: Option<usize>,
 	pub host_len: usize,
 	pub port_len: Option<usize>
@@ -32,7 +31,7 @@ impl ParsedAuthority {
 	}
 
 	pub fn host_offset(&self) -> usize {
-		let mut offset = self.offset;
+		let mut offset = 0;
 
 		if let Some(l) = self.userinfo_len {
 			offset += l + 1;
@@ -42,7 +41,7 @@ impl ParsedAuthority {
 	}
 
 	pub fn port_offset(&self) -> usize {
-		let mut offset = self.offset;
+		let mut offset = 0;
 
 		if let Some(l) = self.userinfo_len {
 			offset += l + 1;
@@ -61,7 +60,7 @@ impl ParsedAuthority {
 #[derive(Default, Clone, Copy)]
 pub struct ParsedIriRef {
 	pub scheme_len: Option<usize>,
-	pub authority: ParsedAuthority,
+	pub authority: Option<ParsedAuthority>,
 	pub path_len: usize,
 	pub query_len: Option<usize>,
 	pub fragment_len: Option<usize>
@@ -71,12 +70,7 @@ impl ParsedIriRef {
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<ParsedIriRef, Error> {
 		let buffer = buffer.as_ref();
 		let mut scheme_len = None;
-		let mut authority = ParsedAuthority {
-			offset: 0,
-			userinfo_len: None,
-			host_len: 0,
-			port_len: None
-		};
+		let mut authority = None;
 		let path_len;
 		let mut query_len = None;
 		let mut fragment_len = None;
@@ -93,13 +87,14 @@ impl ParsedIriRef {
 			0
 		};
 
+		let authority_end;
+
 		match get_char(buffer, scheme_end)? {
 			Some(('/', 1)) => {
 				match get_char(buffer, scheme_end + 1)? {
 					Some(('/', 1)) => {
-						authority.offset = scheme_end + 2;
-						authority = parse_authority(buffer, authority.offset)?;
-						let authority_end = authority.offset + authority.len();
+						authority = Some(parse_authority(buffer, scheme_end + 2)?);
+						authority_end = scheme_end + 2 + authority.unwrap().len();
 						// path must be absolute.
 						path_len = if let Some(('/', 1)) = get_char(buffer, authority_end)? {
 							parse_path(buffer, authority_end)?
@@ -108,18 +103,18 @@ impl ParsedIriRef {
 						};
 					},
 					_ => {
-						authority.offset = scheme_end;
-						path_len = parse_path(buffer, authority.offset)?;
+						authority_end = scheme_end;
+						path_len = parse_path(buffer, authority_end)?;
 					}
 				}
 			},
 			_ => {
-				authority.offset = scheme_end;
-				path_len = parse_path(buffer, authority.offset)?;
+				authority_end = scheme_end;
+				path_len = parse_path(buffer, authority_end)?;
 			}
 		}
 
-		let i = authority.offset + authority.len() +  path_len;
+		let i = authority_end +  path_len;
 
 		match get_char(buffer, i)? {
 			Some(('#', 1)) => {
@@ -146,7 +141,17 @@ impl ParsedIriRef {
 	}
 
 	pub fn len(&self) -> usize {
-		let mut offset = self.authority.offset + self.authority.len() + self.path_len;
+		let mut offset = 0;
+
+		if let Some(len) = self.scheme_len {
+			offset += len + 1;
+		}
+
+		if let Some(authority) = self.authority.as_ref() {
+			offset += 2 + authority.len();
+		}
+
+		offset += self.path_len;
 
 		if let Some(len) = self.query_len {
 			offset += 1 + len;
@@ -159,12 +164,36 @@ impl ParsedIriRef {
 		offset
 	}
 
+	pub fn authority_offset(&self) -> usize {
+		let mut offset = 0;
+
+		if let Some(len) = self.scheme_len {
+			offset += len + 1;
+		}
+
+		if self.authority.is_some() {
+			offset += 2;
+		}
+
+		offset
+	}
+
 	pub fn path_offset(&self) -> usize {
-		self.authority.offset + self.authority.len()
+		let mut offset = 0;
+
+		if let Some(len) = self.scheme_len {
+			offset += len + 1;
+		}
+
+		if let Some(authority) = self.authority.as_ref() {
+			offset += 2 + authority.len();
+		}
+
+		offset
 	}
 
 	pub fn query_offset(&self) -> usize {
-		let mut offset = self.authority.offset + self.authority.len() + self.path_len;
+		let mut offset = self.path_offset() + self.path_len;
 
 		if let Some(_) = self.query_len {
 			offset += 1;
@@ -174,7 +203,7 @@ impl ParsedIriRef {
 	}
 
 	pub fn fragment_offset(&self) -> usize {
-		let mut offset = self.authority.offset + self.authority.len() + self.path_len;
+		let mut offset = self.path_offset() + self.path_len;
 
 		if let Some(len) = self.query_len {
 			offset += 1 + len;
@@ -576,7 +605,6 @@ pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 
 /// Parse the IRI authority.
 pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error> {
-	let offset = i;
 	let mut userinfo_len = None;
 	let host_len;
 	let port_len;
@@ -599,7 +627,7 @@ pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, E
 	};
 
 	Ok(ParsedAuthority {
-		offset, userinfo_len, host_len, port_len
+		userinfo_len, host_len, port_len
 	})
 }
 

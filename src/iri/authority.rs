@@ -60,7 +60,7 @@ impl<'a> Authority<'a> {
 
 	pub fn host(&self) -> Host {
 		let len = self.p.host_len;
-		let offset = self.p.host_offset() - self.p.offset;
+		let offset = self.p.host_offset();
 		Host {
 			data: &self.data[offset..(offset+len)]
 		}
@@ -68,7 +68,7 @@ impl<'a> Authority<'a> {
 
 	pub fn port(&self) -> Option<Port> {
 		if let Some(len) = self.p.port_len {
-			let offset = self.p.port_offset() - self.p.offset;
+			let offset = self.p.port_offset();
 			Some(Port {
 				data: &self.data[offset..(offset+len)]
 			})
@@ -136,6 +136,8 @@ pub struct AuthorityMut<'a> {
 	/// The whole IRI data.
 	pub(crate) data: &'a mut Vec<u8>,
 
+	pub(crate) offset: usize,
+
 	/// Authority positions.
 	pub(crate) p: &'a mut ParsedAuthority
 }
@@ -154,22 +156,18 @@ impl<'a> AuthorityMut<'a> {
 
 	pub fn as_str(&self) -> &str {
 		unsafe {
-			let offset = self.p.offset;
+			let offset = self.offset;
 			std::str::from_utf8_unchecked(&self.data[offset..(offset+self.p.len())])
 		}
 	}
 
 	fn replace(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(self.data, self.p, false, range, content)
-	}
-
-	fn replace_before_authority(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(self.data, self.p, true, range, content)
+		crate::replace(self.data, range, content)
 	}
 
 	pub fn userinfo(&self) -> Option<UserInfo> {
 		if let Some(len) = self.p.userinfo_len {
-			let offset = self.p.offset;
+			let offset = self.offset;
 			Some(UserInfo {
 				data: &self.data[offset..(offset+len)]
 			})
@@ -179,7 +177,7 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	pub fn set_userinfo(&mut self, userinfo: Option<UserInfo>) {
-		let offset = self.p.offset;
+		let offset = self.offset;
 
 		if let Some(new_userinfo) = userinfo {
 			if let Some(userinfo_len) = self.p.userinfo_len {
@@ -196,13 +194,11 @@ impl<'a> AuthorityMut<'a> {
 			}
 
 			self.p.userinfo_len = None;
-			// Make the authority part implicit, if we can.
-			self.make_implicit();
 		}
 	}
 
 	pub fn host(&self) -> Host {
-		let offset = self.p.host_offset();
+		let offset = self.offset + self.p.host_offset();
 		let len = self.p.host_len;
 		Host {
 			data: &self.data[offset..(offset+len)]
@@ -210,21 +206,14 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	pub fn set_host(&mut self, host: Host) {
-		let offset = self.p.host_offset();
+		let offset = self.offset + self.p.host_offset();
 		self.replace(offset..(offset+self.p.host_len), host.as_ref());
 		self.p.host_len = host.as_ref().len();
-
-		if self.p.host_len == 0 {
-			// Make the authority part implicit, if we can.
-			self.make_implicit();
-		} else {
-			self.make_explicit();
-		}
 	}
 
 	pub fn port(&self) -> Option<Port> {
 		if let Some(len) = self.p.port_len {
-			let offset = self.p.port_offset();
+			let offset = self.offset + self.p.port_offset();
 			Some(Port {
 				data: &self.data[offset..(offset+len)]
 			})
@@ -234,7 +223,7 @@ impl<'a> AuthorityMut<'a> {
 	}
 
 	pub fn set_port(&mut self, port: Option<Port>) {
-		let offset = self.p.port_offset();
+		let offset = self.offset + self.p.port_offset();
 
 		if let Some(new_port) = port {
 			if let Some(port_len) = self.p.port_len {
@@ -245,66 +234,12 @@ impl<'a> AuthorityMut<'a> {
 			}
 
 			self.p.port_len = Some(new_port.as_ref().len());
-			// Make the authority part explicit.
-			self.make_explicit();
 		} else {
 			if let Some(port_len) = self.p.port_len {
 				self.replace((offset-1)..(offset+port_len), &[]);
 			}
 
 			self.p.port_len = None;
-			// Make the authority part implicit, if we can.
-			self.make_implicit();
-		}
-	}
-
-	/// Checks if there is an explicit authority delimiter `//` in the IRI.
-	#[inline]
-	pub fn is_explicit(&self) -> bool {
-		if self.p.offset >= 2 {
-			let end = self.p.offset;
-			let start = end - 2;
-			&self.data[start..end] == &[0x2f, 0x2f]
-		} else {
-			false
-		}
-	}
-
-	pub fn is_implicit(&self) -> bool {
-		!self.is_explicit()
-	}
-
-	/// Make sure there is an explicit authority delimiter `//` in the IRI.
-	pub fn make_explicit(&mut self) {
-		if !self.is_explicit() {
-			let offset = self.p.offset;
-			self.replace_before_authority(offset..offset, &[0x2f, 0x2f]);
-		}
-	}
-
-	/// If possible, remove the authority delimiter `//`.
-	///
-	/// It has no effect if the authority is not empty,
-	/// or if the path starts with `//`.
-	/// Returns `true` if the authority is implicit after the method call,
-	/// `false` otherwise.
-	pub fn make_implicit(&mut self) -> bool {
-		if self.is_explicit() {
-			let is_path_authority_alike = {
-				let path_offset = self.p.offset + self.p.len();
-				self.data.len() >= path_offset + 2 && self.data[path_offset] == 0x2f && self.data[path_offset + 1] == 0x2f
-			};
-
-			if self.is_empty() && !is_path_authority_alike {
-				let end = self.p.offset;
-				let start = end - 2;
-				self.replace_before_authority(start..end, &[]);
-				true
-			} else {
-				false
-			}
-		} else {
-			true
 		}
 	}
 }
@@ -318,23 +253,6 @@ mod tests {
 		let iri = Iri::new("scheme:////").unwrap();
 		let authority = iri.authority();
 
-		assert!(authority.is_empty());
-	}
-
-	#[test]
-	fn make_implicit() {
-		let mut iri = IriBuf::new("scheme:///path").unwrap();
-		let mut authority = iri.authority_mut();
-
-		assert!(authority.make_implicit());
-		assert_eq!(iri.as_str(), "scheme:/path");
-	}
-
-	#[test]
-	fn make_implicit_edge_case() {
-		let mut iri = IriBuf::new("scheme:////").unwrap();
-		let mut authority = iri.authority_mut();
-
-		assert!(!authority.make_implicit());
+		assert!(authority.unwrap().is_empty());
 	}
 }

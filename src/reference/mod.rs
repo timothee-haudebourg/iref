@@ -61,15 +61,20 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
-	pub fn authority(&self) -> Authority {
-		Authority {
-			data: &self.data[self.p.authority.offset..(self.p.authority.offset+self.p.authority.len())],
-			p: self.p.authority
+	pub fn authority(&self) -> Option<Authority> {
+		if let Some(authority) = self.p.authority {
+			let offset = self.p.authority_offset();
+			Some(Authority {
+				data: &self.data[offset..(offset+authority.len())],
+				p: authority
+			})
+		} else {
+			None
 		}
 	}
 
 	pub fn path(&'a self) -> Path<'a> {
-		let offset = self.p.authority.offset + self.p.authority.len();
+		let offset = self.p.path_offset();
 		Path {
 			data: &self.data[offset..(offset+self.p.path_len)]
 		}

@@ -6,7 +6,7 @@ use std::ops::Range;
 pub use crate::iri::*;
 pub use crate::reference::*;
 
-pub(crate) fn replace(buffer: &mut Vec<u8>, authority: &mut parsing::ParsedAuthority, before_authority: bool, range: Range<usize>, content: &[u8]) {
+pub(crate) fn replace(buffer: &mut Vec<u8>, range: Range<usize>, content: &[u8]) {
 	let range_len = range.end - range.start;
 
 	// move the content around.
@@ -20,11 +20,6 @@ pub(crate) fn replace(buffer: &mut Vec<u8>, authority: &mut parsing::ParsedAutho
 			}
 
 			buffer.resize(new_end + tail_len, 0);
-
-			if before_authority {
-				let delta = range_len - content.len();
-				authority.offset -= delta;
-			}
 		} else { // grow
 			let tail_len = buffer.len() - range.end;
 
@@ -32,11 +27,6 @@ pub(crate) fn replace(buffer: &mut Vec<u8>, authority: &mut parsing::ParsedAutho
 
 			for i in 0..tail_len {
 				buffer[new_end + tail_len - i - 1] = buffer[range.end + tail_len - i - 1];
-			}
-
-			if before_authority {
-				let delta = content.len() - range_len;
-				authority.offset += delta;
 			}
 		}
 	}

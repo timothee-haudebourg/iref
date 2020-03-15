@@ -122,7 +122,7 @@ let iri_ref: IriRef = iri.into();
 ```
 
 Given a base IRI, references can be resolved into a regular IRI using the
-[Refence Resolution algorithm](https://tools.ietf.org/html/rfc3986#section-5)
+[Reference Resolution Algorithm](https://tools.ietf.org/html/rfc3986#section-5)
 defined in [RFC 3986](https://tools.ietf.org/html/rfc3986).
 This crate provides a *strict* implementation of this algorithm.
 
@@ -144,7 +144,8 @@ Here are the features of the IRI comparison method implemented in this crate.
 
 #### Protocol agnostic
 
-Even if the
+This implementation does not know anything about existing protocols.
+For instance, even if the
 [HTTP protocol](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol)
 defines `80` as the default port,
 the two IRIs `http://example.org` and `http://example.org:80` are **not** equivalent.
@@ -152,6 +153,15 @@ the two IRIs `http://example.org` and `http://example.org:80` are **not** equiva
 #### Every `/` counts
 
 The path `/foo/bar` is **not** equivalent to `/foo/bar/`.
+
+#### No dot segments normalization
+
+Dot segments (`.` and `..`) are intended for use only in IRI references.
+Normalization occurs when using the Reference Resolution Algorithm through the
+`resolve` or `resolved` methods.
+Outside of this algorithm, dot segments are considered as regular segments and
+have no special meaning. As such, they are not normalized during IRI path
+comparison.
 
 #### Percent-encoded characters
 

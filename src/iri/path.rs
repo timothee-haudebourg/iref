@@ -3,10 +3,13 @@ use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use std::iter::IntoIterator;
+use std::ops::Deref;
+use smallvec::SmallVec;
 use pct_str::PctStr;
 use crate::{parsing, IriRefBuf};
 use super::{Error, Segment};
 
+#[derive(Clone, Copy)]
 pub struct Path<'a> {
 	/// The path slice.
 	pub(crate) data: &'a [u8]
@@ -109,6 +112,14 @@ impl<'a> Path<'a> {
 			offset: 0
 		}
 	}
+
+	pub fn normalized_segments(&self) -> NormalizedSegments {
+		NormalizedSegments::new(*self)
+	}
+
+	pub fn into_normalized_segments(self) -> NormalizedSegments<'a> {
+		NormalizedSegments::new(self)
+	}
 }
 
 impl<'a> TryFrom<&'a str> for Path<'a> {
@@ -138,6 +149,7 @@ impl<'a> IntoIterator for Path<'a> {
 	}
 }
 
+#[derive(Clone)]
 pub struct Segments<'a> {
 	data: &'a [u8],
 	offset: usize
@@ -171,8 +183,61 @@ impl<'a> Iterator for Segments<'a> {
 
 		if end > start {
 			Some(Segment {
-				data: &self.data[start..end]
+				data: &self.data[start..end],
+				open: self.data.get(end) == Some(&0x2f)
 			})
+		} else {
+			None
+		}
+	}
+}
+
+/// Stack size (in `Segment`) allocated for [`NormalizedSegments`] to normalize a `Path`.
+/// If it needs more space, it will allocate memory on the heap.
+const NORMALIZE_STACK_SIZE: usize = 16;
+
+/// Stack size (in bytes) allocated for the `normalize` method to normalize a `Path`.
+/// If it needs more space, it will allocate memory on the heap.
+const REMOVE_DOTS_BUFFER_LEN: usize = 512;
+
+pub struct NormalizedSegments<'a> {
+	stack: SmallVec<[Segment<'a>; NORMALIZE_STACK_SIZE]>,
+	i: usize
+}
+
+impl<'a> NormalizedSegments<'a> {
+	fn new(path: Path<'a>) -> NormalizedSegments {
+		let mut stack: SmallVec<[Segment<'a>; NORMALIZE_STACK_SIZE]> = SmallVec::new();
+		for segment in path.into_iter() {
+			match segment.as_str() {
+				"." => {
+					if let Some(last_segment) = stack.last_mut().as_mut() {
+						last_segment.open();
+					}
+				},
+				".." => {
+					if stack.pop().is_none() {
+						stack.push(segment)
+					}
+				},
+				_ => stack.push(segment)
+			}
+		}
+
+		NormalizedSegments {
+			stack, i: 0
+		}
+	}
+}
+
+impl<'a> Iterator for NormalizedSegments<'a> {
+	type Item = Segment<'a>;
+
+	fn next(&mut self) -> Option<Segment<'a>> {
+		if self.i < self.stack.len() {
+			let segment = self.stack[self.i];
+			self.i += 1;
+			Some(segment)
 		} else {
 			None
 		}
@@ -193,7 +258,25 @@ impl<'a> fmt::Debug for Path<'a> {
 
 impl<'a> cmp::PartialEq for Path<'a> {
 	fn eq(&self, other: &Path) -> bool {
-		self.as_pct_str() == other.as_pct_str()
+		if self.is_absolute() == other.is_absolute() {
+			let mut self_segments = self.normalized_segments();
+			let mut other_segments = other.normalized_segments();
+
+			loop {
+				match (self_segments.next(), other_segments.next()) {
+					(None, None) => return true,
+					(Some(_), None) => return false,
+					(None, Some(_)) => return false,
+					(Some(a), Some(b)) => {
+						if a != b {
+							return false
+						}
+					}
+				}
+			}
+		} else {
+			false
+		}
 	}
 }
 
@@ -201,7 +284,11 @@ impl<'a> Eq for Path<'a> { }
 
 impl<'a> cmp::PartialEq<&'a str> for Path<'a> {
 	fn eq(&self, other: &&'a str) -> bool {
-		self.as_pct_str() == *other
+		if let Ok(other) = Path::try_from(*other) {
+			self == &other
+		} else {
+			false
+		}
 	}
 }
 
@@ -213,7 +300,29 @@ impl<'a> PartialOrd for Path<'a> {
 
 impl<'a> Ord for Path<'a> {
 	fn cmp(&self, other: &Path<'a>) -> Ordering {
-		self.as_pct_str().cmp(other.as_pct_str())
+		if self.is_absolute() == other.is_absolute() {
+			let mut self_segments = self.normalized_segments();
+			let mut other_segments = other.normalized_segments();
+
+			loop {
+				match (self_segments.next(), other_segments.next()) {
+					(None, None) => return Ordering::Equal,
+					(Some(_), None) => return Ordering::Greater,
+					(None, Some(_)) => return Ordering::Less,
+					(Some(a), Some(b)) => {
+						match a.cmp(&b) {
+							Ordering::Greater => return Ordering::Greater,
+							Ordering::Less => return Ordering::Less,
+							Ordering::Equal => ()
+						}
+					}
+				}
+			}
+		} else if self.is_absolute() {
+			Ordering::Greater
+		} else {
+			Ordering::Less
+		}
 	}
 }
 
@@ -295,30 +404,36 @@ impl<'a> PathMut<'a> {
 		self.buffer.path().into_iter()
 	}
 
+	pub fn normalized_segments(&self) -> NormalizedSegments {
+		self.buffer.path().into_normalized_segments()
+	}
+
 	/// Add a segment at the end of the path.
-	pub fn push(&mut self, segment: Segment) {
-		let segment = segment.as_ref();
+	pub fn push<'s>(&mut self, segment: Segment<'s>) {
 		if segment.is_empty() {
-			if self.buffer.path().as_str() == "/" {
-				// This is the edge case!
-				// We can't have the path starting with `//` without an explicit authority part.
-				// So we make sure the authority fragment is showing with `://`.
-				self.buffer.authority_mut().make_explicit();
-			} else {
-				// make sure it ends with a slash.
-				self.open();
+			if self.is_empty() && self.is_relative() {
+				self.push(Segment::dot())
 			}
+
+			// make sure it ends with a slash.
+			self.open();
 
 			// add a slash at the end.
 			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
 			self.buffer.replace(offset..offset, &[0x2f]);
 			self.buffer.p.path_len += 1;
 		} else {
+			// make sure it ends with a slash.
 			self.open();
+
 			// add the segment at the end.
 			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			self.buffer.replace(offset..offset, segment);
+			self.buffer.replace(offset..offset, segment.as_ref());
 			self.buffer.p.path_len += segment.len();
+		}
+
+		if segment.is_open() {
+			self.open();
 		}
 	}
 
@@ -346,44 +461,46 @@ impl<'a> PathMut<'a> {
 		}
 	}
 
+	pub fn clear(&mut self) {
+		let mut offset = self.buffer.p.path_offset();
+		let mut len = self.as_ref().len();
+
+		if self.is_absolute() {
+			offset += 1;
+			len -= 1;
+		}
+
+		self.buffer.replace(offset..(offset+len), &[]);
+		self.buffer.p.path_len = offset - self.buffer.p.path_offset();
+	}
+
 	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) {
 		for segment in path {
 			match segment.as_str() {
 				"." => self.open(),
-				".." => self.pop(),
+				".." if !self.is_empty() => self.pop(),
 				_ => self.push(segment)
 			}
 		}
 	}
 
-	pub fn remove_dot_segments(&mut self) {
-		let mut path_buffer = if self.is_absolute() {
-			IriRefBuf::new("/").unwrap()
-		} else {
-			IriRefBuf::default()
-		};
+	pub fn normalize(&mut self) {
+		let mut buffer: SmallVec<[u8; REMOVE_DOTS_BUFFER_LEN]> = SmallVec::new();
+		buffer.extend_from_slice(self.as_ref());
+		let old_path = Path { data: buffer.as_ref() };
 
-		path_buffer.path_mut().symbolic_append(self.as_path());
-		if self.as_path().is_open() {
-			path_buffer.path_mut().open();
-		}
+		self.clear();
 
-		let offset = self.buffer.p.path_offset();
-		let end = offset + self.as_ref().len();
-		self.buffer.replace(offset..end, path_buffer.path().as_ref());
-		self.buffer.p.path_len = path_buffer.len();
-
-		// Make the authority explicit if we need to.
-		if self.buffer.data.len() >= offset + 2 && self.buffer.data[offset] == 0x2f && self.buffer.data[offset + 1] == 0x2f {
-			self.buffer.authority_mut().make_explicit();
+		for segment in old_path.normalized_segments() {
+			self.push(segment);
 		}
 	}
 }
 
 #[cfg(test)]
 mod tests {
-	use std::convert::TryInto;
-	use crate::{Iri, IriBuf};
+	use std::convert::{TryInto, TryFrom};
+	use crate::{Iri, IriBuf, Path};
 
 	#[test]
 	fn empty() {
@@ -474,13 +591,23 @@ mod tests {
 	}
 
 	#[test]
-	fn push_empty_segment_edge_case() {
+	fn push_empty_segment_edge_case1() {
+		let mut iri = IriBuf::new("scheme:").unwrap();
+		let mut path = iri.path_mut();
+
+		path.push("".try_into().unwrap());
+
+		assert_eq!(iri, "scheme:.//");
+	}
+
+	#[test]
+	fn push_empty_segment_edge_case2() {
 		let mut iri = IriBuf::new("scheme:/").unwrap();
 		let mut path = iri.path_mut();
 
 		path.push("".try_into().unwrap());
 
-		assert_eq!(iri.as_str(), "scheme:////");
+		assert_eq!(iri, "scheme:/.//");
 	}
 
 	#[test]
@@ -531,5 +658,22 @@ mod tests {
 		path.open();
 
 		assert_eq!(iri.as_str(), "scheme:/a/");
+	}
+
+	#[test]
+	fn compare() {
+		assert_eq!(Path::try_from("a/b/c").unwrap(), "a/b/c");
+		assert_eq!(Path::try_from("a/b/c/").unwrap(), "a/b/c/.");
+		assert_eq!(Path::try_from("a/b/c/").unwrap(), "a/b/c/./");
+		assert_eq!(Path::try_from("a/b/c").unwrap(), "a/b/../b/c");
+		assert_eq!(Path::try_from("a/b/c/..").unwrap(), "a/b/");
+		assert_eq!(Path::try_from("a/..").unwrap(), "");
+		assert_eq!(Path::try_from("/a/..").unwrap(), "/");
+		assert_eq!(Path::try_from("a/../..").unwrap(), "..");
+		assert_eq!(Path::try_from("/a/../..").unwrap(), "/..");
+
+		assert_ne!(Path::try_from("a/b/c").unwrap(), "a/b/c/");
+		assert_ne!(Path::try_from("a/b/c").unwrap(), "a/b/c/.");
+		assert_ne!(Path::try_from("a/b/c/..").unwrap(), "a/b");
 	}
 }

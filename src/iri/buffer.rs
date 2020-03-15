@@ -43,7 +43,7 @@ impl IriBuf {
 		self.0.set_scheme(Some(scheme))
 	}
 
-	pub fn authority_mut(&mut self) -> AuthorityMut {
+	pub fn authority_mut(&mut self) -> Option<AuthorityMut> {
 		self.0.authority_mut()
 	}
 
@@ -51,7 +51,7 @@ impl IriBuf {
 	///
 	/// It must be a syntactically correct authority. If not,
 	/// this method returns an error, and the IRI is unchanged.
-	pub fn set_authority(&mut self, authority: Authority) {
+	pub fn set_authority(&mut self, authority: Option<Authority>) {
 		self.0.set_authority(authority)
 	}
 

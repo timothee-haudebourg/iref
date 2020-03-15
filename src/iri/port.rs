@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 use crate::parsing;
 use super::Error;
 
+#[derive(Clone, Copy)]
 pub struct Port<'a> {
 	/// The path slice.
 	pub(crate) data: &'a [u8]

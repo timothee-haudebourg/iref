@@ -6,6 +6,7 @@ use pct_str::PctStr;
 use crate::parsing;
 use super::Error;
 
+#[derive(Clone, Copy)]
 pub struct Fragment<'a> {
 	/// The fragment slice.
 	pub(crate) data: &'a [u8]
