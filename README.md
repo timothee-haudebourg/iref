@@ -79,7 +79,7 @@ assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
 
 The `try_into` method is used to ensure that each string is syntactically correct with regard to its corresponding component (for instance, it is not possible to replace `"query"` with `"query?"` since `?` is not a valid query character).
 
-## Detailed Usage
+## Detailed usage
 
 ### Path manipulation
 
