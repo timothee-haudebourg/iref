@@ -8,7 +8,32 @@ use crate::parsing::ParsedIriRef;
 use crate::{Error, Iri, IriBuf, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 use super::IriRef;
 
-/// Owned IRI reference.
+/// Owned IRI-reference.
+///
+/// Holds a mutable buffer representing an IRI-reference.
+/// This type can be used to create and/or modify existing IRI-references.
+/// The authority and path can be accessed mutabily to modify their sub-components.
+///
+/// ## Example
+///
+/// ```
+/// # use std::convert::TryInto;
+/// # use iref::IriBuf;
+/// # fn main() -> Result<(), iref::Error> {
+/// let mut iri = IriBuf::new("https://www.rust-lang.org")?;
+///
+/// iri.authority_mut().unwrap().set_port(Some("40".try_into()?));
+/// iri.set_path("/foo".try_into()?);
+/// iri.path_mut().push("bar".try_into()?);
+/// iri.set_query(Some("query".try_into()?));
+/// iri.set_fragment(Some("fragment".try_into()?));
+///
+/// assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
+/// # Ok(())
+/// # }
+/// ```
+///
+/// See the [`IriRef`] type for more informations about IRI-references.
 #[derive(Default, Clone)]
 pub struct IriRefBuf {
 	pub(crate) p: ParsedIriRef,

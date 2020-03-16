@@ -12,7 +12,7 @@ use crate::{Scheme, Authority, Path, Query, Fragment, Error, Iri, IriBuf};
 
 pub use self::buffer::*;
 
-/// IRI reference slice.
+/// IRI-reference slice.
 ///
 /// Wrapper around a borrowed bytes slice representing an IRI-reference.
 /// An IRI-reference can be seen as an [`Iri`] with an optional [`Scheme`].

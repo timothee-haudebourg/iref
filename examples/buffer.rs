@@ -14,5 +14,5 @@ fn main() -> Result<(), iref::Error> {
 
 	assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
 
-    Ok(())
+	Ok(())
 }
