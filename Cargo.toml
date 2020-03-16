@@ -3,7 +3,14 @@ name = "iref"
 version = "0.1.0"
 authors = ["Timothée Haudebourg <author@haudebourg.net>"]
 edition = "2018"
+categories = ["web-programming", "internationalization"]
+keywords = ["iri", "uri", "resource", "identifier", "slice"]
+description = "Internationalized Resource Identifiers (IRIs) and References, borrowed and owned."
+repository = "https://github.com/timothee-haudebourg/iref"
+documentation = "https://docs.rs/iref"
+license = "MIT/Apache-2.0"
+readme = "README.md"
 
 [dependencies]
-pct-str = "1.0.1"
+pct-str = "1.0.2"
 smallvec = "1.2.0"
