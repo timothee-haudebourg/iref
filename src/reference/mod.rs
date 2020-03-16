@@ -14,8 +14,25 @@ pub use self::buffer::*;
 
 /// IRI reference slice.
 ///
-/// Note that in future versions, this will most likely become a custom dynamic sized type,
-/// similar to `str`.
+/// Wrapper around a borrowed bytes slice representing an IRI-reference.
+/// An IRI-reference can be seen as an [`Iri`] with an optional [`Scheme`].
+/// IRI-references are resolved against a *base IRI* into a proper IRI using
+/// the [Reference Resolution Algorithm](https://tools.ietf.org/html/rfc3986#section-5) provided
+/// by the [`resolved`](`IriRef::resolved`) method.
+///
+/// ## Example
+///
+/// ```rust
+/// # extern crate iref;
+/// # use std::convert::TryInto;
+/// # use iref::{Iri, IriRef, IriRefBuf};
+/// # fn main() -> Result<(), iref::Error> {
+/// let base_iri = Iri::new("http://a/b/c/d;p?q")?;
+/// let mut iri_ref = IriRefBuf::new("g;x=1/../y")?;
+///
+/// assert_eq!(iri_ref.resolved(base_iri), "http://a/b/c/y");
+/// # Ok(())
+/// # }
 #[derive(Clone, Copy)]
 pub struct IriRef<'a> {
 	pub(crate) p: ParsedIriRef,
@@ -23,6 +40,9 @@ pub struct IriRef<'a> {
 }
 
 impl<'a> IriRef<'a> {
+	/// Create a new IRI-reference slice from a bytes slice.
+	///
+	/// This may fail if the source slice is not UTF-8 encoded, or if is not a valid IRI-reference.
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &'a S) -> Result<IriRef<'a>, Error> {
 		Ok(IriRef {
 			data: buffer.as_ref(),
@@ -30,27 +50,42 @@ impl<'a> IriRef<'a> {
 		})
 	}
 
-	/// Length in bytes.
+	/// Get the length is the IRI-reference, in bytes.
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
 
+	/// Get a reference to the underlying bytes slice representing the IRI-reference.
 	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
+	/// Get the IRI-reference as a string slice.
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(self.data)
 		}
 	}
 
+	/// Get the IRI-reference as a percent-encoded string slice.
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.as_str())
 		}
 	}
 
+	/// Get the scheme of the IRI-reference.
+	///
+	/// The scheme is located at the very begining of the IRI-reference and delimited by an ending
+	/// `:`.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use iref::IriRef;
+	/// assert_eq!(IriRef::new("foo://example.com:8042").unwrap().scheme().unwrap(), "foo");
+	/// assert_eq!(IriRef::new("//example.com:8042").unwrap().scheme(), None);
+	/// ```
 	pub fn scheme(&self) -> Option<Scheme> {
 		if let Some(scheme_len) = self.p.scheme_len {
 			Some(Scheme {
@@ -61,6 +96,17 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
+	/// Get the authority of the IRI-reference.
+	///
+	/// The authority is delimited by the `//` string, after the scheme.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use iref::IriRef;
+	/// assert_eq!(IriRef::new("foo://example.com:8042").unwrap().authority().unwrap().host(), "example.com");
+	/// assert_eq!(IriRef::new("foo:").unwrap().authority(), None);
+	/// ```
 	pub fn authority(&self) -> Option<Authority> {
 		if let Some(authority) = self.p.authority {
 			let offset = self.p.authority_offset();
@@ -73,6 +119,17 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
+	/// Get the path of the IRI-reference.
+	///
+	/// The path is located just after the authority. It is always defined, even if empty.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use iref::IriRef;
+	/// assert_eq!(IriRef::new("foo:/a/b/c?query").unwrap().path(), "/a/b/c");
+	/// assert!(IriRef::new("foo:#fragment").unwrap().path().is_empty());
+	/// ```
 	pub fn path(&'a self) -> Path<'a> {
 		let offset = self.p.path_offset();
 		Path {
@@ -80,6 +137,17 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
+	/// Get the query of the IRI-reference.
+	///
+	/// The query part is delimited by the `?` character after the path.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use iref::IriRef;
+	/// assert_eq!(IriRef::new("//example.org?query").unwrap().query().unwrap(), "query");
+	/// assert!(IriRef::new("//example.org/foo/bar#fragment").unwrap().query().is_none());
+	/// ```
 	pub fn query(&self) -> Option<Query> {
 		if let Some(len) = self.p.query_len {
 			let offset = self.p.query_offset();
@@ -91,6 +159,17 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
+	/// Get the fragment of the IRI-reference.
+	///
+	/// The fragment part is delimited by the `#` character after the query.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use iref::IriRef;
+	/// assert_eq!(IriRef::new("//example.org#foo").unwrap().fragment().unwrap(), "foo");
+	/// assert!(IriRef::new("//example.org").unwrap().fragment().is_none());
+	/// ```
 	pub fn fragment(&self) -> Option<Fragment> {
 		if let Some(len) = self.p.fragment_len {
 			let offset = self.p.fragment_offset();
@@ -102,13 +181,17 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
+	/// Convert the IRI-reference into an IRI, if possible.
+	///
+	/// An IRI-reference is a valid IRI only if it has a defined [`Scheme`].
 	pub fn into_iri(self) -> Result<Iri<'a>, IriRef<'a>> {
 		self.try_into()
 	}
 
-	/// Resolve the IRI reference against the given base IRI.
+	/// Resolve the IRI reference against the given *base IRI*.
 	///
 	/// Return the resolved IRI.
+	/// See the [`IriRefBuf::resolve`] method for more informations about the resolution process.
 	pub fn resolved<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> IriBuf {
 		let mut iri_ref: IriRefBuf = self.into();
 		iri_ref.resolve(base_iri);

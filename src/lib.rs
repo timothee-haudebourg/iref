@@ -205,6 +205,10 @@ use std::ops::Range;
 pub use crate::iri::*;
 pub use crate::reference::*;
 
+/// Replacement function in IRI-reference buffers.
+///
+/// Replace the given `range` of the input `buffer` with the given `content`.
+/// This function is used in many places to replace parts of an IRI-reference buffer data.
 pub(crate) fn replace(buffer: &mut Vec<u8>, range: Range<usize>, content: &[u8]) {
 	let range_len = range.end - range.start;
 

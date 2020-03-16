@@ -27,42 +27,93 @@ pub use self::buffer::*;
 pub use self::query::*;
 pub use self::fragment::*;
 
+/// Parsing errors.
+///
+/// These are the different errors raised when some part of an IRI or IRI reference has an
+/// invalid syntax or encoding.
 #[derive(Debug)]
 pub enum Error {
 	/// The input data is not a valid UTF-8 encoded string.
 	InvalidEncoding,
 
+	/// The IRI part support percent-encoding, but the input data as an invalid percent-encoded
+	/// character.
+	/// This can occur for instance while trying to parse a query with the invalid percent encoded
+	/// character `%9a`: `Query::try_from("Hello Error %9a")`.
 	InvalidPercentEncoding,
 
+	/// Occurs when one is trying to convert an [`IriRef`] with no scheme into an [`Iri`],
+	/// or when an IRI is parsed with no scheme.
 	MissingScheme,
 
+	/// Occurs when the parsed [`Scheme`] is not syntactically valid.
+	/// Note that even in an IRI, only ASCII letters, digit and symbols `+`, `-` and `.` are
+	/// allowed.
 	InvalidScheme,
 
+	/// Occurs when the parsed [`Authority`] is not syntactically valid.
 	InvalidAuthority,
 
+	/// Occurs when the parsed [`UserInfo`] part of an [`Authority`] is not syntactically valid.
+	/// Note that the userinfo part cannot include the `@` character.
 	InvalidUserInfo,
 
+	/// Occurs when the parsed [`Host`] part of an [`Authority`] is not syntactically valid.
+	/// Note that the host part cannot include the `:` character.
 	InvalidHost,
 
+	/// Occurs when the parsed [`Port`] part of an [`Authority`] is not syntactically valid.
+	/// This part may only contain ASCII digits.
 	InvalidPort,
 
+	/// Occurs when a path [`Segment`] is not syntactically valid.
+	/// A [`Path`] segment cannot contain any `/` except at the end to denote "open" segments.
 	InvalidSegment,
 
+	/// Occurs when a [`Path`] is not syntactically valid.
+	/// A path cannot contain the characters `?` and `#` delimitating the [`Query`] and
+	/// [`Fragment`] parts.
 	InvalidPath,
 
+	/// Occurs when a [`Query`] part is not syntactically valid.
 	InvalidQuery,
 
+	/// Occurs when a [`Fragment`] part is not syntactically valid.
 	InvalidFragment
 }
 
 /// IRI slice.
 ///
-/// Note that in future versions, this will most likely become a custom dynamic sized type,
-/// similar to `str`.
+/// Wrapper around a borrowed bytes slice representing an IRI.
+/// An IRI can be seen as an IRI-reference with a defined [`Scheme`].
+/// All methods of [`IriRef`] are available from this type, however the [`scheme`](Iri::scheme) method
+/// is redefined to always return some scheme.
+///
+/// ## Example
+///
+/// ```rust
+/// # extern crate iref;
+/// # use iref::Iri;
+/// # fn main() -> Result<(), iref::Error> {
+/// let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
+///
+/// println!("scheme: {}", iri.scheme()); // note the absence of `unwrap` here since
+///                                       // the scheme is always defined in an IRI.
+/// println!("authority: {}", iri.authority().unwrap());
+/// println!("path: {}", iri.path());
+/// println!("query: {}", iri.query().unwrap());
+/// println!("fragment: {}", iri.fragment().unwrap());
+/// #
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone, Copy)]
 pub struct Iri<'a>(IriRef<'a>);
 
 impl<'a> Iri<'a> {
+	/// Create a new IRI slice from a bytes slice.
+	///
+	/// This may fail if the source slice is not UTF-8 encoded, or is not a valid IRI.
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &'a S) -> Result<Iri<'a>, Error> {
 		let iri_ref = IriRef::new(buffer)?;
 		if iri_ref.scheme().is_some() {
@@ -72,11 +123,18 @@ impl<'a> Iri<'a> {
 		}
 	}
 
+	/// Get an [`IriRef`] out of this IRI.
+	///
+	/// An IRI is always a valid IRI-reference.
 	#[inline]
 	pub fn as_iri_ref(&self) -> IriRef<'a> {
 		self.0
 	}
 
+	/// Get the scheme of the IRI.
+	///
+	/// Contrarily to [`IriRef`], the scheme of an IRI is always defined.
+	#[inline]
 	pub fn scheme(&self) -> Scheme {
 		self.0.scheme().unwrap()
 	}
@@ -85,6 +143,7 @@ impl<'a> Iri<'a> {
 impl<'a> Deref for Iri<'a> {
 	type Target = IriRef<'a>;
 
+	#[inline]
 	fn deref(&self) -> &IriRef<'a> {
 		&self.0
 	}
