@@ -32,6 +32,7 @@
 //!
 //! use iref::Iri;
 //!
+//! # fn main() -> Result<(), iref::Error> {
 //! let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
 //!
 //! println!("scheme: {}", iri.scheme());
@@ -39,6 +40,9 @@
 //! println!("path: {}", iri.path());
 //! println!("query: {}", iri.query().unwrap());
 //! println!("fragment: {}", iri.fragment().unwrap());
+//! #
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! IRIs can be created and modified using the `IriBuf` type.
@@ -52,6 +56,7 @@
 //! use std::convert::TryInto;
 //! use iref::IriBuf;
 //!
+//! # fn main() -> Result<(), iref::Error> {
 //! let mut iri = IriBuf::new("https://www.rust-lang.org")?;
 //!
 //! iri.authority_mut().unwrap().set_port(Some("40".try_into()?));
@@ -61,6 +66,8 @@
 //! iri.set_fragment(Some("fragment".try_into()?));
 //!
 //! assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! The `try_into` method is used to ensure that each string is syntactically correct with regard to its corresponding component (for instance, it is not possible to replace `"query"` with `"query?"` since `?` is not a valid query character).
@@ -73,9 +80,15 @@
 //! It is possible to access the segments of a path using the iterator returned by the `segments` method.
 //!
 //! ```rust
+//! # extern crate iref;
+//! # use iref::Iri;
+//! # fn main() -> Result<(), iref::Error> {
+//! # let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
 //! for segment in iri.path().segments() {
 //! 	println!("{}", segment);
 //! }
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! One can use the `normalized_segments` method to iterate over the normalized
@@ -83,14 +96,20 @@
 //! In addition, it is possible to push or pop segments to a path using the
 //! corresponding methods:
 //! ```rust
-//! let mut iri = IriBuf::new("https://rust-lang.org/a/c");
+//! # extern crate iref;
+//! # use std::convert::TryInto;
+//! # use iref::IriBuf;
+//! # fn main() -> Result<(), iref::Error> {
+//! let mut iri = IriBuf::new("https://rust-lang.org/a/c")?;
 //! let mut path = iri.path_mut();
 //!
 //! path.pop();
 //! path.push("b".try_into()?);
 //! path.push("c/".try_into()?); // a `/` character is allowed at the end of a segment.
 //!
-//! assert_eq!(iri.path(), "/a/b/c/")
+//! assert_eq!(iri.path(), "/a/b/c/");
+//! # Ok(())
+//! }
 //! ```
 //!
 //! ### IRI references
@@ -100,6 +119,10 @@
 //! Contrarily to regular IRIs, relative IRI references may have no scheme.
 //!
 //! ```rust
+//! # extern crate iref;
+//! # use std::convert::TryInto;
+//! # use iref::{Iri, IriRef, IriRefBuf};
+//! # fn main() -> Result<(), iref::Error> {
 //! let mut iri_ref = IriRefBuf::default(); // an IRI reference can be empty.
 //!
 //! // An IRI reference with a scheme is a valid IRI.
@@ -108,6 +131,8 @@
 //!
 //! // An IRI can be safely converted into an IRI reference.
 //! let iri_ref: IriRef = iri.into();
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Given a base IRI, references can be resolved into a regular IRI using the
@@ -116,6 +141,10 @@
 //! This crate provides a *strict* implementation of this algorithm.
 //!
 //! ```rust
+//! # extern crate iref;
+//! # use std::convert::TryInto;
+//! # use iref::{Iri, IriRef, IriRefBuf};
+//! # fn main() -> Result<(), iref::Error> {
 //! let base_iri = Iri::new("http://a/b/c/d;p?q")?;
 //! let mut iri_ref = IriRefBuf::new("g;x=1/../y")?;
 //!
@@ -125,6 +154,8 @@
 //! // in-place resolution.
 //! iri_ref.resolve(base_iri);
 //! assert_eq!(iri_ref, "http://a/b/c/y");
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! This crate implements

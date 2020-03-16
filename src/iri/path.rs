@@ -67,6 +67,44 @@ impl<'a> Path<'a> {
 		!self.is_open()
 	}
 
+	fn segment_at(&self, offset: usize) -> (Option<Segment<'a>>, usize) {
+		let mut start = offset;
+		let mut end = offset;
+
+		loop {
+			match parsing::get_char(self.data, end).unwrap() {
+				Some(('/', 1)) => {
+					if end == offset {
+						start += 1;
+						end += 1;
+					} else {
+						break
+					}
+				},
+				Some((_, len)) => {
+					end += len;
+				},
+				None => {
+					if end == start {
+						return (None, end)
+					} else {
+						break
+					}
+				}
+			}
+		}
+
+		(Some(Segment {
+			data: &self.data[start..end],
+			open: self.data.get(end) == Some(&0x2f)
+		}), end)
+	}
+
+	pub fn first(&self) -> Option<Segment<'a>> {
+		let (segment, _) = self.segment_at(0);
+		segment
+	}
+
 	/// Return the path directory part.
 	///
 	/// This correspond to the path without everything after the right most `/`.
@@ -108,7 +146,7 @@ impl<'a> Path<'a> {
 	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
 	pub fn segments(&self) -> Segments {
 		Segments {
-			data: &self.data,
+			path: *self,
 			offset: 0
 		}
 	}
@@ -143,7 +181,7 @@ impl<'a> IntoIterator for Path<'a> {
 
 	fn into_iter(self) -> Segments<'a> {
 		Segments {
-			data: self.data,
+			path: self,
 			offset: 0
 		}
 	}
@@ -151,7 +189,7 @@ impl<'a> IntoIterator for Path<'a> {
 
 #[derive(Clone)]
 pub struct Segments<'a> {
-	data: &'a [u8],
+	path: Path<'a>,
 	offset: usize
 }
 
@@ -159,36 +197,9 @@ impl<'a> Iterator for Segments<'a> {
 	type Item = Segment<'a>;
 
 	fn next(&mut self) -> Option<Segment<'a>> {
-		let mut start = self.offset;
-		let mut end = self.offset;
-
-		loop {
-			match parsing::get_char(self.data, end).unwrap() {
-				Some(('/', 1)) => {
-					if end == self.offset {
-						start += 1;
-						end += 1;
-					} else {
-						break
-					}
-				},
-				Some((_, len)) => {
-					end += len;
-				},
-				None => break
-			}
-		}
-
+		let (segment, end) = self.path.segment_at(self.offset);
 		self.offset = end;
-
-		if end > start {
-			Some(Segment {
-				data: &self.data[start..end],
-				open: self.data.get(end) == Some(&0x2f)
-			})
-		} else {
-			None
-		}
+		segment
 	}
 }
 
@@ -207,6 +218,7 @@ pub struct NormalizedSegments<'a> {
 
 impl<'a> NormalizedSegments<'a> {
 	fn new(path: Path<'a>) -> NormalizedSegments {
+		let relative = path.is_relative();
 		let mut stack: SmallVec<[Segment<'a>; NORMALIZE_STACK_SIZE]> = SmallVec::new();
 		for segment in path.into_iter() {
 			match segment.as_str() {
@@ -216,7 +228,7 @@ impl<'a> NormalizedSegments<'a> {
 					}
 				},
 				".." => {
-					if stack.pop().is_none() {
+					if stack.pop().is_none() && relative {
 						stack.push(segment)
 					}
 				},
@@ -408,11 +420,30 @@ impl<'a> PathMut<'a> {
 		self.buffer.path().into_normalized_segments()
 	}
 
+	pub(crate) fn disambiguate(&mut self) {
+		if let Some(first) = self.as_path().first() {
+			if (first.is_empty() && self.buffer.authority().is_none()) ||
+			   (self.is_relative() && self.buffer.scheme().is_none() && self.buffer.authority().is_none() && first.as_ref().contains(&0x3a)) {
+				// add `./` at the begining.
+				let mut offset = self.buffer.p.path_offset();
+				if self.is_absolute() {
+					offset += 1;
+				}
+				self.buffer.replace(offset..offset, &[0x2e, 0x2f]);
+				self.buffer.p.path_len += 2;
+			}
+		}
+	}
+
 	/// Add a segment at the end of the path.
 	pub fn push<'s>(&mut self, segment: Segment<'s>) {
 		if segment.is_empty() {
-			if self.is_empty() && self.is_relative() {
-				self.push(Segment::dot())
+			// if the whole IRI is of the form (1) `scheme:?query#fragment` or (2) `scheme:/?query#fragment`,
+			// we must add a `./` before this segment to make sure that
+			// (1) we don't ambiguously add a `/` at the begining making the path absolute.
+			// (2) we don't make the path start with `//`, confusing it with the authority.
+			if self.is_empty() && self.buffer.authority().is_none() {
+				self.push(Segment::current())
 			}
 
 			// make sure it ends with a slash.
@@ -423,6 +454,13 @@ impl<'a> PathMut<'a> {
 			self.buffer.replace(offset..offset, &[0x2f]);
 			self.buffer.p.path_len += 1;
 		} else {
+			// if the whole IRI is of the form `?query#fragment`, and we push a segment containing a `:`,
+			// it may be confused with the scheme.
+			// We must add a `./` before the first segment to remove the ambiguity.
+			if self.is_relative() && self.is_empty() && self.buffer.scheme().is_none() && self.buffer.authority().is_none() && segment.as_ref().contains(&0x3a) {
+				self.push(Segment::current())
+			}
+
 			// make sure it ends with a slash.
 			self.open();
 
@@ -458,6 +496,8 @@ impl<'a> PathMut<'a> {
 
 			self.buffer.replace(start..end, &[]);
 			self.buffer.p.path_len -= end - start;
+		} else if self.is_relative() {
+			self.push(Segment::parent());
 		}
 	}
 
@@ -478,7 +518,12 @@ impl<'a> PathMut<'a> {
 		for segment in path {
 			match segment.as_str() {
 				"." => self.open(),
-				".." if !self.is_empty() => self.pop(),
+				".." => {
+					self.pop();
+					if segment.is_open() {
+						self.open()
+					}
+				},
 				_ => self.push(segment)
 			}
 		}
@@ -500,7 +545,7 @@ impl<'a> PathMut<'a> {
 #[cfg(test)]
 mod tests {
 	use std::convert::{TryInto, TryFrom};
-	use crate::{Iri, IriBuf, Path};
+	use crate::{Iri, IriBuf, IriRefBuf, Path};
 
 	#[test]
 	fn empty() {
@@ -608,6 +653,16 @@ mod tests {
 		path.push("".try_into().unwrap());
 
 		assert_eq!(iri, "scheme:/.//");
+	}
+
+	#[test]
+	fn push_scheme_edge_case() {
+		let mut iri_ref = IriRefBuf::new("").unwrap();
+		let mut path = iri_ref.path_mut();
+
+		path.push("a:b".try_into().unwrap());
+
+		assert_eq!(iri_ref.as_str(), "./a:b");
 	}
 
 	#[test]

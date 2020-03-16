@@ -15,9 +15,16 @@ pub struct Segment<'a> {
 }
 
 impl<'a> Segment<'a> {
-	pub fn dot() -> Segment<'static> {
+	pub fn current() -> Segment<'static> {
 		Segment {
 			data: &[0x2e],
+			open: false
+		}
+	}
+
+	pub fn parent() -> Segment<'static> {
+		Segment {
+			data: &[0x2e, 0x2e],
 			open: false
 		}
 	}

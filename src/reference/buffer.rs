@@ -82,6 +82,7 @@ impl IriRefBuf {
 			}
 
 			self.p.scheme_len = None;
+			self.path_mut().disambiguate();
 		}
 	}
 
@@ -131,7 +132,8 @@ impl IriRefBuf {
 				self.replace((offset-2)..(offset+authority.len()), &[]);
 			}
 
-			self.p.query_len = None;
+			self.p.authority = None;
+			self.path_mut().disambiguate();
 		}
 	}
 
@@ -389,7 +391,35 @@ impl Hash for IriRefBuf {
 
 #[cfg(test)]
 mod tests {
-	use crate::{Iri, IriRef};
+	use crate::{Iri, IriRef, IriRefBuf};
+
+	#[test]
+	fn disambiguate1() {
+		let mut iri_ref = IriRefBuf::new("scheme:a:b/c").unwrap();
+		iri_ref.set_scheme(None);
+		assert_eq!(iri_ref.as_str(), "./a:b/c")
+	}
+
+	#[test]
+	fn disambiguate2() {
+		let mut iri_ref = IriRefBuf::new("//host//path").unwrap();
+		iri_ref.set_authority(None);
+		assert_eq!(iri_ref.as_str(), "/.//path")
+	}
+
+	#[test]
+	fn unambiguous_resolution() {
+		let base_iri = Iri::new("http:/a/b").unwrap();
+
+		let tests = [
+			("../..//", "http:/.//")
+		];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
+			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+		}
+	}
 
 	#[test]
 	fn resolution_normal() {
@@ -457,7 +487,7 @@ mod tests {
 		];
 
 		for (relative, absolute) in &tests {
-			println!("{} => {}", relative, absolute);
+			// println!("{} => {}", relative, absolute);
 			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
 		}
 	}
