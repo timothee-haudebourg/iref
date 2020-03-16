@@ -180,6 +180,12 @@ Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 percent encoded characters are correctly handled.
 The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
 
+## What is missing
+
+For now, this crate lacks of a proper way to compare strings in a case
+insensitive manner. As a result, the IRIs `http://example.org` and
+`htTp://ExAmpLe.Org` that should be equivalent are not.
+
 ## License
 
 Licensed under either of
