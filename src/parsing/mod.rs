@@ -225,11 +225,26 @@ pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error>
 	}
 }
 
+pub fn is_alpha(c: char) -> bool {
+	let c = c as u32;
+	(c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)
+}
+
+pub fn is_digit(c: char) -> bool {
+	let c = c as u32;
+	c >= 0x30 && c <= 0x39
+}
+
+pub fn is_alphanumeric(c: char) -> bool {
+	let c = c as u32;
+	(c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)
+}
+
 /// Parse the IRI scheme.
 pub fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	loop {
 		match get_char(buffer, i)? {
-			Some((c, len)) if (i == 0 && c.is_alphabetic()) || (i > 0 && (c.is_alphanumeric() || c == '+' || c == '-' || c == '.')) => {
+			Some((c, len)) if (i == 0 && is_alpha(c)) || (i > 0 && (is_alphanumeric(c) || c == '+' || c == '-' || c == '.')) => {
 				i += len
 			},
 			_ => break
@@ -266,7 +281,7 @@ fn is_private(c: char) -> bool {
 }
 
 fn is_unreserved(c: char) -> bool {
-	c.is_alphanumeric() || c == '-' || c == '.' || c == '_' || c == '~' || is_ucschar(c)
+	is_alphanumeric(c) || c == '-' || c == '.' || c == '_' || c == '~' || is_ucschar(c)
 }
 
 fn is_subdelim(c: char) -> bool {
