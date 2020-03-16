@@ -32,7 +32,9 @@ pub enum Error {
 	/// The input data is not a valid UTF-8 encoded string.
 	InvalidEncoding,
 
-	Invalid,
+	InvalidPercentEncoding,
+
+	MissingScheme,
 
 	InvalidScheme,
 
@@ -50,11 +52,7 @@ pub enum Error {
 
 	InvalidQuery,
 
-	InvalidFragment,
-
-	InvalidPCTEncoded,
-
-	EmptyPath
+	InvalidFragment
 }
 
 /// IRI slice.
@@ -70,7 +68,7 @@ impl<'a> Iri<'a> {
 		if iri_ref.scheme().is_some() {
 			Ok(Iri(iri_ref))
 		} else {
-			Err(Error::Invalid)
+			Err(Error::MissingScheme)
 		}
 	}
 

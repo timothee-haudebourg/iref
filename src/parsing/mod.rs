@@ -78,7 +78,7 @@ impl ParsedIriRef {
 		let scheme_len_tmp = parse_scheme(buffer, 0)?;
 		let scheme_end = if let Some((':', 1)) = get_char(buffer, scheme_len_tmp)? {
 			if scheme_len_tmp == 0 {
-				return Err(Error::Invalid)
+				return Err(Error::MissingScheme)
 			}
 
 			scheme_len = Some(scheme_len_tmp);
@@ -291,7 +291,7 @@ fn parse_pct_encoded(buffer: &[u8], i: usize) -> Result<Option<usize>, Error> {
 			if is_hex_digit(buffer, i+1)? && is_hex_digit(buffer, i+2)? {
 				Ok(Some(3))
 			} else {
-				Err(Error::InvalidPCTEncoded)
+				Err(Error::InvalidPercentEncoding)
 			}
 		},
 		_ => Ok(None)

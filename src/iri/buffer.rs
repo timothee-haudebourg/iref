@@ -16,7 +16,7 @@ impl IriBuf {
 		if iri_ref.scheme().is_some() {
 			Ok(IriBuf(iri_ref))
 		} else {
-			Err(Error::Invalid)
+			Err(Error::MissingScheme)
 		}
 	}
 
