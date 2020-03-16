@@ -3,7 +3,6 @@ use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use std::iter::IntoIterator;
-use std::ops::Deref;
 use smallvec::SmallVec;
 use pct_str::PctStr;
 use crate::{parsing, IriRefBuf};
