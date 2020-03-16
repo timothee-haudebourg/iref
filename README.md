@@ -143,7 +143,7 @@ assert_eq!(iri_ref, "http://a/b/c/y");
 
 This crate implements
 [Errata 4547](https://www.rfc-editor.org/errata/eid4547) about the
-abnormal use of dot segments.
+abnormal use of dot segments in relative paths.
 This means that for instance, the path `a/b/../../../` is normalized into
 `../`.
 
@@ -170,9 +170,9 @@ This means for instance that the paths `a/b/c` and `a/../a/./b/../b/c` **are**
 equivalent.
 Note however that this crate implements
 [Errata 4547](https://www.rfc-editor.org/errata/eid4547) about the
-abnormal use of dot segments.
-This means that for instance, the path `/a/b/../../../` is equivalent to
-`../` and **not** `/`.
+abnormal use of dot segments in relative paths.
+This means that for instance, the IRI `http:a/b/../../../` is equivalent to
+`http:../` and **not** `http:`.
 
 #### Percent-encoded characters
 
