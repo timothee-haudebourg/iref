@@ -35,7 +35,7 @@ Import the crate by adding the following line to
 the `dependencies` section of the `Cargo.toml` file:
 ```toml
 [dependencies]
-iref = "1.1.0"
+iref = "1.1.1"
 ```
 You can parse IRI strings by wrapping an `Iri` instance around a `str` slice.
 Note that no memory allocation occurs using `Iri`, it only borrows the input data.
@@ -78,6 +78,21 @@ assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
 ```
 
 The `try_into` method is used to ensure that each string is syntactically correct with regard to its corresponding component (for instance, it is not possible to replace `"query"` with `"query?"` since `?` is not a valid query character).
+
+The [`static-iri`](https://docs.rs/static-iref) crate provides two macros,
+`iri!` and `iref!`, to build IRIs and IRI references with a `'static` lifetime
+at compile time.
+
+```rust
+extern crate iref;
+#[macro_use]
+extern crate static_iref;
+
+use iref::{Iri, IriRef};
+
+const IRI: Iri<'static> = iri!("https://www.rust-lang.org/foo/bar#frag");
+const IREF: IriRef<'static> = iref!("/foo/bar#frag");
+```
 
 ## Detailed usage
 
