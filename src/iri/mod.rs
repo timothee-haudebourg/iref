@@ -123,6 +123,11 @@ impl<'a> Iri<'a> {
 		}
 	}
 
+	/// Build an IRI from an IRI reference.
+	pub const fn from_iri_ref(iri_ref: IriRef<'a>) -> Iri<'a> {
+		Iri(iri_ref)
+	}
+
 	/// Get an [`IriRef`] out of this IRI.
 	///
 	/// An IRI is always a valid IRI-reference.

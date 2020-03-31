@@ -50,6 +50,21 @@ impl<'a> IriRef<'a> {
 		})
 	}
 
+	/// Get the underlying parsing data.
+	pub fn parsing_data(&self) -> ParsedIriRef {
+		self.p
+	}
+
+	/// Build an IRI reference from a slice and parsing data.
+	///
+	/// This is unsafe since the input slice is not checked against the given parsing data.
+	pub const unsafe fn from_raw(data: &'a [u8], p: ParsedIriRef) -> IriRef<'a> {
+		IriRef {
+			p: p,
+			data: data
+		}
+	}
+
 	/// Get the length is the IRI-reference, in bytes.
 	pub fn len(&self) -> usize {
 		self.data.len()
