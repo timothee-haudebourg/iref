@@ -76,7 +76,7 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Convert the IRI-refrence into its underlying bytes slicee.
-	pub fn as_ref(self) -> &[u8] {
+	pub fn into_ref(self) -> &'a [u8] {
 		self.data
 	}
 
@@ -88,7 +88,7 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Convert the IRI-reference into a string slice.
-	pub fn into_str(self) -> &str {
+	pub fn into_str(self) -> &'a str {
 		unsafe {
 			std::str::from_utf8_unchecked(self.data)
 		}
@@ -102,7 +102,7 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Convert the IRI-reference into a percent-encoded string slice.
-	pub fn into_pct_str(self) -> &PctStr {
+	pub fn into_pct_str(self) -> &'a PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.into_str())
 		}
