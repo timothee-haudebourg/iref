@@ -15,6 +15,7 @@ pub struct Segment<'a> {
 }
 
 impl<'a> Segment<'a> {
+	/// The special dot segment `.` indicating the current directory.
 	pub fn current() -> Segment<'static> {
 		Segment {
 			data: &[0x2e],
@@ -22,6 +23,7 @@ impl<'a> Segment<'a> {
 		}
 	}
 
+	/// The special dot segment `..` indicating the parent directory.
 	pub fn parent() -> Segment<'static> {
 		Segment {
 			data: &[0x2e, 0x2e],
@@ -29,6 +31,7 @@ impl<'a> Segment<'a> {
 		}
 	}
 
+	/// Get the length of the path name.
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
@@ -40,7 +43,14 @@ impl<'a> Segment<'a> {
     /// Get the underlying segment slice as a string slice.
 	pub fn as_str(&self) -> &str {
 		unsafe {
-			std::str::from_utf8_unchecked(&self.data)
+			std::str::from_utf8_unchecked(self.data)
+		}
+	}
+
+	/// Get the underlying segment slice as a string slice by consuming the segment reference.
+	pub fn into_str(self) -> &'a str {
+		unsafe {
+			std::str::from_utf8_unchecked(self.data)
 		}
 	}
 
@@ -60,6 +70,7 @@ impl<'a> Segment<'a> {
 		self.data.is_empty()
 	}
 
+	/// Open that path.
 	pub fn open(&mut self) {
 		self.open = true
 	}

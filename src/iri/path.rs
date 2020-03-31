@@ -15,6 +15,15 @@ pub struct Path<'a> {
 }
 
 impl<'a> Path<'a> {
+	/// The inner data length (in bytes), without the trailing `/` is the path is open.
+	fn closed_len(&self) -> usize {
+		if self.is_open() {
+			self.data.len() - 1
+		} else {
+			self.data.len()
+		}
+	}
+
 	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
@@ -144,18 +153,62 @@ impl<'a> Path<'a> {
 	/// `b`.
 	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
 	pub fn segments(&self) -> Segments {
-		Segments {
-			path: *self,
-			offset: 0
-		}
+		Segments::new(*self)
 	}
 
+	/// Iterate over the normalized segments of the path.
+	///
+	/// Remove the special dot segments `..` and `.` from the iteration using the usual path
+	/// semantics for dot segments.
+	/// This may be expensive for large paths since it will need to internally normalize the path
+	/// first.
 	pub fn normalized_segments(&self) -> NormalizedSegments {
 		NormalizedSegments::new(*self)
 	}
 
+	/// Consume the path reference and return an iterator over its normalized segments.
 	pub fn into_normalized_segments(self) -> NormalizedSegments<'a> {
 		NormalizedSegments::new(self)
+	}
+
+	/// Returns the name of the final segment of the path, if there is one.
+	///
+	/// If the path is a normal file, this is the file name. If it's the path of a directory, this
+	/// is the directory name.
+	///
+	/// This does not consider the normalized version of the path, dot segments are preserved.
+	pub fn file_name(&self) -> Option<&'a str> {
+		match self.into_iter().next_back() {
+			Some(s) => Some(s.into_str()),
+			None => None
+		}
+	}
+
+	/// Returns the path without its final component, if there is one.
+	pub fn parent(&self) -> Option<Path<'a>> {
+		let mut i = self.closed_len();
+
+		if self.is_empty() {
+			None
+		} else {
+			i -= 1;
+
+			loop {
+				if self.data[i] == 0x2f {
+					break
+				} else {
+					if i > 0 {
+						i -= 1;
+					} else {
+						return None
+					}
+				}
+			}
+
+			Some(Path {
+				data: &self.data[0..(i+1)]
+			})
+		}
 	}
 }
 
@@ -179,26 +232,66 @@ impl<'a> IntoIterator for Path<'a> {
 	type IntoIter = Segments<'a>;
 
 	fn into_iter(self) -> Segments<'a> {
-		Segments {
-			path: self,
-			offset: 0
-		}
+		Segments::new(self)
 	}
 }
 
 #[derive(Clone)]
 pub struct Segments<'a> {
 	path: Path<'a>,
-	offset: usize
+	offset: usize,
+	offset_back: usize
+}
+
+impl<'a> Segments<'a> {
+	fn new(path: Path<'a>) -> Segments<'a> {
+		let offset_back = path.closed_len();
+		Segments {
+			path,
+			offset: 0,
+			offset_back
+		}
+	}
 }
 
 impl<'a> Iterator for Segments<'a> {
 	type Item = Segment<'a>;
 
 	fn next(&mut self) -> Option<Segment<'a>> {
-		let (segment, end) = self.path.segment_at(self.offset);
-		self.offset = end;
-		segment
+		if self.offset >= self.offset_back {
+			None
+		} else {
+			let (segment, end) = self.path.segment_at(self.offset);
+			self.offset = end;
+			segment
+		}
+	}
+}
+
+impl<'a> DoubleEndedIterator for Segments<'a> {
+	fn next_back(&mut self) -> Option<Segment<'a>> {
+		if self.offset >= self.offset_back {
+			None
+		} else {
+			let mut i = self.offset_back - 1; // Note that `offset_back` cannot be 0 here, or we
+			                                   // wouldn't be in this branch.
+
+			loop {
+				if i > 0 {
+					if self.path.data[i] == 0x2f {
+						break
+					} else {
+						i -= 1;
+					}
+				} else {
+					break
+				}
+			}
+
+			self.offset_back = i;
+			let (segment, _) = self.path.segment_at(self.offset_back);
+			segment
+		}
 	}
 }
 
@@ -729,5 +822,124 @@ mod tests {
 		assert_ne!(Path::try_from("a/b/c").unwrap(), "a/b/c/");
 		assert_ne!(Path::try_from("a/b/c").unwrap(), "a/b/c/.");
 		assert_ne!(Path::try_from("a/b/c/..").unwrap(), "a/b");
+	}
+
+	#[test]
+	fn segments() {
+		let path = Path::try_from("//a/b/foo//bar/").unwrap();
+		let mut segments = path.into_iter();
+
+		assert_eq!(segments.next().unwrap(), "");
+		assert_eq!(segments.next().unwrap(), "a");
+		assert_eq!(segments.next().unwrap(), "b");
+		assert_eq!(segments.next().unwrap(), "foo");
+		assert_eq!(segments.next().unwrap(), "");
+		assert_eq!(segments.next().unwrap(), "bar");
+		assert_eq!(segments.next(), None);
+	}
+
+	#[test]
+	fn empty_segments() {
+		let path = Path::try_from("").unwrap();
+		let mut segments = path.into_iter();
+
+		assert_eq!(segments.next(), None);
+	}
+
+	#[test]
+	fn reverse_segments() {
+		let path = Path::try_from("//a/b/foo//bar/").unwrap();
+		let mut segments = path.into_iter();
+
+		assert_eq!(segments.next_back().unwrap(), "bar");
+		assert_eq!(segments.next_back().unwrap(), "");
+		assert_eq!(segments.next_back().unwrap(), "foo");
+		assert_eq!(segments.next_back().unwrap(), "b");
+		assert_eq!(segments.next_back().unwrap(), "a");
+		assert_eq!(segments.next_back().unwrap(), "");
+		assert_eq!(segments.next_back(), None);
+	}
+
+	#[test]
+	fn empty_reverse_segments() {
+		let path = Path::try_from("").unwrap();
+		let mut segments = path.into_iter();
+
+		assert_eq!(segments.next_back(), None);
+	}
+
+	#[test]
+	fn double_ended_segments() {
+		let path = Path::try_from("//a/b/foo//bar/").unwrap();
+		let mut segments = path.into_iter();
+
+		assert_eq!(segments.next_back().unwrap(), "bar");
+		assert_eq!(segments.next().unwrap(), "");
+		assert_eq!(segments.next_back().unwrap(), "");
+		assert_eq!(segments.next().unwrap(), "a");
+		assert_eq!(segments.next_back().unwrap(), "foo");
+		assert_eq!(segments.next().unwrap(), "b");
+		assert_eq!(segments.next_back(), None);
+		assert_eq!(segments.next(), None);
+	}
+
+	#[test]
+	fn file_name() {
+		let path = Path::try_from("//a/b/foo//bar/").unwrap();
+		assert_eq!(path.file_name().unwrap(), "bar");
+	}
+
+	#[test]
+	fn parent1() {
+		let path = Path::try_from("//a/b/foo//bar/").unwrap();
+		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/foo//").unwrap());
+	}
+
+	#[test]
+	fn parent1_closed() {
+		let path = Path::try_from("//a/b/foo//bar").unwrap();
+		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/foo//").unwrap());
+	}
+
+	#[test]
+	fn parent2() {
+		let path = Path::try_from("//a/b/foo//").unwrap();
+		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/foo/").unwrap());
+	}
+
+	#[test]
+	fn parent3() {
+		let path = Path::try_from("//a/b/foo/").unwrap();
+		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/").unwrap());
+	}
+
+	#[test]
+	fn parent4() {
+		let path = Path::try_from("//a/b/").unwrap();
+		assert_eq!(path.parent().unwrap(), Path::try_from("//a/").unwrap());
+	}
+
+	#[test]
+	fn parent5() {
+		let path = Path::try_from("//a/").unwrap();
+		assert_eq!(path.parent().unwrap(), Path::try_from("//").unwrap());
+	}
+
+	#[test]
+	fn parent6() {
+		let path = Path::try_from("//").unwrap();
+		assert_eq!(path.parent().unwrap(), Path::try_from("/").unwrap());
+	}
+
+	#[test]
+	fn parent7() {
+		let path = Path::try_from("/").unwrap();
+		assert_eq!(path.parent(), None);
+	}
+
+	#[test]
+	fn parent_empty() {
+		let path = Path::try_from("").unwrap();
+		assert_eq!(path.parent(), None);
 	}
 }
