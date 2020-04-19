@@ -653,9 +653,17 @@ pub fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	loop {
 		match get_char(buffer, i)? {
 			None | Some(('?', _)) | Some(('#', _)) => break,
-			Some((_, len)) => {
+			Some(('%', 1)) => {
+				if let Some(len) = parse_pct_encoded(buffer, i)? {
+					i += len
+				} else {
+					break
+				}
+			},
+			Some((c, len)) if is_subdelim(c) || is_unreserved(c) || c == '@' || c == ':' || c == '/' => {
 				i += len
-			}
+			},
+			_ => break
 		}
 	}
 
@@ -669,9 +677,17 @@ pub fn parse_path_segment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	loop {
 		match get_char(buffer, i)? {
 			None | Some(('?', _)) | Some(('#', _)) | Some(('/', _)) => break,
-			Some((_, len)) => {
+			Some(('%', 1)) => {
+				if let Some(len) = parse_pct_encoded(buffer, i)? {
+					i += len
+				} else {
+					break
+				}
+			},
+			Some((c, len)) if is_subdelim(c) || is_unreserved(c) || c == '@' || c == ':' => {
 				i += len
-			}
+			},
+			_ => break
 		}
 	}
 

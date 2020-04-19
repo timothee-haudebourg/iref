@@ -68,3 +68,20 @@ fn test7() {
 	assert!(iri.authority().is_none());
 	assert_eq!(iri.path(), "foo/bar");
 }
+
+#[test]
+#[should_panic]
+fn test8() {
+	let buffer = "https:foo/bar space";
+	let iri = Iri::new(buffer).unwrap();
+
+	println!("{}", iri.path());
+}
+
+#[test]
+fn test9() {
+	let iri1 = Iri::new("https:foo/bar").unwrap();
+	let iri2 = Iri::new("https:foo/%62%61%72").unwrap();
+
+	assert_eq!(iri1, iri2)
+}
