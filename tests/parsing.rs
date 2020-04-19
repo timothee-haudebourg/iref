@@ -77,3 +77,11 @@ fn test8() {
 
 	println!("{}", iri.path());
 }
+
+#[test]
+fn test9() {
+	let iri1 = Iri::new("https:foo/bar").unwrap();
+	let iri2 = Iri::new("https:foo/%62%61%72").unwrap();
+
+	assert_eq!(iri1, iri2)
+}
