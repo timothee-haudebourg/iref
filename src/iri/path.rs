@@ -228,7 +228,14 @@ impl<'a> Path<'a> {
 	///
 	/// # Example
 	/// ```
-	/// use iref::Path;
+	/// # use std::convert::TryFrom;
+	/// use iref::{Path, PathBuf};
+	///
+	/// let prefix = Path::try_from("/foo/bar").unwrap();
+	/// let path = Path::try_from("/foo/bar/baz").unwrap();
+	/// let suffix: PathBuf = path.suffix(prefix).unwrap();
+	///
+	/// assert_eq!(suffix, "baz");
 	/// ```
 	pub fn suffix(&self, prefix: Path) -> Option<PathBuf> {
 		if self.is_absolute() != prefix.is_absolute() {
@@ -761,6 +768,12 @@ impl<'a> PartialEq<PathMut<'a>> for PathBuf {
 	}
 }
 
+impl<'a> PartialEq<&'a str> for PathBuf {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.data.path() == *other
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use std::convert::{TryInto, TryFrom};
@@ -1074,8 +1087,8 @@ mod tests {
 	fn suffix_simple() {
 		let prefix = Path::try_from("/foo/bar").unwrap();
 		let path = Path::try_from("/foo/bar/baz").unwrap();
-		let prefix: PathBuf = path.suffix(prefix).unwrap();
-		assert_eq!(prefix, Path::try_from("baz").unwrap());
+		let suffix: PathBuf = path.suffix(prefix).unwrap();
+		assert_eq!(suffix, "baz");
 	}
 
 	#[test]

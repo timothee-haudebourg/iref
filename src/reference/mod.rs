@@ -8,7 +8,7 @@ use std::convert::TryInto;
 use pct_str::PctStr;
 
 use crate::parsing::ParsedIriRef;
-use crate::{Scheme, Authority, Path, Query, Fragment, Error, Iri, IriBuf};
+use crate::{Scheme, Authority, Path, PathBuf, Query, Fragment, Error, Iri, IriBuf};
 
 pub use self::buffer::*;
 
@@ -232,9 +232,26 @@ impl<'a> IriRef<'a> {
 		iri_ref.try_into().unwrap()
 	}
 
-	// pub fn suffix(&self, prefix: IriRef) -> (Path, Query, Fragment) {
-	// 	// ...
-	// }
+	/// Get the suffix of this IRI reference, if any, with regard to the given prefix IRI reference..
+	///
+	/// Returns `Some((suffix, query, fragment))` if this IRI reference is of the form
+	/// `prefix/suffix?query#fragment` where `prefix` is given as parameter.
+	/// Returns `None` otherwise.
+	/// If the `suffix` scheme or authority is different from this path, it will return `None`.
+	///
+	/// See [`Path::suffix`] for more details.
+	pub fn suffix(&self, prefix: IriRef) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
+		if self.scheme() == prefix.scheme() && self.authority() == prefix.authority() {
+			match self.path().suffix(prefix.path()) {
+				Some(suffix_path) => {
+					Some((suffix_path, self.query(), self.fragment()))
+				},
+				None => None
+			}
+		} else {
+			None
+		}
+	}
 }
 
 impl<'a> fmt::Display for IriRef<'a> {
