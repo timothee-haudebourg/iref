@@ -231,6 +231,10 @@ impl<'a> IriRef<'a> {
 		iri_ref.resolve(base_iri);
 		iri_ref.try_into().unwrap()
 	}
+
+	// pub fn suffix(&self, prefix: IriRef) -> (Path, Query, Fragment) {
+	// 	// ...
+	// }
 }
 
 impl<'a> fmt::Display for IriRef<'a> {

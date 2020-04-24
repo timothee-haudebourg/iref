@@ -31,7 +31,14 @@ impl<'a> Path<'a> {
 	/// Get the underlying path slice as a string slice.
 	pub fn as_str(&self) -> &str {
 		unsafe {
-			std::str::from_utf8_unchecked(&self.data)
+			std::str::from_utf8_unchecked(self.data)
+		}
+	}
+
+	/// Convert this path into the underlying path slice.
+	pub fn into_str(self) -> &'a str {
+		unsafe {
+			std::str::from_utf8_unchecked(self.data)
 		}
 	}
 
@@ -209,6 +216,39 @@ impl<'a> Path<'a> {
 				data: &self.data[0..(i+1)]
 			})
 		}
+	}
+
+	/// Get the suffix part of this path, if any, with regard to the given prefix path.
+	///
+	/// Returns `Some(suffix)` if this path is of the form `prefix/suffix` where `prefix` is given
+	/// as parameter. Returns `None` otherwise.
+	///
+	/// Both paths are normalized during the process.
+	/// The result is a normalized suffix path.
+	///
+	/// # Example
+	/// ```
+	/// use iref::Path;
+	/// ```
+	pub fn suffix(&self, prefix: Path) -> Option<PathBuf> {
+		if self.is_absolute() != prefix.is_absolute() {
+			return None
+		}
+
+		let mut buf = PathBuf::new();
+		let mut self_it = self.normalized_segments();
+		let mut prefix_it = prefix.normalized_segments();
+
+		loop {
+			match (self_it.next(), prefix_it.next()) {
+				(Some(self_seg), Some(prefix_seg)) if self_seg.as_pct_str() == prefix_seg.as_pct_str() => (),
+				(_, Some(_)) => return None,
+				(Some(seg), None) => buf.as_path_mut().push(seg),
+				(None, None) => break
+			}
+		}
+
+		Some(buf)
 	}
 }
 
@@ -441,10 +481,12 @@ pub struct PathMut<'a> {
 }
 
 impl<'a> PathMut<'a> {
+	/// Get the inner path.
 	pub fn as_path(&self) -> Path {
 		self.buffer.path()
 	}
 
+	/// Get the underlying byte slice.
 	pub fn as_ref(&self) -> &[u8] {
 		let offset = self.buffer.p.path_offset();
 		let len = self.buffer.path().as_ref().len();
@@ -634,10 +676,95 @@ impl<'a> PathMut<'a> {
 	}
 }
 
+impl<'a> PartialEq<PathMut<'a>> for Path<'a> {
+	fn eq(&self, other: &PathMut<'a>) -> bool {
+		*self == other.as_path()
+	}
+}
+
+impl<'a> PartialEq<Path<'a>> for PathMut<'a> {
+	fn eq(&self, other: &Path<'a>) -> bool {
+		self.as_path() == *other
+	}
+}
+
+/// A path buffer, that can be manipulated independently of an IRI.
+#[derive(PartialEq, Eq, Hash, PartialOrd, Ord, Clone)]
+pub struct PathBuf {
+	/// We actually store the path as an IRI-reference.
+	data: IriRefBuf
+}
+
+impl PathBuf {
+	/// Create a new empty path.
+	pub fn new() -> PathBuf {
+		PathBuf {
+			data: IriRefBuf::default()
+		}
+	}
+
+	pub fn as_str(&self) -> &str {
+		self.data.path().into_str()
+	}
+
+	pub fn as_path(&self) -> Path {
+		self.data.path()
+	}
+
+	pub fn as_path_mut(&mut self) -> PathMut {
+		self.data.path_mut()
+	}
+}
+
+impl<'a> From<Path<'a>> for PathBuf {
+	fn from(path: Path<'a>) -> PathBuf {
+		let mut buf = PathBuf::new();
+		buf.data.replace(0..0, path.as_ref());
+		buf.data.p.path_len = path.as_ref().len();
+		buf
+	}
+}
+
+impl<'a> From<NormalizedSegments<'a>> for PathBuf {
+	fn from(segments: NormalizedSegments<'a>) -> PathBuf {
+		let mut buf = PathBuf::new();
+		let mut path = buf.as_path_mut();
+		for seg in segments {
+			path.push(seg)
+		}
+
+		buf
+	}
+}
+
+impl fmt::Display for PathBuf {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_str().fmt(f)
+	}
+}
+
+impl fmt::Debug for PathBuf {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_str().fmt(f)
+	}
+}
+
+impl<'a> PartialEq<Path<'a>> for PathBuf {
+	fn eq(&self, other: &Path<'a>) -> bool {
+		self.data.path() == *other
+	}
+}
+
+impl<'a> PartialEq<PathMut<'a>> for PathBuf {
+	fn eq(&self, other: &PathMut<'a>) -> bool {
+		self.data.path() == *other
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use std::convert::{TryInto, TryFrom};
-	use crate::{Iri, IriBuf, IriRefBuf, Path};
+	use crate::{Iri, IriBuf, IriRefBuf, Path, PathBuf};
 
 	#[test]
 	fn empty() {
@@ -941,5 +1068,20 @@ mod tests {
 	fn parent_empty() {
 		let path = Path::try_from("").unwrap();
 		assert_eq!(path.parent(), None);
+	}
+
+	#[test]
+	fn suffix_simple() {
+		let prefix = Path::try_from("/foo/bar").unwrap();
+		let path = Path::try_from("/foo/bar/baz").unwrap();
+		let prefix: PathBuf = path.suffix(prefix).unwrap();
+		assert_eq!(prefix, Path::try_from("baz").unwrap());
+	}
+
+	#[test]
+	fn suffix_not() {
+		let prefix = Path::try_from("/foo/bar").unwrap();
+		let path = Path::try_from("/a/b/baz").unwrap();
+		assert!(path.suffix(prefix).is_none());
 	}
 }
