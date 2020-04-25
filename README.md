@@ -201,6 +201,17 @@ For now, this crate lacks of a proper way to compare strings in a case
 insensitive manner. As a result, the IRIs `http://example.org` and
 `htTp://ExAmpLe.Org` that should be equivalent are not.
 
+## What's next?
+
+I am waiting for [Custom DSTs](https://github.com/rust-lang/rfcs/pull/2594) to
+be available in order to
+turn the types `Iri` and `IriRef` (and `Path`, `Authority`, etc.) into
+dynamically sized types just like `str`, `OsStr`, etc.
+This would allow buffered types (`IriBuf`, `PathBuf`, etc.) to `Deref` into
+those DSTs and be far more easy to use while simplifying the API.
+
+We just need to wait...
+
 ## License
 
 Licensed under either of
