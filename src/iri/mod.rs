@@ -11,6 +11,7 @@ mod fragment;
 
 use std::ops::Deref;
 use std::convert::TryFrom;
+use std::error::Error as StdError;
 use std::fmt;
 use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
@@ -31,7 +32,7 @@ pub use self::fragment::*;
 ///
 /// These are the different errors raised when some part of an IRI or IRI reference has an
 /// invalid syntax or encoding.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
 	/// The input data is not a valid UTF-8 encoded string.
 	InvalidEncoding,
@@ -81,6 +82,27 @@ pub enum Error {
 	/// Occurs when a [`Fragment`] part is not syntactically valid.
 	InvalidFragment
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Error::InvalidEncoding => "Invalid encoding",
+            Error::InvalidPercentEncoding => "Invalid percent encoding",
+            Error::MissingScheme => "Missing scheme",
+            Error::InvalidScheme => "Invalid scheme",
+            Error::InvalidAuthority => "Invalid authority",
+            Error::InvalidUserInfo => "Invalid user info",
+            Error::InvalidHost => "Invalid host",
+            Error::InvalidPort => "Invalid port",
+            Error::InvalidSegment => "Invalid segment",
+            Error::InvalidPath => "Invalid path",
+            Error::InvalidQuery => "Invalid query",
+            Error::InvalidFragment => "Invalid fragment"
+        })
+    }
+}
+
+impl StdError for Error {}
 
 /// IRI slice.
 ///
