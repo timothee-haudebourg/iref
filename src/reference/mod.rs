@@ -368,13 +368,7 @@ impl<'a> From<&'a IriBuf> for IriRef<'a> {
 
 impl<'a> From<Path<'a>> for IriRef<'a> {
 	fn from(path: Path<'a>) -> IriRef<'a> {
-		IriRef {
-			p: ParsedIriRef {
-				path_len: path.data.len(),
-				..ParsedIriRef::default()
-			},
-			data: path.data
-		}
+		path.into_iri_ref()
 	}
 }
 

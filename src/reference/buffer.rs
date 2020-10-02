@@ -5,7 +5,7 @@ use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 use crate::parsing::ParsedIriRef;
-use crate::{Error, Iri, IriBuf, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
+use crate::{Error, Iri, IriBuf, Scheme, Authority, AuthorityMut, Path, PathMut, PathBuf, Query, Fragment};
 use super::IriRef;
 
 /// Owned IRI-reference.
@@ -46,6 +46,25 @@ impl IriRefBuf {
 			data: Vec::from(buffer.as_ref()),
 			p: ParsedIriRef::new(buffer)?
 		})
+	}
+
+	/// Consume the IRI buffer and return its constituing parts:
+	/// the internal buffer and parsing data.
+	#[inline]
+	pub fn into_raw_parts(self) -> (Vec<u8>, ParsedIriRef) {
+		(self.data, self.p)
+	}
+
+	/// Consume the IRI reference and return its internal buffer.
+	#[inline]
+	pub fn into_bytes(self) -> Vec<u8> {
+		self.data
+	}
+
+	/// Borrow the internal buffer storing this IRI reference.
+	#[inline]
+	pub fn as_ref(&self) -> &[u8] {
+		self.data.as_ref()
 	}
 
 	pub fn as_iri_ref(&self) -> IriRef {
@@ -405,6 +424,20 @@ impl<'a> From<&'a Iri<'a>> for IriRefBuf {
 impl From<IriBuf> for IriRefBuf {
 	fn from(iri: IriBuf) -> IriRefBuf {
 		iri.0
+	}
+}
+
+impl<'a> From<Path<'a>> for IriRefBuf {
+	#[inline]
+	fn from(path: Path<'a>) -> IriRefBuf {
+		path.into_iri_ref().into()
+	}
+}
+
+impl From<PathBuf> for IriRefBuf {
+	#[inline]
+	fn from(path: PathBuf) -> IriRefBuf {
+		path.into_iri_ref().into()
 	}
 }
 

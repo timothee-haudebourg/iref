@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 use std::iter::IntoIterator;
 use smallvec::SmallVec;
 use pct_str::PctStr;
-use crate::{parsing, IriRefBuf};
+use crate::{parsing, IriRef, IriRefBuf};
 use super::{Error, Segment};
 
 #[derive(Clone, Copy)]
@@ -28,6 +28,11 @@ impl<'a> Path<'a> {
 		self.data
 	}
 
+	#[inline]
+	pub fn into_ref(self) -> &'a [u8] {
+		self.data
+	}
+
 	/// Get the underlying path slice as a string slice.
 	pub fn as_str(&self) -> &str {
 		unsafe {
@@ -46,6 +51,30 @@ impl<'a> Path<'a> {
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.as_str())
+		}
+	}
+
+	/// Get the path slice as an IRI reference.
+	#[inline]
+	pub fn as_iri_ref(&self) -> IriRef {
+		IriRef {
+			p: parsing::ParsedIriRef {
+				path_len: self.data.len(),
+				..parsing::ParsedIriRef::default()
+			},
+			data: self.data
+		}
+	}
+
+	/// Convert this path into an IRI reference.
+	#[inline]
+	pub fn into_iri_ref(self) -> IriRef<'a> {
+		IriRef {
+			p: parsing::ParsedIriRef {
+				path_len: self.data.len(),
+				..parsing::ParsedIriRef::default()
+			},
+			data: self.data
 		}
 	}
 
@@ -710,6 +739,18 @@ impl PathBuf {
 		}
 	}
 
+	/// Consume the path and return its internal buffer.
+	#[inline]
+	pub fn into_bytes(self) -> Vec<u8> {
+		self.data.into_bytes()
+	}
+
+	/// Borrow the internal buffer storing this path.
+	#[inline]
+	pub fn as_ref(&self) -> &[u8] {
+		self.data.path().into_ref()
+	}
+
 	pub fn as_str(&self) -> &str {
 		self.data.path().into_str()
 	}
@@ -720,6 +761,18 @@ impl PathBuf {
 
 	pub fn as_path_mut(&mut self) -> PathMut {
 		self.data.path_mut()
+	}
+
+	/// Borrow the path as an IRI reference.
+	#[inline]
+	pub fn as_iri_ref(&self) -> IriRef {
+		self.data.as_iri_ref()
+	}
+
+	/// Convert the path into an IRI reference.
+	#[inline]
+	pub fn into_iri_ref(self) -> IriRefBuf {
+		self.data
 	}
 }
 
