@@ -17,6 +17,7 @@ pub struct Authority<'a> {
 }
 
 impl<'a> Hash for Authority<'a> {
+	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.userinfo().hash(hasher);
 		self.host().hash(hasher);
@@ -25,6 +26,7 @@ impl<'a> Hash for Authority<'a> {
 }
 
 impl<'a> Authority<'a> {
+	#[inline]
 	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
@@ -34,20 +36,24 @@ impl<'a> Authority<'a> {
 	/// It is empty if it has no user info, an empty host string, and no port.
 	/// Note that empty user info or port is different from no user info and port.
 	/// For instance, the authorities `@`, `:` and `@:` are not empty.
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.p.userinfo_len.is_none() && self.p.host_len == 0 && self.p.port_len.is_none()
 	}
 
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(&self.data[0..self.p.len()])
 		}
 	}
 
+	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 
+	#[inline]
 	pub fn userinfo(&self) -> Option<UserInfo> {
 		if let Some(len) = self.p.userinfo_len {
 			Some(UserInfo {
@@ -58,6 +64,7 @@ impl<'a> Authority<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn host(&self) -> Host {
 		let len = self.p.host_len;
 		let offset = self.p.host_offset();
@@ -66,6 +73,7 @@ impl<'a> Authority<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn port(&self) -> Option<Port> {
 		if let Some(len) = self.p.port_len {
 			let offset = self.p.port_offset();
@@ -81,6 +89,7 @@ impl<'a> Authority<'a> {
 impl<'a> TryFrom<&'a str> for Authority<'a> {
 	type Error = Error;
 
+	#[inline]
 	fn try_from(str: &'a str) -> Result<Authority<'a>, Error> {
 		let parsed_authority = parsing::parse_authority(str.as_ref(), 0)?;
 		if parsed_authority.len() < str.len() {
@@ -95,30 +104,35 @@ impl<'a> TryFrom<&'a str> for Authority<'a> {
 }
 
 impl<'a> fmt::Display for Authority<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> fmt::Debug for Authority<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> cmp::PartialEq for Authority<'a> {
+	#[inline]
 	fn eq(&self, other: &Authority) -> bool {
 		self.userinfo() == other.userinfo() && self.port() == other.port() && self.host() == other.host()
 	}
 }
 
 impl<'a> PartialOrd for Authority<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &Authority<'a>) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl<'a> Ord for Authority<'a> {
+	#[inline]
 	fn cmp(&self, other: &Authority<'a>) -> Ordering {
 		self.as_pct_str().cmp(other.as_pct_str())
 	}
@@ -127,6 +141,7 @@ impl<'a> Ord for Authority<'a> {
 impl<'a> Eq for Authority<'a> { }
 
 impl<'a> cmp::PartialEq<&'a str> for Authority<'a> {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_pct_str() == *other
 	}
@@ -143,6 +158,7 @@ pub struct AuthorityMut<'a> {
 }
 
 impl<'a> AuthorityMut<'a> {
+	#[inline]
 	pub fn as_authority(&'a self) -> Authority<'a> {
 		Authority {
 			data: self.data.as_slice(),
@@ -150,10 +166,12 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.as_authority().is_empty()
 	}
 
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			let offset = self.offset;
@@ -161,10 +179,12 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
+	#[inline]
 	fn replace(&mut self, range: Range<usize>, content: &[u8]) {
 		crate::replace(self.data, range, content)
 	}
 
+	#[inline]
 	pub fn userinfo(&self) -> Option<UserInfo> {
 		if let Some(len) = self.p.userinfo_len {
 			let offset = self.offset;
@@ -176,6 +196,7 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn set_userinfo(&mut self, userinfo: Option<UserInfo>) {
 		let offset = self.offset;
 
@@ -197,6 +218,7 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn host(&self) -> Host {
 		let offset = self.offset + self.p.host_offset();
 		let len = self.p.host_len;
@@ -205,12 +227,14 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn set_host(&mut self, host: Host) {
 		let offset = self.offset + self.p.host_offset();
 		self.replace(offset..(offset+self.p.host_len), host.as_ref());
 		self.p.host_len = host.as_ref().len();
 	}
 
+	#[inline]
 	pub fn port(&self) -> Option<Port> {
 		if let Some(len) = self.p.port_len {
 			let offset = self.offset + self.p.port_offset();
@@ -222,6 +246,7 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn set_port(&mut self, port: Option<Port>) {
 		let offset = self.offset + self.p.port_offset();
 

@@ -41,6 +41,7 @@ pub struct IriRefBuf {
 }
 
 impl IriRefBuf {
+	#[inline]
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<IriRefBuf, Error> {
 		Ok(IriRefBuf {
 			data: Vec::from(buffer.as_ref()),
@@ -67,6 +68,7 @@ impl IriRefBuf {
 		self.data.as_ref()
 	}
 
+	#[inline]
 	pub fn as_iri_ref(&self) -> IriRef {
 		IriRef {
 			data: self.data.as_ref(),
@@ -74,31 +76,37 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn as_iri(&self) -> Result<Iri, Error> {
 		self.try_into()
 	}
 
 	/// Length in bytes.
+	#[inline]
 	pub fn len(&self) -> usize {
 		self.p.len()
 	}
 
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(&self.data[0..self.len()])
 		}
 	}
 
+	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.as_str())
 		}
 	}
 
+	#[inline]
 	pub(crate) fn replace(&mut self, range: Range<usize>, content: &[u8]) {
 		crate::replace(&mut self.data, range, content)
 	}
 
+	#[inline]
 	pub fn scheme(&self) -> Option<Scheme> {
 		if let Some(scheme_len) = self.p.scheme_len {
 			Some(Scheme {
@@ -110,6 +118,7 @@ impl IriRefBuf {
 	}
 
 	/// Set the scheme of the IRI.
+	#[inline]
 	pub fn set_scheme(&mut self, scheme: Option<Scheme>) {
 		if let Some(new_scheme) = scheme {
 			if let Some(scheme_len) = self.p.scheme_len {
@@ -130,6 +139,7 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn authority(&self) -> Option<Authority> {
 		if let Some(authority) = self.p.authority {
 			let offset = self.p.authority_offset();
@@ -142,6 +152,7 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn authority_mut(&mut self) -> Option<AuthorityMut> {
 		let offset = self.p.authority_offset();
 		if let Some(authority) = self.p.authority.as_mut() {
@@ -159,6 +170,7 @@ impl IriRefBuf {
 	///
 	/// It must be a syntactically correct authority. If not,
 	/// this method returns an error, and the IRI is unchanged.
+	#[inline]
 	pub fn set_authority(&mut self, authority: Option<Authority>) {
 		let offset = self.p.authority_offset();
 
@@ -181,6 +193,7 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn path(&self) -> Path {
 		let offset = self.p.path_offset();
 		Path {
@@ -188,18 +201,21 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn path_mut(&mut self) -> PathMut {
 		PathMut {
 			buffer: self
 		}
 	}
 
+	#[inline]
 	pub fn set_path(&mut self, path: Path) {
 		let offset = self.p.path_offset();
 		self.replace(offset..(offset+self.p.path_len), path.as_ref());
 		self.p.path_len = path.as_ref().len()
 	}
 
+	#[inline]
 	pub fn query(&self) -> Option<Query> {
 		if let Some(len) = self.p.query_len {
 			let offset = self.p.query_offset();
@@ -211,6 +227,7 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn set_query(&mut self, query: Option<Query>) {
 		let offset = self.p.query_offset();
 
@@ -232,6 +249,7 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn fragment(&self) -> Option<Fragment> {
 		if let Some(len) = self.p.fragment_len {
 			let offset = self.p.fragment_offset();
@@ -242,7 +260,7 @@ impl IriRefBuf {
 			None
 		}
 	}
-
+	#[inline]
 	pub fn set_fragment(&mut self, fragment: Option<Fragment>) {
 		let offset = self.p.fragment_offset();
 
@@ -306,24 +324,28 @@ impl IriRefBuf {
 		}
 	}
 
+	#[inline]
 	pub fn resolved<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> IriBuf {
 		self.as_iri_ref().resolved(base_iri)
 	}
 }
 
 impl fmt::Display for IriRefBuf {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_iri_ref().fmt(f)
 	}
 }
 
 impl fmt::Debug for IriRefBuf {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_iri_ref().fmt(f)
 	}
 }
 
 impl PartialEq for IriRefBuf {
+	#[inline]
 	fn eq(&self, other: &IriRefBuf) -> bool {
 		self.as_iri_ref() == other.as_iri_ref()
 	}
@@ -332,66 +354,77 @@ impl PartialEq for IriRefBuf {
 impl Eq for IriRefBuf { }
 
 impl<'a> PartialEq<IriRef<'a>> for IriRefBuf {
+	#[inline]
 	fn eq(&self, iri_ref: &IriRef<'a>) -> bool {
 		self.as_iri_ref() == *iri_ref
 	}
 }
 
 impl<'a> PartialEq<Iri<'a>> for IriRefBuf {
+	#[inline]
 	fn eq(&self, iri: &Iri<'a>) -> bool {
 		self.as_iri_ref() == iri.as_iri_ref()
 	}
 }
 
 impl PartialEq<IriBuf> for IriRefBuf {
+	#[inline]
 	fn eq(&self, iri: &IriBuf) -> bool {
 		self.as_iri_ref() == iri.as_iri_ref()
 	}
 }
 
 impl PartialEq<str> for IriRefBuf {
+	#[inline]
 	fn eq(&self, other: &str) -> bool {
 		self.as_iri_ref() == other
 	}
 }
 
 impl<'a> PartialEq<&'a str> for IriRefBuf {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_iri_ref() == *other
 	}
 }
 
 impl PartialOrd for IriRefBuf {
+	#[inline]
 	fn partial_cmp(&self, other: &IriRefBuf) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl Ord for IriRefBuf {
+	#[inline]
 	fn cmp(&self, other: &IriRefBuf) -> Ordering {
 		self.as_iri_ref().cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> PartialOrd<IriRef<'a>> for IriRefBuf {
+	#[inline]
 	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(other)
 	}
 }
 
 impl<'a> PartialOrd<Iri<'a>> for IriRefBuf {
+	#[inline]
 	fn partial_cmp(&self, other: &Iri<'a>) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl PartialOrd<IriBuf> for IriRefBuf {
+	#[inline]
 	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> From<IriRef<'a>> for IriRefBuf {
+	#[inline]
 	fn from(iri_ref: IriRef<'a>) -> IriRefBuf {
 		let mut data = Vec::new();
 		data.resize(iri_ref.as_ref().len(), 0);
@@ -404,24 +437,28 @@ impl<'a> From<IriRef<'a>> for IriRefBuf {
 }
 
 impl<'a> From<&'a IriRef<'a>> for IriRefBuf {
+	#[inline]
 	fn from(iri_ref: &'a IriRef<'a>) -> IriRefBuf {
 		(*iri_ref).into()
 	}
 }
 
 impl<'a> From<Iri<'a>> for IriRefBuf {
+	#[inline]
 	fn from(iri: Iri<'a>) -> IriRefBuf {
 		iri.as_iri_ref().into()
 	}
 }
 
 impl<'a> From<&'a Iri<'a>> for IriRefBuf {
+	#[inline]
 	fn from(iri: &'a Iri<'a>) -> IriRefBuf {
 		(*iri).into()
 	}
 }
 
 impl From<IriBuf> for IriRefBuf {
+	#[inline]
 	fn from(iri: IriBuf) -> IriRefBuf {
 		iri.0
 	}
@@ -442,6 +479,7 @@ impl From<PathBuf> for IriRefBuf {
 }
 
 impl Hash for IriRefBuf {
+	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_iri_ref().hash(hasher)
 	}

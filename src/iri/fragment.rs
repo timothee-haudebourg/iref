@@ -13,11 +13,13 @@ pub struct Fragment<'a> {
 }
 
 impl<'a> Fragment<'a> {
+	#[inline]
     pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
     /// Get the underlying fragment slice as a string slice.
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(&self.data)
@@ -25,6 +27,7 @@ impl<'a> Fragment<'a> {
 	}
 
     /// Get the underlying fragment slice as a percent-encoded string slice.
+	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.as_str())
@@ -32,6 +35,7 @@ impl<'a> Fragment<'a> {
 	}
 
     /// Checks if the fragment is empty.
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
 	}
@@ -40,6 +44,7 @@ impl<'a> Fragment<'a> {
 impl<'a> TryFrom<&'a str> for Fragment<'a> {
 	type Error = Error;
 
+	#[inline]
 	fn try_from(str: &'a str) -> Result<Fragment<'a>, Error> {
 		let fragment_len = parsing::parse_fragment(str.as_ref(), 0)?;
 		if fragment_len < str.len() {

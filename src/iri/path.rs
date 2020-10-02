@@ -16,6 +16,7 @@ pub struct Path<'a> {
 
 impl<'a> Path<'a> {
 	/// The inner data length (in bytes), without the trailing `/` is the path is open.
+	#[inline]
 	fn closed_len(&self) -> usize {
 		if self.is_open() {
 			self.data.len() - 1
@@ -24,6 +25,7 @@ impl<'a> Path<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
@@ -34,6 +36,7 @@ impl<'a> Path<'a> {
 	}
 
 	/// Get the underlying path slice as a string slice.
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(self.data)
@@ -41,6 +44,7 @@ impl<'a> Path<'a> {
 	}
 
 	/// Convert this path into the underlying path slice.
+	#[inline]
 	pub fn into_str(self) -> &'a str {
 		unsafe {
 			std::str::from_utf8_unchecked(self.data)
@@ -48,6 +52,7 @@ impl<'a> Path<'a> {
 	}
 
 	/// Get the underlying path slice as a percent-encoded string slice.
+	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.as_str())
@@ -81,6 +86,7 @@ impl<'a> Path<'a> {
 	/// Checks if the path is empty.
 	///
 	/// Returns `true` if the path is `` or `/`.
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty() || self.data == &[0x2f]
 	}
@@ -90,6 +96,7 @@ impl<'a> Path<'a> {
 	/// A path is absolute if it starts with a `/`.
 	/// A path is necessarily absolute if the IRI it is contained in contains a non-empty
 	/// authority.
+	#[inline]
 	pub fn is_absolute(&self) -> bool {
 		!self.data.is_empty() && self.data[0] == 0x2f
 	}
@@ -98,15 +105,18 @@ impl<'a> Path<'a> {
 	///
 	/// A path is relative if it does not start with a `/`.
 	/// A path cannot be relative if the IRI it is contained in contains a non-empty authority.
+	#[inline]
 	pub fn is_relative(&self) -> bool {
 		self.data.is_empty() || self.data[0] != 0x2f
 	}
 
 	/// Checks if the path ends with a `/` but is not equal to `/`.
+	#[inline]
 	pub fn is_open(&self) -> bool {
 		self.data.len() > 1 && self.data.last() == Some(&0x2f)
 	}
 
+	#[inline]
 	pub fn is_closed(&self) -> bool {
 		!self.is_open()
 	}
@@ -144,6 +154,7 @@ impl<'a> Path<'a> {
 		}), end)
 	}
 
+	#[inline]
 	pub fn first(&self) -> Option<Segment<'a>> {
 		let (segment, _) = self.segment_at(0);
 		segment
@@ -152,6 +163,7 @@ impl<'a> Path<'a> {
 	/// Return the path directory part.
 	///
 	/// This correspond to the path without everything after the right most `/`.
+	#[inline]
 	pub fn directory(&self) -> Path {
 		if self.data.is_empty() {
 			Path {
@@ -188,6 +200,7 @@ impl<'a> Path<'a> {
 	/// Empty segments are preserved: the path `a//b` will raise the three segments `a`, `` and
 	/// `b`.
 	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
+	#[inline]
 	pub fn segments(&self) -> Segments {
 		Segments::new(*self)
 	}
@@ -198,11 +211,13 @@ impl<'a> Path<'a> {
 	/// semantics for dot segments.
 	/// This may be expensive for large paths since it will need to internally normalize the path
 	/// first.
+	#[inline]
 	pub fn normalized_segments(&self) -> NormalizedSegments {
 		NormalizedSegments::new(*self)
 	}
 
 	/// Consume the path reference and return an iterator over its normalized segments.
+	#[inline]
 	pub fn into_normalized_segments(self) -> NormalizedSegments<'a> {
 		NormalizedSegments::new(self)
 	}
@@ -213,6 +228,7 @@ impl<'a> Path<'a> {
 	/// is the directory name.
 	///
 	/// This does not consider the normalized version of the path, dot segments are preserved.
+	#[inline]
 	pub fn file_name(&self) -> Option<&'a str> {
 		match self.into_iter().next_back() {
 			Some(s) => Some(s.into_str()),
@@ -221,6 +237,7 @@ impl<'a> Path<'a> {
 	}
 
 	/// Returns the path without its final component, if there is one.
+	#[inline]
 	pub fn parent(&self) -> Option<Path<'a>> {
 		let mut i = self.closed_len();
 
@@ -266,6 +283,7 @@ impl<'a> Path<'a> {
 	///
 	/// assert_eq!(suffix, "baz");
 	/// ```
+	#[inline]
 	pub fn suffix(&self, prefix: Path) -> Option<PathBuf> {
 		if self.is_absolute() != prefix.is_absolute() {
 			return None
@@ -291,6 +309,7 @@ impl<'a> Path<'a> {
 impl<'a> TryFrom<&'a str> for Path<'a> {
 	type Error = Error;
 
+	#[inline]
 	fn try_from(str: &'a str) -> Result<Path<'a>, Error> {
 		let path_len = parsing::parse_path(str.as_ref(), 0)?;
 		if path_len < str.len() {
@@ -307,6 +326,7 @@ impl<'a> IntoIterator for Path<'a> {
 	type Item = Segment<'a>;
 	type IntoIter = Segments<'a>;
 
+	#[inline]
 	fn into_iter(self) -> Segments<'a> {
 		Segments::new(self)
 	}
@@ -333,6 +353,7 @@ impl<'a> Segments<'a> {
 impl<'a> Iterator for Segments<'a> {
 	type Item = Segment<'a>;
 
+	#[inline]
 	fn next(&mut self) -> Option<Segment<'a>> {
 		if self.offset >= self.offset_back {
 			None
@@ -345,6 +366,7 @@ impl<'a> Iterator for Segments<'a> {
 }
 
 impl<'a> DoubleEndedIterator for Segments<'a> {
+	#[inline]
 	fn next_back(&mut self) -> Option<Segment<'a>> {
 		if self.offset >= self.offset_back {
 			None
@@ -413,6 +435,7 @@ impl<'a> NormalizedSegments<'a> {
 impl<'a> Iterator for NormalizedSegments<'a> {
 	type Item = Segment<'a>;
 
+	#[inline]
 	fn next(&mut self) -> Option<Segment<'a>> {
 		if self.i < self.stack.len() {
 			let segment = self.stack[self.i];
@@ -425,18 +448,21 @@ impl<'a> Iterator for NormalizedSegments<'a> {
 }
 
 impl<'a> fmt::Display for Path<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> fmt::Debug for Path<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> cmp::PartialEq for Path<'a> {
+	#[inline]
 	fn eq(&self, other: &Path) -> bool {
 		if self.is_absolute() == other.is_absolute() {
 			let mut self_segments = self.normalized_segments();
@@ -463,6 +489,7 @@ impl<'a> cmp::PartialEq for Path<'a> {
 impl<'a> Eq for Path<'a> { }
 
 impl<'a> cmp::PartialEq<&'a str> for Path<'a> {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		if let Ok(other) = Path::try_from(*other) {
 			self == &other
@@ -473,12 +500,14 @@ impl<'a> cmp::PartialEq<&'a str> for Path<'a> {
 }
 
 impl<'a> PartialOrd for Path<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &Path<'a>) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl<'a> Ord for Path<'a> {
+	#[inline]
 	fn cmp(&self, other: &Path<'a>) -> Ordering {
 		if self.is_absolute() == other.is_absolute() {
 			let mut self_segments = self.normalized_segments();
@@ -507,6 +536,7 @@ impl<'a> Ord for Path<'a> {
 }
 
 impl<'a> Hash for Path<'a> {
+	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_pct_str().hash(hasher)
 	}
@@ -518,11 +548,13 @@ pub struct PathMut<'a> {
 
 impl<'a> PathMut<'a> {
 	/// Get the inner path.
+	#[inline]
 	pub fn as_path(&self) -> Path {
 		self.buffer.path()
 	}
 
 	/// Get the underlying byte slice.
+	#[inline]
 	pub fn as_ref(&self) -> &[u8] {
 		let offset = self.buffer.p.path_offset();
 		let len = self.buffer.path().as_ref().len();
@@ -532,6 +564,7 @@ impl<'a> PathMut<'a> {
 	/// Checks if the path is empty.
 	///
 	/// Returns `true` if the path is `` or `/`.
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.buffer.path().is_empty()
 	}
@@ -541,6 +574,7 @@ impl<'a> PathMut<'a> {
 	/// A path is absolute if it starts with a `/`.
 	/// A path is necessarily absolute if the IRI it is contained in contains a non-empty
 	/// authority.
+	#[inline]
 	pub fn is_absolute(&self) -> bool {
 		self.buffer.path().is_absolute()
 	}
@@ -549,15 +583,18 @@ impl<'a> PathMut<'a> {
 	///
 	/// A path is relative if it does not start with a `/`.
 	/// A path cannot be relative if the IRI it is contained in contains a non-empty authority.
+	#[inline]
 	pub fn is_relative(&self) -> bool {
 		self.buffer.path().is_relative()
 	}
 
 	/// Checks if the path ends with a `/` but is not equal to `/`.
+	#[inline]
 	pub fn is_open(&self) -> bool {
 	 	self.buffer.path().is_open()
 	}
 
+	#[inline]
 	pub fn is_closed(&self) -> bool {
 		self.buffer.path().is_closed()
 	}
@@ -565,6 +602,7 @@ impl<'a> PathMut<'a> {
 	/// Make sure the last segment is followed by a `/`.
 	///
 	/// This has no effect if the path is empty.
+	#[inline]
 	pub fn open(&mut self) {
 		if !self.is_empty() && self.is_closed() {
 			// add a slash at the end.
@@ -582,10 +620,12 @@ impl<'a> PathMut<'a> {
 	/// Empty segments are preserved: the path `a//b` will raise the three segments `a`, `` and
 	/// `b`.
 	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
+	#[inline]
 	pub fn segments(&self) -> Segments {
 		self.buffer.path().into_iter()
 	}
 
+	#[inline]
 	pub fn normalized_segments(&self) -> NormalizedSegments {
 		self.buffer.path().into_normalized_segments()
 	}
@@ -606,6 +646,7 @@ impl<'a> PathMut<'a> {
 	}
 
 	/// Add a segment at the end of the path.
+	#[inline]
 	pub fn push<'s>(&mut self, segment: Segment<'s>) {
 		if segment.is_empty() {
 			// if the whole IRI is of the form (1) `scheme:?query#fragment` or (2) `scheme:/?query#fragment`,
@@ -645,6 +686,7 @@ impl<'a> PathMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn pop(&mut self) {
 		if !self.is_empty() {
 			let end = self.buffer.p.path_offset() + self.buffer.p.path_len;
@@ -671,6 +713,7 @@ impl<'a> PathMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn clear(&mut self) {
 		let mut offset = self.buffer.p.path_offset();
 		let mut len = self.as_ref().len();
@@ -684,6 +727,7 @@ impl<'a> PathMut<'a> {
 		self.buffer.p.path_len = offset - self.buffer.p.path_offset();
 	}
 
+	#[inline]
 	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) {
 		for segment in path {
 			match segment.as_str() {
@@ -699,6 +743,7 @@ impl<'a> PathMut<'a> {
 		}
 	}
 
+	#[inline]
 	pub fn normalize(&mut self) {
 		let mut buffer: SmallVec<[u8; REMOVE_DOTS_BUFFER_LEN]> = SmallVec::new();
 		buffer.extend_from_slice(self.as_ref());
@@ -713,12 +758,14 @@ impl<'a> PathMut<'a> {
 }
 
 impl<'a> PartialEq<PathMut<'a>> for Path<'a> {
+	#[inline]
 	fn eq(&self, other: &PathMut<'a>) -> bool {
 		*self == other.as_path()
 	}
 }
 
 impl<'a> PartialEq<Path<'a>> for PathMut<'a> {
+	#[inline]
 	fn eq(&self, other: &Path<'a>) -> bool {
 		self.as_path() == *other
 	}
@@ -733,6 +780,7 @@ pub struct PathBuf {
 
 impl PathBuf {
 	/// Create a new empty path.
+	#[inline]
 	pub fn new() -> PathBuf {
 		PathBuf {
 			data: IriRefBuf::default()
@@ -751,14 +799,17 @@ impl PathBuf {
 		self.data.path().into_ref()
 	}
 
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		self.data.path().into_str()
 	}
 
+	#[inline]
 	pub fn as_path(&self) -> Path {
 		self.data.path()
 	}
 
+	#[inline]
 	pub fn as_path_mut(&mut self) -> PathMut {
 		self.data.path_mut()
 	}
@@ -777,6 +828,7 @@ impl PathBuf {
 }
 
 impl<'a> From<Path<'a>> for PathBuf {
+	#[inline]
 	fn from(path: Path<'a>) -> PathBuf {
 		let mut buf = PathBuf::new();
 		buf.data.replace(0..0, path.as_ref());
@@ -786,6 +838,7 @@ impl<'a> From<Path<'a>> for PathBuf {
 }
 
 impl<'a> From<NormalizedSegments<'a>> for PathBuf {
+	#[inline]
 	fn from(segments: NormalizedSegments<'a>) -> PathBuf {
 		let mut buf = PathBuf::new();
 		let mut path = buf.as_path_mut();
@@ -798,30 +851,35 @@ impl<'a> From<NormalizedSegments<'a>> for PathBuf {
 }
 
 impl fmt::Display for PathBuf {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl fmt::Debug for PathBuf {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> PartialEq<Path<'a>> for PathBuf {
+	#[inline]
 	fn eq(&self, other: &Path<'a>) -> bool {
 		self.data.path() == *other
 	}
 }
 
 impl<'a> PartialEq<PathMut<'a>> for PathBuf {
+	#[inline]
 	fn eq(&self, other: &PathMut<'a>) -> bool {
 		self.data.path() == *other
 	}
 }
 
 impl<'a> PartialEq<&'a str> for PathBuf {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.data.path() == *other
 	}

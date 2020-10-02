@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Convertions operations between `Path`/`PathBuf` and `IriRef`/`IriRefBuf`.
 - `IriRef::relative_to`
 
+### Changed
+- `#[inline]` almost all the API.
+
 ## [1.2.0] - 2020-09-10
 ### Added
 - A `CHANGELOG.md` file.

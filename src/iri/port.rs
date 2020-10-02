@@ -12,11 +12,13 @@ pub struct Port<'a> {
 }
 
 impl<'a> Port<'a> {
+	#[inline]
     pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
     /// Get the underlying port slice as a string slice.
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(&self.data)
@@ -24,6 +26,7 @@ impl<'a> Port<'a> {
 	}
 
     /// Checks if the port is empty.
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
 	}
@@ -32,6 +35,7 @@ impl<'a> Port<'a> {
 impl<'a> TryFrom<&'a str> for Port<'a> {
 	type Error = Error;
 
+	#[inline]
 	fn try_from(str: &'a str) -> Result<Port<'a>, Error> {
 		let port_len = parsing::parse_port(str.as_ref(), 0)?;
 		if port_len < str.len() {
@@ -45,18 +49,21 @@ impl<'a> TryFrom<&'a str> for Port<'a> {
 }
 
 impl<'a> fmt::Display for Port<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> fmt::Debug for Port<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> cmp::PartialEq for Port<'a> {
+	#[inline]
 	fn eq(&self, other: &Port) -> bool {
 		self.as_str() == other.as_str()
 	}
@@ -65,24 +72,28 @@ impl<'a> cmp::PartialEq for Port<'a> {
 impl<'a> Eq for Port<'a> { }
 
 impl<'a> cmp::PartialEq<&'a str> for Port<'a> {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_str() == *other
 	}
 }
 
 impl<'a> PartialOrd for Port<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &Port<'a>) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl<'a> Ord for Port<'a> {
+	#[inline]
 	fn cmp(&self, other: &Port<'a>) -> Ordering {
 		self.as_str().cmp(other.as_str())
 	}
 }
 
 impl<'a> Hash for Port<'a> {
+	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_str().hash(hasher)
 	}

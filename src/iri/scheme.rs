@@ -12,11 +12,13 @@ pub struct Scheme<'a> {
 }
 
 impl<'a> Scheme<'a> {
+	#[inline]
     pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
     /// Get the underlying scheme slice as a string slice.
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(&self.data)
@@ -24,6 +26,7 @@ impl<'a> Scheme<'a> {
 	}
 
     /// Checks if the scheme is empty.
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
 	}
@@ -32,6 +35,7 @@ impl<'a> Scheme<'a> {
 impl<'a> TryFrom<&'a str> for Scheme<'a> {
 	type Error = Error;
 
+	#[inline]
 	fn try_from(str: &'a str) -> Result<Scheme<'a>, Error> {
 		let scheme_len = parsing::parse_scheme(str.as_ref(), 0)?;
 		if scheme_len < str.len() {
@@ -45,18 +49,21 @@ impl<'a> TryFrom<&'a str> for Scheme<'a> {
 }
 
 impl<'a> fmt::Display for Scheme<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> fmt::Debug for Scheme<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> cmp::PartialEq for Scheme<'a> {
+	#[inline]
 	fn eq(&self, other: &Scheme) -> bool {
 		self.as_str() == other.as_str()
 	}
@@ -65,24 +72,28 @@ impl<'a> cmp::PartialEq for Scheme<'a> {
 impl<'a> Eq for Scheme<'a> { }
 
 impl<'a> PartialOrd for Scheme<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &Scheme<'a>) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl<'a> Ord for Scheme<'a> {
+	#[inline]
 	fn cmp(&self, other: &Scheme<'a>) -> Ordering {
 		self.as_str().cmp(other.as_str())
 	}
 }
 
 impl<'a> cmp::PartialEq<&'a str> for Scheme<'a> {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_str() == *other
 	}
 }
 
 impl<'a> Hash for Scheme<'a> {
+	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_str().hash(hasher)
 	}

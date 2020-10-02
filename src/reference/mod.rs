@@ -43,6 +43,7 @@ impl<'a> IriRef<'a> {
 	/// Create a new IRI-reference slice from a bytes slice.
 	///
 	/// This may fail if the source slice is not UTF-8 encoded, or if is not a valid IRI-reference.
+	#[inline]
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &'a S) -> Result<IriRef<'a>, Error> {
 		Ok(IriRef {
 			data: buffer.as_ref(),
@@ -51,6 +52,7 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Get the underlying parsing data.
+	#[inline]
 	pub fn parsing_data(&self) -> ParsedIriRef {
 		self.p
 	}
@@ -58,6 +60,7 @@ impl<'a> IriRef<'a> {
 	/// Build an IRI reference from a slice and parsing data.
 	///
 	/// This is unsafe since the input slice is not checked against the given parsing data.
+	#[inline]
 	pub const unsafe fn from_raw(data: &'a [u8], p: ParsedIriRef) -> IriRef<'a> {
 		IriRef {
 			p: p,
@@ -66,21 +69,25 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Get the length is the IRI-reference, in bytes.
+	#[inline]
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
 
 	/// Get a reference to the underlying bytes slice representing the IRI-reference.
+	#[inline]
 	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
-	/// Convert the IRI-refrence into its underlying bytes slicee.
+	/// Convert the IRI-refrence into its underlying bytes slice.
+	#[inline]
 	pub fn into_ref(self) -> &'a [u8] {
 		self.data
 	}
 
 	/// Get the IRI-reference as a string slice.
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			std::str::from_utf8_unchecked(self.data)
@@ -88,6 +95,7 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Convert the IRI-reference into a string slice.
+	#[inline]
 	pub fn into_str(self) -> &'a str {
 		unsafe {
 			std::str::from_utf8_unchecked(self.data)
@@ -95,6 +103,7 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Get the IRI-reference as a percent-encoded string slice.
+	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.as_str())
@@ -102,6 +111,7 @@ impl<'a> IriRef<'a> {
 	}
 
 	/// Convert the IRI-reference into a percent-encoded string slice.
+	#[inline]
 	pub fn into_pct_str(self) -> &'a PctStr {
 		unsafe {
 			PctStr::new_unchecked(self.into_str())
@@ -120,6 +130,7 @@ impl<'a> IriRef<'a> {
 	/// assert_eq!(IriRef::new("foo://example.com:8042").unwrap().scheme().unwrap(), "foo");
 	/// assert_eq!(IriRef::new("//example.com:8042").unwrap().scheme(), None);
 	/// ```
+	#[inline]
 	pub fn scheme(&self) -> Option<Scheme> {
 		if let Some(scheme_len) = self.p.scheme_len {
 			Some(Scheme {
@@ -141,6 +152,7 @@ impl<'a> IriRef<'a> {
 	/// assert_eq!(IriRef::new("foo://example.com:8042").unwrap().authority().unwrap().host(), "example.com");
 	/// assert_eq!(IriRef::new("foo:").unwrap().authority(), None);
 	/// ```
+	#[inline]
 	pub fn authority(&self) -> Option<Authority> {
 		if let Some(authority) = self.p.authority {
 			let offset = self.p.authority_offset();
@@ -164,6 +176,7 @@ impl<'a> IriRef<'a> {
 	/// assert_eq!(IriRef::new("foo:/a/b/c?query").unwrap().path(), "/a/b/c");
 	/// assert!(IriRef::new("foo:#fragment").unwrap().path().is_empty());
 	/// ```
+	#[inline]
 	pub fn path(&'a self) -> Path<'a> {
 		let offset = self.p.path_offset();
 		Path {
@@ -182,6 +195,7 @@ impl<'a> IriRef<'a> {
 	/// assert_eq!(IriRef::new("//example.org?query").unwrap().query().unwrap(), "query");
 	/// assert!(IriRef::new("//example.org/foo/bar#fragment").unwrap().query().is_none());
 	/// ```
+	#[inline]
 	pub fn query(&self) -> Option<Query> {
 		if let Some(len) = self.p.query_len {
 			let offset = self.p.query_offset();
@@ -204,6 +218,7 @@ impl<'a> IriRef<'a> {
 	/// assert_eq!(IriRef::new("//example.org#foo").unwrap().fragment().unwrap(), "foo");
 	/// assert!(IriRef::new("//example.org").unwrap().fragment().is_none());
 	/// ```
+	#[inline]
 	pub fn fragment(&self) -> Option<Fragment> {
 		if let Some(len) = self.p.fragment_len {
 			let offset = self.p.fragment_offset();
@@ -218,6 +233,7 @@ impl<'a> IriRef<'a> {
 	/// Convert the IRI-reference into an IRI, if possible.
 	///
 	/// An IRI-reference is a valid IRI only if it has a defined [`Scheme`].
+	#[inline]
 	pub fn into_iri(self) -> Result<Iri<'a>, IriRef<'a>> {
 		self.try_into()
 	}
@@ -226,6 +242,7 @@ impl<'a> IriRef<'a> {
 	///
 	/// Return the resolved IRI.
 	/// See the [`IriRefBuf::resolve`] method for more informations about the resolution process.
+	#[inline]
 	pub fn resolved<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> IriBuf {
 		let mut iri_ref: IriRefBuf = self.into();
 		iri_ref.resolve(base_iri);
@@ -240,6 +257,7 @@ impl<'a> IriRef<'a> {
 	/// If the `suffix` scheme or authority is different from this path, it will return `None`.
 	///
 	/// See [`Path::suffix`] for more details.
+	#[inline]
 	pub fn suffix(&self, prefix: IriRef) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
 		if self.scheme() == prefix.scheme() && self.authority() == prefix.authority() {
 			match self.path().suffix(prefix.path()) {
@@ -278,18 +296,21 @@ impl<'a> IriRef<'a> {
 }
 
 impl<'a> fmt::Display for IriRef<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> fmt::Debug for IriRef<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
 impl<'a> cmp::PartialEq for IriRef<'a> {
+	#[inline]
 	fn eq(&self, other: &IriRef) -> bool {
 		self.scheme() == other.scheme() && self.fragment() == other.fragment() && self.authority() == other.authority() && self.path() == other.path() && self.query() == other.query()
 	}
@@ -298,24 +319,28 @@ impl<'a> cmp::PartialEq for IriRef<'a> {
 impl<'a> Eq for IriRef<'a> { }
 
 impl<'a> cmp::PartialEq<IriRefBuf> for IriRef<'a> {
+	#[inline]
 	fn eq(&self, other: &IriRefBuf) -> bool {
 		*self == other.as_iri_ref()
 	}
 }
 
 impl<'a> cmp::PartialEq<Iri<'a>> for IriRef<'a> {
+	#[inline]
 	fn eq(&self, other: &Iri<'a>) -> bool {
 		*self == other.as_iri_ref()
 	}
 }
 
 impl<'a> cmp::PartialEq<IriBuf> for IriRef<'a> {
+	#[inline]
 	fn eq(&self, other: &IriBuf) -> bool {
 		*self == other.as_iri_ref()
 	}
 }
 
 impl<'a> cmp::PartialEq<&'a str> for IriRef<'a> {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		if let Ok(other) = IriRef::new(other) {
 			self == &other
@@ -326,12 +351,14 @@ impl<'a> cmp::PartialEq<&'a str> for IriRef<'a> {
 }
 
 impl<'a> PartialOrd for IriRef<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl<'a> Ord for IriRef<'a> {
+	#[inline]
 	fn cmp(&self, other: &IriRef<'a>) -> Ordering {
 		if self.scheme() == other.scheme() {
 			if self.authority() == other.authority() {
@@ -354,42 +381,49 @@ impl<'a> Ord for IriRef<'a> {
 }
 
 impl<'a> PartialOrd<IriRefBuf> for IriRef<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &IriRefBuf) -> Option<Ordering> {
 		self.partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> PartialOrd<Iri<'a>> for IriRef<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &Iri<'a>) -> Option<Ordering> {
 		self.partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> PartialOrd<IriBuf> for IriRef<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
 		self.partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> From<&'a IriRefBuf> for IriRef<'a> {
+	#[inline]
 	fn from(iri_ref_buf: &'a IriRefBuf) -> IriRef<'a> {
 		iri_ref_buf.as_iri_ref()
 	}
 }
 
 impl<'a> From<Iri<'a>> for IriRef<'a> {
+	#[inline]
 	fn from(iri: Iri<'a>) -> IriRef<'a> {
 		iri.as_iri_ref()
 	}
 }
 
 impl<'a> From<&'a IriBuf> for IriRef<'a> {
+	#[inline]
 	fn from(iri_ref_buf: &'a IriBuf) -> IriRef<'a> {
 		iri_ref_buf.as_iri_ref()
 	}
 }
 
 impl<'a> From<Path<'a>> for IriRef<'a> {
+	#[inline]
 	fn from(path: Path<'a>) -> IriRef<'a> {
 		path.into_iri_ref()
 	}
@@ -403,6 +437,7 @@ impl<'a> From<&'a PathBuf> for IriRef<'a> {
 }
 
 impl<'a> Hash for IriRef<'a> {
+	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.scheme().hash(hasher);
 		self.authority().hash(hasher);

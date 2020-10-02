@@ -10,10 +10,12 @@ pub struct ParsedAuthority {
 }
 
 impl ParsedAuthority {
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.userinfo_len.is_none() && self.host_len == 0 && self.port_len.is_none()
 	}
 
+	#[inline]
 	pub fn len(&self) -> usize {
 		let mut len = 0;
 
@@ -30,6 +32,7 @@ impl ParsedAuthority {
 		len
 	}
 
+	#[inline]
 	pub fn host_offset(&self) -> usize {
 		let mut offset = 0;
 
@@ -40,6 +43,7 @@ impl ParsedAuthority {
 		offset
 	}
 
+	#[inline]
 	pub fn port_offset(&self) -> usize {
 		let mut offset = 0;
 
@@ -67,6 +71,7 @@ pub struct ParsedIriRef {
 }
 
 impl ParsedIriRef {
+	#[inline]
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<ParsedIriRef, Error> {
 		let buffer = buffer.as_ref();
 		let mut scheme_len = None;
@@ -140,6 +145,7 @@ impl ParsedIriRef {
 		})
 	}
 
+	#[inline]
 	pub fn len(&self) -> usize {
 		let mut offset = 0;
 
@@ -164,6 +170,7 @@ impl ParsedIriRef {
 		offset
 	}
 
+	#[inline]
 	pub fn authority_offset(&self) -> usize {
 		let mut offset = 0;
 
@@ -178,6 +185,7 @@ impl ParsedIriRef {
 		offset
 	}
 
+	#[inline]
 	pub fn path_offset(&self) -> usize {
 		let mut offset = 0;
 
@@ -192,6 +200,7 @@ impl ParsedIriRef {
 		offset
 	}
 
+	#[inline]
 	pub fn query_offset(&self) -> usize {
 		let mut offset = self.path_offset() + self.path_len;
 
@@ -202,6 +211,7 @@ impl ParsedIriRef {
 		offset
 	}
 
+	#[inline]
 	pub fn fragment_offset(&self) -> usize {
 		let mut offset = self.path_offset() + self.path_len;
 
@@ -217,6 +227,7 @@ impl ParsedIriRef {
 	}
 }
 
+#[inline]
 pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error> {
 	match utf8::get_char(buffer, i) {
 		Ok(None) => Ok(None),
@@ -225,22 +236,26 @@ pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error>
 	}
 }
 
+#[inline]
 pub fn is_alpha(c: char) -> bool {
 	let c = c as u32;
 	(c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)
 }
 
+#[inline]
 pub fn is_digit(c: char) -> bool {
 	let c = c as u32;
 	c >= 0x30 && c <= 0x39
 }
 
+#[inline]
 pub fn is_alphanumeric(c: char) -> bool {
 	let c = c as u32;
 	(c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)
 }
 
 /// Parse the IRI scheme.
+#[inline]
 pub fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	loop {
 		match get_char(buffer, i)? {
@@ -313,6 +328,7 @@ fn parse_pct_encoded(buffer: &[u8], i: usize) -> Result<Option<usize>, Error> {
 	}
 }
 
+#[inline]
 pub fn parse_userinfo(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 
@@ -338,6 +354,7 @@ pub fn parse_userinfo(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	Ok(i - offset)
 }
 
+#[inline]
 pub fn parse_query(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 
@@ -360,6 +377,7 @@ pub fn parse_query(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	Ok(i - offset)
 }
 
+#[inline]
 pub fn parse_fragment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 
@@ -590,6 +608,7 @@ fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	Ok(i - offset)
 }
 
+#[inline]
 pub fn parse_host(buffer: &[u8], i: usize) -> Result<usize, Error> {
 	if let Some(len) = parse_ip_literal(buffer, i)? {
 		Ok(len)
@@ -600,6 +619,7 @@ pub fn parse_host(buffer: &[u8], i: usize) -> Result<usize, Error> {
 	}
 }
 
+#[inline]
 pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 	loop {
@@ -619,6 +639,7 @@ pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 }
 
 /// Parse the IRI authority.
+#[inline]
 pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error> {
 	let mut userinfo_len = None;
 	let host_len;
@@ -647,6 +668,7 @@ pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, E
 }
 
 /// Parse IRI path.
+#[inline]
 pub fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let start = i;
 
@@ -671,6 +693,7 @@ pub fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 }
 
 /// Parse IRI path segment.
+#[inline]
 pub fn parse_path_segment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let start = i;
 

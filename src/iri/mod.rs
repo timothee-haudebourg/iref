@@ -136,6 +136,7 @@ impl<'a> Iri<'a> {
 	/// Create a new IRI slice from a bytes slice.
 	///
 	/// This may fail if the source slice is not UTF-8 encoded, or is not a valid IRI.
+	#[inline]
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &'a S) -> Result<Iri<'a>, Error> {
 		let iri_ref = IriRef::new(buffer)?;
 		if iri_ref.scheme().is_some() {
@@ -146,6 +147,7 @@ impl<'a> Iri<'a> {
 	}
 
 	/// Build an IRI from an IRI reference.
+	#[inline]
 	pub const fn from_iri_ref(iri_ref: IriRef<'a>) -> Iri<'a> {
 		Iri(iri_ref)
 	}
@@ -177,18 +179,21 @@ impl<'a> Deref for Iri<'a> {
 }
 
 impl<'a> fmt::Display for Iri<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_iri_ref().fmt(f)
 	}
 }
 
 impl<'a> fmt::Debug for Iri<'a> {
+	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_iri_ref().fmt(f)
 	}
 }
 
 impl<'a> PartialEq for Iri<'a> {
+	#[inline]
 	fn eq(&self, other: &Iri) -> bool {
 		self.as_iri_ref() == other.as_iri_ref()
 	}
@@ -197,60 +202,70 @@ impl<'a> PartialEq for Iri<'a> {
 impl<'a> Eq for Iri<'a> { }
 
 impl<'a> PartialEq<IriRef<'a>> for Iri<'a> {
+	#[inline]
 	fn eq(&self, other: &IriRef<'a>) -> bool {
 		self.as_iri_ref() == *other
 	}
 }
 
 impl<'a> PartialEq<IriRefBuf> for Iri<'a> {
+	#[inline]
 	fn eq(&self, other: &IriRefBuf) -> bool {
 		self.as_iri_ref() == other.as_iri_ref()
 	}
 }
 
 impl<'a> PartialEq<IriBuf> for Iri<'a> {
+	#[inline]
 	fn eq(&self, other: &IriBuf) -> bool {
 		self.as_iri_ref() == other.as_iri_ref()
 	}
 }
 
 impl<'a> PartialEq<&'a str> for Iri<'a> {
+	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_iri_ref().eq(other)
 	}
 }
 
 impl<'a> PartialOrd for Iri<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &Iri<'a>) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> Ord for Iri<'a> {
+	#[inline]
 	fn cmp(&self, other: &Iri<'a>) -> Ordering {
 		self.as_iri_ref().cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> PartialOrd<IriRef<'a>> for Iri<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &IriRef<'a>) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(other)
 	}
 }
 
 impl<'a> PartialOrd<IriRefBuf> for Iri<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &IriRefBuf) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> PartialOrd<IriBuf> for Iri<'a> {
+	#[inline]
 	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
 	}
 }
 
 impl<'a> From<&'a IriBuf> for Iri<'a> {
+	#[inline]
 	fn from(buffer: &'a IriBuf) -> Iri<'a> {
 		buffer.as_iri()
 	}
@@ -259,6 +274,7 @@ impl<'a> From<&'a IriBuf> for Iri<'a> {
 impl<'a> TryFrom<IriRef<'a>> for Iri<'a> {
 	type Error = IriRef<'a>;
 
+	#[inline]
 	fn try_from(iri_ref: IriRef<'a>) -> Result<Iri<'a>, IriRef<'a>> {
 		if iri_ref.p.scheme_len.is_some() {
 			Ok(Iri(iri_ref))
@@ -271,6 +287,7 @@ impl<'a> TryFrom<IriRef<'a>> for Iri<'a> {
 impl<'a> TryFrom<&'a IriRefBuf> for Iri<'a> {
 	type Error = Error;
 
+	#[inline]
 	fn try_from(buffer: &'a IriRefBuf) -> Result<Iri<'a>, Error> {
 		if buffer.p.scheme_len.is_some() {
 			Ok(Iri(buffer.as_iri_ref()))
@@ -281,6 +298,7 @@ impl<'a> TryFrom<&'a IriRefBuf> for Iri<'a> {
 }
 
 impl<'a> Hash for Iri<'a> {
+	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_iri_ref().hash(hasher)
 	}
