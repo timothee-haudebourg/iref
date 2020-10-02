@@ -252,6 +252,29 @@ impl<'a> IriRef<'a> {
 			None
 		}
 	}
+
+	/// Get this IRI reference relatively to the given one.
+	///
+	/// # Example
+	/// ```
+	/// # use iref::IriRef;
+	/// let a = IriRef::new("https://crates.io/").unwrap();
+	/// let b = IriRef::new("https://crates.io/crates/iref").unwrap();
+	/// assert_eq!(b.relative_to(a), "crates/iref");
+	/// assert_eq!(a.relative_to(b), "https://crates.io/")
+	/// ```
+	#[inline]
+	pub fn relative_to(&self, other: IriRef) -> IriRefBuf {
+		match self.suffix(other) {
+			Some((suffix, query, fragment)) => {
+				let mut relative_iri = suffix.into_iri_ref();
+				relative_iri.set_query(query);
+				relative_iri.set_fragment(fragment);
+				relative_iri
+			},
+			None => self.into()
+		}
+	}
 }
 
 impl<'a> fmt::Display for IriRef<'a> {
