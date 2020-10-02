@@ -378,6 +378,13 @@ impl<'a> From<Path<'a>> for IriRef<'a> {
 	}
 }
 
+impl<'a> From<&'a PathBuf> for IriRef<'a> {
+	#[inline]
+	fn from(path: &'a PathBuf) -> IriRef<'a> {
+		path.as_path().into()
+	}
+}
+
 impl<'a> Hash for IriRef<'a> {
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.scheme().hash(hasher);
