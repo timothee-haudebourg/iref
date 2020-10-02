@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Path::into_ref`
+- `PathBuf::as_ref, into_bytes`
+- `IriRefBuf::into_raw_parts, into_bytes, as_ref`
+- Convertions operations between `Path`/`PathBuf` and `IriRef`/`IriRefBuf`.
 - `IriRef::relative_to`
 
 ## [1.2.0] - 2020-09-10
