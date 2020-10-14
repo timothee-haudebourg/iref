@@ -311,6 +311,13 @@ impl<'a> AsIri for Iri<'a> {
 	}
 }
 
+impl<'a> AsIriRef for Iri<'a> {
+	#[inline]
+	fn as_iri_ref(&self) -> IriRef {
+		self.as_iri_ref()
+	}
+}
+
 /// Cheap reference-to-IRI-reference convertion.
 ///
 /// This is to be used instead of `AsRef<IriRef>` until custom DSTs are introduced.
@@ -325,8 +332,16 @@ pub trait AsIri {
 	fn as_iri(&self) -> Iri;
 }
 
-impl<T: AsIri> AsIriRef for T {
+impl<'a, T: AsIri> AsIri for &'a T {
+	#[inline]
+	fn as_iri(&self) -> Iri {
+		(*self).as_iri()
+	}
+}
+
+impl<'a, T: AsIriRef> AsIriRef for &'a T {
+	#[inline]
 	fn as_iri_ref(&self) -> IriRef {
-		self.as_iri().into()
+		(*self).as_iri_ref()
 	}
 }

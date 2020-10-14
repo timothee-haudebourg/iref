@@ -4,7 +4,7 @@ use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use std::convert::TryFrom;
 use crate::IriRefBuf;
-use super::{Iri, IriRef, AsIri, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
+use super::{Iri, IriRef, AsIri, AsIriRef, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
 
 /// Owned IRI.
 #[derive(Clone)]
@@ -89,6 +89,13 @@ impl AsIri for IriBuf {
 	#[inline]
 	fn as_iri(&self) -> Iri {
 		self.as_iri()
+	}
+}
+
+impl AsIriRef for IriBuf {
+	#[inline]
+	fn as_iri_ref(&self) -> IriRef {
+		self.as_iri_ref()
 	}
 }
 
