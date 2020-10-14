@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `AsIri` and `AsIriRef`
 
+## [1.3.1] - 2020-10-02
+### Changed
+- Use generic `Into<IriRef>` type parameter in `IriRef::suffix` and `IriRef::relative_to`.
+
 ## [1.3.0] - 2020-10-02
 ### Added
 - `Path::into_ref`

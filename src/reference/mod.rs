@@ -258,7 +258,8 @@ impl<'a> IriRef<'a> {
 	///
 	/// See [`Path::suffix`] for more details.
 	#[inline]
-	pub fn suffix(&self, prefix: IriRef) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
+	pub fn suffix<'b, Prefix: Into<IriRef<'b>>>(&self, prefix: Prefix) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
+		let prefix = prefix.into();
 		if self.scheme() == prefix.scheme() && self.authority() == prefix.authority() {
 			match self.path().suffix(prefix.path()) {
 				Some(suffix_path) => {
@@ -282,7 +283,7 @@ impl<'a> IriRef<'a> {
 	/// assert_eq!(a.relative_to(b), "https://crates.io/")
 	/// ```
 	#[inline]
-	pub fn relative_to(&self, other: IriRef) -> IriRefBuf {
+	pub fn relative_to<'b, Other: Into<IriRef<'b>>>(&self, other: Other) -> IriRefBuf {
 		match self.suffix(other) {
 			Some((suffix, query, fragment)) => {
 				let mut relative_iri = suffix.into_iri_ref();
