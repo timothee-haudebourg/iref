@@ -8,7 +8,7 @@ use std::convert::TryInto;
 use pct_str::PctStr;
 
 use crate::parsing::ParsedIriRef;
-use crate::{Scheme, Authority, Path, PathBuf, Query, Fragment, Error, Iri, IriBuf};
+use crate::{Scheme, Authority, Path, PathBuf, Query, Fragment, Error, Iri, IriBuf, AsIriRef};
 
 pub use self::buffer::*;
 
@@ -292,6 +292,13 @@ impl<'a> IriRef<'a> {
 			},
 			None => self.into()
 		}
+	}
+}
+
+impl<'a> AsIriRef for IriRef<'a> {
+	#[inline]
+	fn as_iri_ref(&self) -> IriRef {
+		*self
 	}
 }
 

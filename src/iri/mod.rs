@@ -303,3 +303,30 @@ impl<'a> Hash for Iri<'a> {
 		self.as_iri_ref().hash(hasher)
 	}
 }
+
+impl<'a> AsIri for Iri<'a> {
+	#[inline]
+	fn as_iri(&self) -> Iri {
+		*self
+	}
+}
+
+/// Cheap reference-to-IRI-reference convertion.
+///
+/// This is to be used instead of `AsRef<IriRef>` until custom DSTs are introduced.
+pub trait AsIriRef {
+	fn as_iri_ref(&self) -> IriRef;
+}
+
+/// Cheap reference-to-IRI convertion.
+///
+/// This is to be used instead of `AsRef<Iri>` until custom DSTs are introduced.
+pub trait AsIri {
+	fn as_iri(&self) -> Iri;
+}
+
+impl<T: AsIri> AsIriRef for T {
+	fn as_iri_ref(&self) -> IriRef {
+		self.as_iri().into()
+	}
+}

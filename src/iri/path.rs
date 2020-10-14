@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 use std::iter::IntoIterator;
 use smallvec::SmallVec;
 use pct_str::PctStr;
-use crate::{parsing, IriRef, IriRefBuf};
+use crate::{parsing, IriRef, IriRefBuf, AsIriRef};
 use super::{Error, Segment};
 
 #[derive(Clone, Copy)]
@@ -303,6 +303,13 @@ impl<'a> Path<'a> {
 		}
 
 		Some(buf)
+	}
+}
+
+impl<'a> AsIriRef for Path<'a> {
+	#[inline]
+	fn as_iri_ref(&self) -> IriRef {
+		self.as_iri_ref()
 	}
 }
 
@@ -754,6 +761,13 @@ impl<'a> PathMut<'a> {
 		for segment in old_path.normalized_segments() {
 			self.push(segment);
 		}
+	}
+}
+
+impl<'a> AsIriRef for PathMut<'a> {
+	#[inline]
+	fn as_iri_ref(&self) -> IriRef {
+		self.as_path().into_iri_ref()
 	}
 }
 

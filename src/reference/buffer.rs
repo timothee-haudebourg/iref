@@ -5,7 +5,7 @@ use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
 use pct_str::PctStr;
 use crate::parsing::ParsedIriRef;
-use crate::{Error, Iri, IriBuf, Scheme, Authority, AuthorityMut, Path, PathMut, PathBuf, Query, Fragment};
+use crate::{Error, Iri, IriBuf, AsIriRef, Scheme, Authority, AuthorityMut, Path, PathMut, PathBuf, Query, Fragment};
 use super::IriRef;
 
 /// Owned IRI-reference.
@@ -327,6 +327,13 @@ impl IriRefBuf {
 	#[inline]
 	pub fn resolved<'b, Base: Into<Iri<'b>>>(&self, base_iri: Base) -> IriBuf {
 		self.as_iri_ref().resolved(base_iri)
+	}
+}
+
+impl AsIriRef for IriRefBuf {
+	#[inline]
+	fn as_iri_ref(&self) -> IriRef {
+		self.as_iri_ref()
 	}
 }
 
