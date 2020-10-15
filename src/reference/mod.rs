@@ -272,6 +272,35 @@ impl<'a> IriRef<'a> {
 		}
 	}
 
+	/// The IRI reference without the file name, query and fragment.
+	///
+	/// # Example
+	/// ```
+	/// # use iref::IriRef;
+	/// let a = IriRef::new("https://crates.io/crates/iref?query#fragment").unwrap();
+	/// let b = IriRef::new("https://crates.io/crates/iref/?query#fragment").unwrap();
+	/// assert_eq!(a.base(), "https://crates.io/crates/");
+	/// assert_eq!(b.base(), "https://crates.io/crates/iref/")
+	/// ```
+	#[inline]
+	pub fn base(&self) -> IriRef {
+		let directory_path = self.path().directory();
+
+		let p = ParsedIriRef {
+			path_len: directory_path.len(),
+			query_len: None,
+			fragment_len: None,
+			..self.p
+		};
+
+		let len = p.len();
+
+		IriRef {
+			p,
+			data: &self.data[0..len]
+		}
+	}
+
 	/// Get this IRI reference relatively to the given one.
 	///
 	/// # Example
@@ -279,12 +308,15 @@ impl<'a> IriRef<'a> {
 	/// # use iref::IriRef;
 	/// let a = IriRef::new("https://crates.io/").unwrap();
 	/// let b = IriRef::new("https://crates.io/crates/iref").unwrap();
+	/// let c = IriRef::new("https://crates.io/crates/json-ld").unwrap();
 	/// assert_eq!(b.relative_to(a), "crates/iref");
-	/// assert_eq!(a.relative_to(b), "https://crates.io/")
+	/// assert_eq!(a.relative_to(b), "https://crates.io/");
+	/// assert_eq!(b.relative_to(c), "iref");
+	/// assert_eq!(c.relative_to(b), "json-ld");
 	/// ```
 	#[inline]
 	pub fn relative_to<'b, Other: Into<IriRef<'b>>>(&self, other: Other) -> IriRefBuf {
-		match self.suffix(other) {
+		match self.suffix(other.into().base()) {
 			Some((suffix, query, fragment)) => {
 				let mut relative_iri = suffix.into_iri_ref();
 				relative_iri.set_query(query);

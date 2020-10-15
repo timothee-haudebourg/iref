@@ -15,9 +15,15 @@ pub struct Path<'a> {
 }
 
 impl<'a> Path<'a> {
-	/// The inner data length (in bytes), without the trailing `/` is the path is open.
+	/// Byte length of the path.
 	#[inline]
-	fn closed_len(&self) -> usize {
+	pub fn len(&self) -> usize {
+		self.data.len()
+	}
+
+	/// The inner data length (in bytes), without the trailing `/` if the path is open.
+	#[inline]
+	pub fn closed_len(&self) -> usize {
 		if self.is_open() {
 			self.data.len() - 1
 		} else {
@@ -164,7 +170,7 @@ impl<'a> Path<'a> {
 	///
 	/// This correspond to the path without everything after the right most `/`.
 	#[inline]
-	pub fn directory(&self) -> Path {
+	pub fn directory(&self) -> Path<'a> {
 		if self.data.is_empty() {
 			Path {
 				data: &[]
@@ -201,7 +207,7 @@ impl<'a> Path<'a> {
 	/// `b`.
 	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
 	#[inline]
-	pub fn segments(&self) -> Segments {
+	pub fn segments(&self) -> Segments<'a> {
 		Segments::new(*self)
 	}
 
