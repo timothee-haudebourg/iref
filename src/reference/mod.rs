@@ -321,16 +321,16 @@ impl<'a> IriRef<'a> {
 
 		match (self.scheme(), other.scheme()) {
 			(Some(a), Some(b)) if a == b => (),
-			(Some(a), None) => (),
-			(None, Some(b)) => (),
+			(Some(_), None) => (),
+			(None, Some(_)) => (),
 			(None, None) => (),
 			_ => return self.into()
 		}
 
 		match (self.authority(), other.authority()) {
 			(Some(a), Some(b)) if a == b => (),
-			(Some(a), None) => (),
-			(None, Some(b)) => (),
+			(Some(_), None) => (),
+			(None, Some(_)) => (),
 			(None, None) => (),
 			_ => return self.into()
 		}
