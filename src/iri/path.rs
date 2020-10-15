@@ -127,6 +127,17 @@ impl<'a> Path<'a> {
 		!self.is_open()
 	}
 
+	#[inline]
+	pub fn closed(self) -> Path<'a> {
+		if self.is_open() {
+			Path {
+				data: &self.data[0..(self.len()-1)]
+			}
+		} else {
+			self
+		}
+	}
+
 	fn segment_at(&self, offset: usize) -> (Option<Segment<'a>>, usize) {
 		let mut start = offset;
 		let mut end = offset;

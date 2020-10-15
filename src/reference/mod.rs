@@ -8,7 +8,7 @@ use std::convert::TryInto;
 use pct_str::PctStr;
 
 use crate::parsing::ParsedIriRef;
-use crate::{Scheme, Authority, Path, PathBuf, Query, Fragment, Error, Iri, IriBuf, AsIriRef};
+use crate::{Scheme, Authority, Path, Segment, PathBuf, Query, Fragment, Error, Iri, IriBuf, AsIriRef};
 
 pub use self::buffer::*;
 
@@ -310,21 +310,64 @@ impl<'a> IriRef<'a> {
 	/// let b = IriRef::new("https://crates.io/crates/iref").unwrap();
 	/// let c = IriRef::new("https://crates.io/crates/json-ld").unwrap();
 	/// assert_eq!(b.relative_to(a), "crates/iref");
-	/// assert_eq!(a.relative_to(b), "https://crates.io/");
+	/// assert_eq!(a.relative_to(b), "../");
 	/// assert_eq!(b.relative_to(c), "iref");
 	/// assert_eq!(c.relative_to(b), "json-ld");
 	/// ```
 	#[inline]
 	pub fn relative_to<'b, Other: Into<IriRef<'b>>>(&self, other: Other) -> IriRefBuf {
-		match self.suffix(other.into().base()) {
-			Some((suffix, query, fragment)) => {
-				let mut relative_iri = suffix.into_iri_ref();
-				relative_iri.set_query(query);
-				relative_iri.set_fragment(fragment);
-				relative_iri
-			},
-			None => self.into()
+		let other = other.into();
+		let mut result = IriRefBuf::default();
+
+		match (self.scheme(), other.scheme()) {
+			(Some(a), Some(b)) if a == b => (),
+			(Some(a), None) => (),
+			(None, Some(b)) => (),
+			(None, None) => (),
+			_ => return self.into()
 		}
+
+		match (self.authority(), other.authority()) {
+			(Some(a), Some(b)) if a == b => (),
+			(Some(a), None) => (),
+			(None, Some(b)) => (),
+			(None, None) => (),
+			_ => return self.into()
+		}
+
+		let mut self_segments = self.path().into_normalized_segments().peekable();
+		let mut base_segments = other.path().into_normalized_segments().peekable();
+
+		loop {
+			match base_segments.peek() {
+				Some(a) => {
+					match self_segments.peek() {
+						Some(b) if a.as_pct_str() == b.as_pct_str() => {
+							base_segments.next();
+							self_segments.next();
+						},
+						_ => break
+					}
+				},
+			 	_=> break
+			}
+		}
+
+		while let Some(segment) = base_segments.next() {
+			if segment.is_open() {
+				result.path_mut().push(Segment::parent());
+				result.path_mut().open();
+			}
+		}
+
+		for segment in self_segments {
+			result.path_mut().push(segment)
+		}
+
+		result.set_query(self.query());
+		result.set_fragment(self.fragment());
+
+		result
 	}
 }
 
@@ -484,5 +527,31 @@ impl<'a> Hash for IriRef<'a> {
 		self.path().hash(hasher);
 		self.query().hash(hasher);
 		self.fragment().hash(hasher);
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn relative_to() {
+		let base = IriRef::new("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld").unwrap();
+		let challenges = [
+			("https://w3c.github.io/json-ld-api/tests/compact/link", "link"),
+			("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld#fragment-works", "#fragment-works"),
+			("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld?query=works", "?query=works"),
+			("https://w3c.github.io/json-ld-api/tests/", "../"),
+			("https://w3c.github.io/json-ld-api/", "../../"),
+			("https://w3c.github.io/json-ld-api/parent", "../../parent"),
+			("https://w3c.github.io/json-ld-api/parent#fragment", "../../parent#fragment"),
+			("https://w3c.github.io/parent-parent-eq-root", "../../../parent-parent-eq-root"),
+			("http://example.org/scheme-relative", "http://example.org/scheme-relative")
+		];
+
+		for (input, expected) in &challenges {
+			let input = IriRef::new(input).unwrap();
+			assert_eq!(input.relative_to(base), *expected)
+		}
 	}
 }
