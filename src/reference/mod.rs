@@ -340,7 +340,7 @@ impl<'a> IriRef<'a> {
 
 		loop {
 			match base_segments.peek() {
-				Some(a) => {
+				Some(a) if a.is_open() || self.query().is_some() || self.fragment().is_some() => {
 					match self_segments.peek() {
 						Some(b) if a.as_pct_str() == b.as_pct_str() => {
 							base_segments.next();
@@ -546,7 +546,8 @@ mod tests {
 			("https://w3c.github.io/json-ld-api/parent", "../../parent"),
 			("https://w3c.github.io/json-ld-api/parent#fragment", "../../parent#fragment"),
 			("https://w3c.github.io/parent-parent-eq-root", "../../../parent-parent-eq-root"),
-			("http://example.org/scheme-relative", "http://example.org/scheme-relative")
+			("http://example.org/scheme-relative", "http://example.org/scheme-relative"),
+			("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld", "0066-in.jsonld")
 		];
 
 		for (input, expected) in &challenges {
