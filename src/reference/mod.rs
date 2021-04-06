@@ -53,6 +53,22 @@ impl<'a> IriRef<'a> {
 		})
 	}
 
+	/// Create a new IRI-reference from a string.
+	///
+	/// This replaces a [`std::str::FromStr`] implementation as the trait is
+	/// incompatiple with the result storing the input which [`IriRef`] does.
+	pub fn from_str(s: &'a str) -> Result<Self, Error> {
+		Self::new(s)
+	}
+
+	/// Convert the slice-like [`IriRef`] into the owned version [`IriRefBuf`].
+	pub fn to_owned(self) -> IriRefBuf {
+		IriRefBuf {
+			p: self.p,
+			data: self.data.to_vec(),
+		}
+	}
+
 	/// Get the underlying parsing data.
 	#[inline]
 	pub fn parsing_data(&self) -> ParsedIriRef {
