@@ -1,14 +1,16 @@
 mod buffer;
 
-use std::{fmt, cmp};
-use std::cmp::{PartialOrd, Ord, Ordering};
-use std::hash::{Hash, Hasher};
+use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryInto;
+use std::hash::{Hash, Hasher};
+use std::{cmp, fmt};
 // use log::*;
 use pct_str::PctStr;
 
 use crate::parsing::ParsedIriRef;
-use crate::{Scheme, Authority, Path, Segment, PathBuf, Query, Fragment, Error, Iri, IriBuf, AsIriRef};
+use crate::{
+	AsIriRef, Authority, Error, Fragment, Iri, IriBuf, Path, PathBuf, Query, Scheme, Segment,
+};
 
 pub use self::buffer::*;
 
@@ -47,7 +49,7 @@ impl<'a> IriRef<'a> {
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &'a S) -> Result<IriRef<'a>, Error> {
 		Ok(IriRef {
 			data: buffer.as_ref(),
-			p: ParsedIriRef::new(buffer)?
+			p: ParsedIriRef::new(buffer)?,
 		})
 	}
 
@@ -62,10 +64,7 @@ impl<'a> IriRef<'a> {
 	/// This is unsafe since the input slice is not checked against the given parsing data.
 	#[inline]
 	pub const unsafe fn from_raw(data: &'a [u8], p: ParsedIriRef) -> IriRef<'a> {
-		IriRef {
-			p: p,
-			data: data
-		}
+		IriRef { p: p, data: data }
 	}
 
 	/// Get the length is the IRI-reference, in bytes.
@@ -89,33 +88,25 @@ impl<'a> IriRef<'a> {
 	/// Get the IRI-reference as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
 	/// Convert the IRI-reference into a string slice.
 	#[inline]
 	pub fn into_str(self) -> &'a str {
-		unsafe {
-			std::str::from_utf8_unchecked(self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
 	/// Get the IRI-reference as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
-		unsafe {
-			PctStr::new_unchecked(self.as_str())
-		}
+		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 
 	/// Convert the IRI-reference into a percent-encoded string slice.
 	#[inline]
 	pub fn into_pct_str(self) -> &'a PctStr {
-		unsafe {
-			PctStr::new_unchecked(self.into_str())
-		}
+		unsafe { PctStr::new_unchecked(self.into_str()) }
 	}
 
 	/// Get the scheme of the IRI-reference.
@@ -134,7 +125,7 @@ impl<'a> IriRef<'a> {
 	pub fn scheme(&self) -> Option<Scheme> {
 		if let Some(scheme_len) = self.p.scheme_len {
 			Some(Scheme {
-				data: &self.data[0..scheme_len]
+				data: &self.data[0..scheme_len],
 			})
 		} else {
 			None
@@ -157,8 +148,8 @@ impl<'a> IriRef<'a> {
 		if let Some(authority) = self.p.authority {
 			let offset = self.p.authority_offset();
 			Some(Authority {
-				data: &self.data[offset..(offset+authority.len())],
-				p: authority
+				data: &self.data[offset..(offset + authority.len())],
+				p: authority,
 			})
 		} else {
 			None
@@ -180,7 +171,7 @@ impl<'a> IriRef<'a> {
 	pub fn path(&'a self) -> Path<'a> {
 		let offset = self.p.path_offset();
 		Path {
-			data: &self.data[offset..(offset+self.p.path_len)]
+			data: &self.data[offset..(offset + self.p.path_len)],
 		}
 	}
 
@@ -200,7 +191,7 @@ impl<'a> IriRef<'a> {
 		if let Some(len) = self.p.query_len {
 			let offset = self.p.query_offset();
 			Some(Query {
-				data: &self.data[offset..(offset+len)]
+				data: &self.data[offset..(offset + len)],
 			})
 		} else {
 			None
@@ -223,7 +214,7 @@ impl<'a> IriRef<'a> {
 		if let Some(len) = self.p.fragment_len {
 			let offset = self.p.fragment_offset();
 			Some(Fragment {
-				data: &self.data[offset..(offset+len)]
+				data: &self.data[offset..(offset + len)],
 			})
 		} else {
 			None
@@ -258,14 +249,15 @@ impl<'a> IriRef<'a> {
 	///
 	/// See [`Path::suffix`] for more details.
 	#[inline]
-	pub fn suffix<'b, Prefix: Into<IriRef<'b>>>(&self, prefix: Prefix) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
+	pub fn suffix<'b, Prefix: Into<IriRef<'b>>>(
+		&self,
+		prefix: Prefix,
+	) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
 		let prefix = prefix.into();
 		if self.scheme() == prefix.scheme() && self.authority() == prefix.authority() {
 			match self.path().suffix(prefix.path()) {
-				Some(suffix_path) => {
-					Some((suffix_path, self.query(), self.fragment()))
-				},
-				None => None
+				Some(suffix_path) => Some((suffix_path, self.query(), self.fragment())),
+				None => None,
 			}
 		} else {
 			None
@@ -297,7 +289,7 @@ impl<'a> IriRef<'a> {
 
 		IriRef {
 			p,
-			data: &self.data[0..len]
+			data: &self.data[0..len],
 		}
 	}
 
@@ -324,7 +316,7 @@ impl<'a> IriRef<'a> {
 			(Some(_), None) => (),
 			(None, Some(_)) => (),
 			(None, None) => (),
-			_ => return self.into()
+			_ => return self.into(),
 		}
 
 		match (self.authority(), other.authority()) {
@@ -332,7 +324,7 @@ impl<'a> IriRef<'a> {
 			(Some(_), None) => (),
 			(None, Some(_)) => (),
 			(None, None) => (),
-			_ => return self.into()
+			_ => return self.into(),
 		}
 
 		let mut self_segments = self.path().into_normalized_segments().peekable();
@@ -345,11 +337,11 @@ impl<'a> IriRef<'a> {
 						Some(b) if a.as_pct_str() == b.as_pct_str() => {
 							base_segments.next();
 							self_segments.next();
-						},
-						_ => break
+						}
+						_ => break,
 					}
-				},
-			 	_=> break
+				}
+				_ => break,
 			}
 		}
 
@@ -395,11 +387,15 @@ impl<'a> fmt::Debug for IriRef<'a> {
 impl<'a> cmp::PartialEq for IriRef<'a> {
 	#[inline]
 	fn eq(&self, other: &IriRef) -> bool {
-		self.scheme() == other.scheme() && self.fragment() == other.fragment() && self.authority() == other.authority() && self.path() == other.path() && self.query() == other.query()
+		self.scheme() == other.scheme()
+			&& self.fragment() == other.fragment()
+			&& self.authority() == other.authority()
+			&& self.path() == other.path()
+			&& self.query() == other.query()
 	}
 }
 
-impl<'a> Eq for IriRef<'a> { }
+impl<'a> Eq for IriRef<'a> {}
 
 impl<'a> cmp::PartialEq<IriRefBuf> for IriRef<'a> {
 	#[inline]
@@ -536,18 +532,40 @@ mod tests {
 
 	#[test]
 	fn relative_to() {
-		let base = IriRef::new("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld").unwrap();
+		let base =
+			IriRef::new("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld").unwrap();
 		let challenges = [
-			("https://w3c.github.io/json-ld-api/tests/compact/link", "link"),
-			("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld#fragment-works", "#fragment-works"),
-			("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld?query=works", "?query=works"),
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/link",
+				"link",
+			),
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld#fragment-works",
+				"#fragment-works",
+			),
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld?query=works",
+				"?query=works",
+			),
 			("https://w3c.github.io/json-ld-api/tests/", "../"),
 			("https://w3c.github.io/json-ld-api/", "../../"),
 			("https://w3c.github.io/json-ld-api/parent", "../../parent"),
-			("https://w3c.github.io/json-ld-api/parent#fragment", "../../parent#fragment"),
-			("https://w3c.github.io/parent-parent-eq-root", "../../../parent-parent-eq-root"),
-			("http://example.org/scheme-relative", "http://example.org/scheme-relative"),
-			("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld", "0066-in.jsonld")
+			(
+				"https://w3c.github.io/json-ld-api/parent#fragment",
+				"../../parent#fragment",
+			),
+			(
+				"https://w3c.github.io/parent-parent-eq-root",
+				"../../../parent-parent-eq-root",
+			),
+			(
+				"http://example.org/scheme-relative",
+				"http://example.org/scheme-relative",
+			),
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld",
+				"0066-in.jsonld",
+			),
 		];
 
 		for (input, expected) in &challenges {

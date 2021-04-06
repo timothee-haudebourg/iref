@@ -1,19 +1,19 @@
-use std::ops::Range;
-use std::{fmt, cmp};
-use std::cmp::{PartialOrd, Ord, Ordering};
+use pct_str::PctStr;
+use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
-use pct_str::PctStr;
+use std::ops::Range;
+use std::{cmp, fmt};
 
+use super::{Error, Host, Port, UserInfo};
 use crate::parsing::{self, ParsedAuthority};
-use super::{Error, UserInfo, Host, Port};
 
 pub struct Authority<'a> {
 	/// Authority slice.
 	pub(crate) data: &'a [u8],
 
 	/// Authority positions.
-	pub(crate) p: ParsedAuthority
+	pub(crate) p: ParsedAuthority,
 }
 
 impl<'a> Hash for Authority<'a> {
@@ -43,9 +43,7 @@ impl<'a> Authority<'a> {
 
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(&self.data[0..self.p.len()])
-		}
+		unsafe { std::str::from_utf8_unchecked(&self.data[0..self.p.len()]) }
 	}
 
 	#[inline]
@@ -57,7 +55,7 @@ impl<'a> Authority<'a> {
 	pub fn userinfo(&self) -> Option<UserInfo> {
 		if let Some(len) = self.p.userinfo_len {
 			Some(UserInfo {
-				data: &self.data[0..len]
+				data: &self.data[0..len],
 			})
 		} else {
 			None
@@ -69,7 +67,7 @@ impl<'a> Authority<'a> {
 		let len = self.p.host_len;
 		let offset = self.p.host_offset();
 		Host {
-			data: &self.data[offset..(offset+len)]
+			data: &self.data[offset..(offset + len)],
 		}
 	}
 
@@ -78,7 +76,7 @@ impl<'a> Authority<'a> {
 		if let Some(len) = self.p.port_len {
 			let offset = self.p.port_offset();
 			Some(Port {
-				data: &self.data[offset..(offset+len)]
+				data: &self.data[offset..(offset + len)],
 			})
 		} else {
 			None
@@ -97,7 +95,7 @@ impl<'a> TryFrom<&'a str> for Authority<'a> {
 		} else {
 			Ok(Authority {
 				data: str.as_ref(),
-				p: parsed_authority
+				p: parsed_authority,
 			})
 		}
 	}
@@ -120,7 +118,9 @@ impl<'a> fmt::Debug for Authority<'a> {
 impl<'a> cmp::PartialEq for Authority<'a> {
 	#[inline]
 	fn eq(&self, other: &Authority) -> bool {
-		self.userinfo() == other.userinfo() && self.port() == other.port() && self.host() == other.host()
+		self.userinfo() == other.userinfo()
+			&& self.port() == other.port()
+			&& self.host() == other.host()
 	}
 }
 
@@ -138,7 +138,7 @@ impl<'a> Ord for Authority<'a> {
 	}
 }
 
-impl<'a> Eq for Authority<'a> { }
+impl<'a> Eq for Authority<'a> {}
 
 impl<'a> cmp::PartialEq<&'a str> for Authority<'a> {
 	#[inline]
@@ -154,7 +154,7 @@ pub struct AuthorityMut<'a> {
 	pub(crate) offset: usize,
 
 	/// Authority positions.
-	pub(crate) p: &'a mut ParsedAuthority
+	pub(crate) p: &'a mut ParsedAuthority,
 }
 
 impl<'a> AuthorityMut<'a> {
@@ -162,7 +162,7 @@ impl<'a> AuthorityMut<'a> {
 	pub fn as_authority(&'a self) -> Authority<'a> {
 		Authority {
 			data: self.data.as_slice(),
-			p: *self.p
+			p: *self.p,
 		}
 	}
 
@@ -175,7 +175,7 @@ impl<'a> AuthorityMut<'a> {
 	pub fn as_str(&self) -> &str {
 		unsafe {
 			let offset = self.offset;
-			std::str::from_utf8_unchecked(&self.data[offset..(offset+self.p.len())])
+			std::str::from_utf8_unchecked(&self.data[offset..(offset + self.p.len())])
 		}
 	}
 
@@ -189,7 +189,7 @@ impl<'a> AuthorityMut<'a> {
 		if let Some(len) = self.p.userinfo_len {
 			let offset = self.offset;
 			Some(UserInfo {
-				data: &self.data[offset..(offset+len)]
+				data: &self.data[offset..(offset + len)],
 			})
 		} else {
 			None
@@ -202,7 +202,7 @@ impl<'a> AuthorityMut<'a> {
 
 		if let Some(new_userinfo) = userinfo {
 			if let Some(userinfo_len) = self.p.userinfo_len {
-				self.replace(offset..(offset+userinfo_len), new_userinfo.as_ref());
+				self.replace(offset..(offset + userinfo_len), new_userinfo.as_ref());
 			} else {
 				self.replace(offset..offset, &[0x40]);
 				self.replace(offset..offset, new_userinfo.as_ref());
@@ -211,7 +211,7 @@ impl<'a> AuthorityMut<'a> {
 			self.p.userinfo_len = Some(new_userinfo.as_ref().len());
 		} else {
 			if let Some(userinfo_len) = self.p.userinfo_len {
-				self.replace(offset..(offset+userinfo_len+1), &[]);
+				self.replace(offset..(offset + userinfo_len + 1), &[]);
 			}
 
 			self.p.userinfo_len = None;
@@ -223,14 +223,14 @@ impl<'a> AuthorityMut<'a> {
 		let offset = self.offset + self.p.host_offset();
 		let len = self.p.host_len;
 		Host {
-			data: &self.data[offset..(offset+len)]
+			data: &self.data[offset..(offset + len)],
 		}
 	}
 
 	#[inline]
 	pub fn set_host(&mut self, host: Host) {
 		let offset = self.offset + self.p.host_offset();
-		self.replace(offset..(offset+self.p.host_len), host.as_ref());
+		self.replace(offset..(offset + self.p.host_len), host.as_ref());
 		self.p.host_len = host.as_ref().len();
 	}
 
@@ -239,7 +239,7 @@ impl<'a> AuthorityMut<'a> {
 		if let Some(len) = self.p.port_len {
 			let offset = self.offset + self.p.port_offset();
 			Some(Port {
-				data: &self.data[offset..(offset+len)]
+				data: &self.data[offset..(offset + len)],
 			})
 		} else {
 			None
@@ -252,16 +252,16 @@ impl<'a> AuthorityMut<'a> {
 
 		if let Some(new_port) = port {
 			if let Some(port_len) = self.p.port_len {
-				self.replace(offset..(offset+port_len), new_port.as_ref());
+				self.replace(offset..(offset + port_len), new_port.as_ref());
 			} else {
 				self.replace(offset..offset, &[0x3a]);
-				self.replace((offset+1)..(offset+1), new_port.as_ref());
+				self.replace((offset + 1)..(offset + 1), new_port.as_ref());
 			}
 
 			self.p.port_len = Some(new_port.as_ref().len());
 		} else {
 			if let Some(port_len) = self.p.port_len {
-				self.replace((offset-1)..(offset+port_len), &[]);
+				self.replace((offset - 1)..(offset + port_len), &[]);
 			}
 
 			self.p.port_len = None;

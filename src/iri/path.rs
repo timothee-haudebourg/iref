@@ -1,17 +1,17 @@
-use std::{fmt, cmp};
-use std::cmp::{PartialOrd, Ord, Ordering};
-use std::hash::{Hash, Hasher};
-use std::convert::TryFrom;
-use std::iter::IntoIterator;
-use smallvec::SmallVec;
-use pct_str::PctStr;
-use crate::{parsing, IriRef, IriRefBuf, AsIriRef};
 use super::{Error, Segment};
+use crate::{parsing, AsIriRef, IriRef, IriRefBuf};
+use pct_str::PctStr;
+use smallvec::SmallVec;
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::convert::TryFrom;
+use std::hash::{Hash, Hasher};
+use std::iter::IntoIterator;
+use std::{cmp, fmt};
 
 #[derive(Clone, Copy)]
 pub struct Path<'a> {
 	/// The path slice.
-	pub(crate) data: &'a [u8]
+	pub(crate) data: &'a [u8],
 }
 
 impl<'a> Path<'a> {
@@ -44,25 +44,19 @@ impl<'a> Path<'a> {
 	/// Get the underlying path slice as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
 	/// Convert this path into the underlying path slice.
 	#[inline]
 	pub fn into_str(self) -> &'a str {
-		unsafe {
-			std::str::from_utf8_unchecked(self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
 	/// Get the underlying path slice as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
-		unsafe {
-			PctStr::new_unchecked(self.as_str())
-		}
+		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 
 	/// Get the path slice as an IRI reference.
@@ -73,7 +67,7 @@ impl<'a> Path<'a> {
 				path_len: self.data.len(),
 				..parsing::ParsedIriRef::default()
 			},
-			data: self.data
+			data: self.data,
 		}
 	}
 
@@ -85,7 +79,7 @@ impl<'a> Path<'a> {
 				path_len: self.data.len(),
 				..parsing::ParsedIriRef::default()
 			},
-			data: self.data
+			data: self.data,
 		}
 	}
 
@@ -131,7 +125,7 @@ impl<'a> Path<'a> {
 	pub fn closed(self) -> Path<'a> {
 		if self.is_open() {
 			Path {
-				data: &self.data[0..(self.len()-1)]
+				data: &self.data[0..(self.len() - 1)],
 			}
 		} else {
 			self
@@ -149,26 +143,29 @@ impl<'a> Path<'a> {
 						start += 1;
 						end += 1;
 					} else {
-						break
+						break;
 					}
-				},
+				}
 				Some((_, len)) => {
 					end += len;
-				},
+				}
 				None => {
 					if end == start {
-						return (None, end)
+						return (None, end);
 					} else {
-						break
+						break;
 					}
 				}
 			}
 		}
 
-		(Some(Segment {
-			data: &self.data[start..end],
-			open: self.data.get(end) == Some(&0x2f)
-		}), end)
+		(
+			Some(Segment {
+				data: &self.data[start..end],
+				open: self.data.get(end) == Some(&0x2f),
+			}),
+			end,
+		)
 	}
 
 	#[inline]
@@ -183,9 +180,7 @@ impl<'a> Path<'a> {
 	#[inline]
 	pub fn directory(&self) -> Path<'a> {
 		if self.data.is_empty() {
-			Path {
-				data: &[]
-			}
+			Path { data: &[] }
 		} else {
 			let mut last = self.data.len() - 1;
 
@@ -195,16 +190,14 @@ impl<'a> Path<'a> {
 				}
 
 				if last == 0 {
-					return Path {
-						data: &[]
-					}
+					return Path { data: &[] };
 				}
 
 				last -= 1;
 			}
 
 			Path {
-				data: &self.data[0..(last + 1)]
+				data: &self.data[0..(last + 1)],
 			}
 		}
 	}
@@ -249,7 +242,7 @@ impl<'a> Path<'a> {
 	pub fn file_name(&self) -> Option<&'a str> {
 		match self.into_iter().next_back() {
 			Some(s) => Some(s.into_str()),
-			None => None
+			None => None,
 		}
 	}
 
@@ -265,18 +258,18 @@ impl<'a> Path<'a> {
 
 			loop {
 				if self.data[i] == 0x2f {
-					break
+					break;
 				} else {
 					if i > 0 {
 						i -= 1;
 					} else {
-						return None
+						return None;
 					}
 				}
 			}
 
 			Some(Path {
-				data: &self.data[0..(i+1)]
+				data: &self.data[0..(i + 1)],
 			})
 		}
 	}
@@ -303,7 +296,7 @@ impl<'a> Path<'a> {
 	#[inline]
 	pub fn suffix(&self, prefix: Path) -> Option<PathBuf> {
 		if self.is_absolute() != prefix.is_absolute() {
-			return None
+			return None;
 		}
 
 		let mut buf = PathBuf::new();
@@ -312,10 +305,14 @@ impl<'a> Path<'a> {
 
 		loop {
 			match (self_it.next(), prefix_it.next()) {
-				(Some(self_seg), Some(prefix_seg)) if self_seg.as_pct_str() == prefix_seg.as_pct_str() => (),
+				(Some(self_seg), Some(prefix_seg))
+					if self_seg.as_pct_str() == prefix_seg.as_pct_str() =>
+				{
+					()
+				}
 				(_, Some(_)) => return None,
 				(Some(seg), None) => buf.as_path_mut().push(seg),
-				(None, None) => break
+				(None, None) => break,
 			}
 		}
 
@@ -339,9 +336,7 @@ impl<'a> TryFrom<&'a str> for Path<'a> {
 		if path_len < str.len() {
 			Err(Error::InvalidPath)
 		} else {
-			Ok(Path {
-				data: str.as_ref()
-			})
+			Ok(Path { data: str.as_ref() })
 		}
 	}
 }
@@ -360,7 +355,7 @@ impl<'a> IntoIterator for Path<'a> {
 pub struct Segments<'a> {
 	path: Path<'a>,
 	offset: usize,
-	offset_back: usize
+	offset_back: usize,
 }
 
 impl<'a> Segments<'a> {
@@ -369,7 +364,7 @@ impl<'a> Segments<'a> {
 		Segments {
 			path,
 			offset: 0,
-			offset_back
+			offset_back,
 		}
 	}
 }
@@ -396,17 +391,17 @@ impl<'a> DoubleEndedIterator for Segments<'a> {
 			None
 		} else {
 			let mut i = self.offset_back - 1; // Note that `offset_back` cannot be 0 here, or we
-			                                   // wouldn't be in this branch.
+								  // wouldn't be in this branch.
 
 			loop {
 				if i > 0 {
 					if self.path.data[i] == 0x2f {
-						break
+						break;
 					} else {
 						i -= 1;
 					}
 				} else {
-					break
+					break;
 				}
 			}
 
@@ -427,7 +422,7 @@ const REMOVE_DOTS_BUFFER_LEN: usize = 512;
 
 pub struct NormalizedSegments<'a> {
 	stack: SmallVec<[Segment<'a>; NORMALIZE_STACK_SIZE]>,
-	i: usize
+	i: usize,
 }
 
 impl<'a> NormalizedSegments<'a> {
@@ -440,19 +435,17 @@ impl<'a> NormalizedSegments<'a> {
 					if let Some(last_segment) = stack.last_mut().as_mut() {
 						last_segment.open();
 					}
-				},
+				}
 				".." => {
 					if stack.pop().is_none() && relative {
 						stack.push(segment)
 					}
-				},
-				_ => stack.push(segment)
+				}
+				_ => stack.push(segment),
 			}
 		}
 
-		NormalizedSegments {
-			stack, i: 0
-		}
+		NormalizedSegments { stack, i: 0 }
 	}
 }
 
@@ -499,7 +492,7 @@ impl<'a> cmp::PartialEq for Path<'a> {
 					(None, Some(_)) => return false,
 					(Some(a), Some(b)) => {
 						if a != b {
-							return false
+							return false;
 						}
 					}
 				}
@@ -510,7 +503,7 @@ impl<'a> cmp::PartialEq for Path<'a> {
 	}
 }
 
-impl<'a> Eq for Path<'a> { }
+impl<'a> Eq for Path<'a> {}
 
 impl<'a> cmp::PartialEq<&'a str> for Path<'a> {
 	#[inline]
@@ -542,13 +535,11 @@ impl<'a> Ord for Path<'a> {
 					(None, None) => return Ordering::Equal,
 					(Some(_), None) => return Ordering::Greater,
 					(None, Some(_)) => return Ordering::Less,
-					(Some(a), Some(b)) => {
-						match a.cmp(&b) {
-							Ordering::Greater => return Ordering::Greater,
-							Ordering::Less => return Ordering::Less,
-							Ordering::Equal => ()
-						}
-					}
+					(Some(a), Some(b)) => match a.cmp(&b) {
+						Ordering::Greater => return Ordering::Greater,
+						Ordering::Less => return Ordering::Less,
+						Ordering::Equal => (),
+					},
 				}
 			}
 		} else if self.is_absolute() {
@@ -567,7 +558,7 @@ impl<'a> Hash for Path<'a> {
 }
 
 pub struct PathMut<'a> {
-	pub(crate) buffer: &'a mut IriRefBuf
+	pub(crate) buffer: &'a mut IriRefBuf,
 }
 
 impl<'a> PathMut<'a> {
@@ -582,7 +573,7 @@ impl<'a> PathMut<'a> {
 	pub fn as_ref(&self) -> &[u8] {
 		let offset = self.buffer.p.path_offset();
 		let len = self.buffer.path().as_ref().len();
-		&self.buffer.data[offset..(offset+len)]
+		&self.buffer.data[offset..(offset + len)]
 	}
 
 	/// Checks if the path is empty.
@@ -615,7 +606,7 @@ impl<'a> PathMut<'a> {
 	/// Checks if the path ends with a `/` but is not equal to `/`.
 	#[inline]
 	pub fn is_open(&self) -> bool {
-	 	self.buffer.path().is_open()
+		self.buffer.path().is_open()
 	}
 
 	#[inline]
@@ -656,8 +647,12 @@ impl<'a> PathMut<'a> {
 
 	pub(crate) fn disambiguate(&mut self) {
 		if let Some(first) = self.as_path().first() {
-			if (first.is_empty() && self.buffer.authority().is_none()) ||
-			   (self.is_relative() && self.buffer.scheme().is_none() && self.buffer.authority().is_none() && first.as_ref().contains(&0x3a)) {
+			if (first.is_empty() && self.buffer.authority().is_none())
+				|| (self.is_relative()
+					&& self.buffer.scheme().is_none()
+					&& self.buffer.authority().is_none()
+					&& first.as_ref().contains(&0x3a))
+			{
 				// add `./` at the begining.
 				let mut offset = self.buffer.p.path_offset();
 				if self.is_absolute() {
@@ -692,7 +687,12 @@ impl<'a> PathMut<'a> {
 			// if the whole IRI is of the form `?query#fragment`, and we push a segment containing a `:`,
 			// it may be confused with the scheme.
 			// We must add a `./` before the first segment to remove the ambiguity.
-			if self.is_relative() && self.is_empty() && self.buffer.scheme().is_none() && self.buffer.authority().is_none() && segment.as_ref().contains(&0x3a) {
+			if self.is_relative()
+				&& self.is_empty()
+				&& self.buffer.scheme().is_none()
+				&& self.buffer.authority().is_none()
+				&& segment.as_ref().contains(&0x3a)
+			{
 				self.push(Segment::current())
 			}
 
@@ -747,7 +747,7 @@ impl<'a> PathMut<'a> {
 			len -= 1;
 		}
 
-		self.buffer.replace(offset..(offset+len), &[]);
+		self.buffer.replace(offset..(offset + len), &[]);
 		self.buffer.p.path_len = offset - self.buffer.p.path_offset();
 	}
 
@@ -761,8 +761,8 @@ impl<'a> PathMut<'a> {
 					if segment.is_open() {
 						self.open()
 					}
-				},
-				_ => self.push(segment)
+				}
+				_ => self.push(segment),
 			}
 		}
 	}
@@ -771,7 +771,9 @@ impl<'a> PathMut<'a> {
 	pub fn normalize(&mut self) {
 		let mut buffer: SmallVec<[u8; REMOVE_DOTS_BUFFER_LEN]> = SmallVec::new();
 		buffer.extend_from_slice(self.as_ref());
-		let old_path = Path { data: buffer.as_ref() };
+		let old_path = Path {
+			data: buffer.as_ref(),
+		};
 
 		self.clear();
 
@@ -806,7 +808,7 @@ impl<'a> PartialEq<Path<'a>> for PathMut<'a> {
 #[derive(PartialEq, Eq, Hash, PartialOrd, Ord, Clone)]
 pub struct PathBuf {
 	/// We actually store the path as an IRI-reference.
-	data: IriRefBuf
+	data: IriRefBuf,
 }
 
 impl PathBuf {
@@ -814,7 +816,7 @@ impl PathBuf {
 	#[inline]
 	pub fn new() -> PathBuf {
 		PathBuf {
-			data: IriRefBuf::default()
+			data: IriRefBuf::default(),
 		}
 	}
 
@@ -918,8 +920,8 @@ impl<'a> PartialEq<&'a str> for PathBuf {
 
 #[cfg(test)]
 mod tests {
-	use std::convert::{TryInto, TryFrom};
 	use crate::{Iri, IriBuf, IriRefBuf, Path, PathBuf};
+	use std::convert::{TryFrom, TryInto};
 
 	#[test]
 	fn empty() {
@@ -1174,19 +1176,28 @@ mod tests {
 	#[test]
 	fn parent1() {
 		let path = Path::try_from("//a/b/foo//bar/").unwrap();
-		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/foo//").unwrap());
+		assert_eq!(
+			path.parent().unwrap(),
+			Path::try_from("//a/b/foo//").unwrap()
+		);
 	}
 
 	#[test]
 	fn parent1_closed() {
 		let path = Path::try_from("//a/b/foo//bar").unwrap();
-		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/foo//").unwrap());
+		assert_eq!(
+			path.parent().unwrap(),
+			Path::try_from("//a/b/foo//").unwrap()
+		);
 	}
 
 	#[test]
 	fn parent2() {
 		let path = Path::try_from("//a/b/foo//").unwrap();
-		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/foo/").unwrap());
+		assert_eq!(
+			path.parent().unwrap(),
+			Path::try_from("//a/b/foo/").unwrap()
+		);
 	}
 
 	#[test]

@@ -4,7 +4,7 @@ use iref::Iri;
 
 #[test]
 fn test1() {
-    let buffer = "https://www.rust-lang.org/foo/bar#frag";
+	let buffer = "https://www.rust-lang.org/foo/bar#frag";
 	let iri = Iri::new(buffer).expect("parsing failed");
 
 	assert_eq!(iri.scheme(), "https");

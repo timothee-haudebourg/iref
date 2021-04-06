@@ -6,7 +6,7 @@ use super::Error;
 pub struct ParsedAuthority {
 	pub userinfo_len: Option<usize>,
 	pub host_len: usize,
-	pub port_len: Option<usize>
+	pub port_len: Option<usize>,
 }
 
 impl ParsedAuthority {
@@ -67,7 +67,7 @@ pub struct ParsedIriRef {
 	pub authority: Option<ParsedAuthority>,
 	pub path_len: usize,
 	pub query_len: Option<usize>,
-	pub fragment_len: Option<usize>
+	pub fragment_len: Option<usize>,
 }
 
 impl ParsedIriRef {
@@ -83,7 +83,7 @@ impl ParsedIriRef {
 		let scheme_len_tmp = parse_scheme(buffer, 0)?;
 		let scheme_end = if let Some((':', 1)) = get_char(buffer, scheme_len_tmp)? {
 			if scheme_len_tmp == 0 {
-				return Err(Error::MissingScheme)
+				return Err(Error::MissingScheme);
 			}
 
 			scheme_len = Some(scheme_len_tmp);
@@ -106,42 +106,42 @@ impl ParsedIriRef {
 						} else {
 							0
 						};
-					},
+					}
 					_ => {
 						authority_end = scheme_end;
 						path_len = parse_path(buffer, authority_end)?;
 					}
 				}
-			},
+			}
 			_ => {
 				authority_end = scheme_end;
 				path_len = parse_path(buffer, authority_end)?;
 			}
 		}
 
-		let i = authority_end +  path_len;
+		let i = authority_end + path_len;
 
 		match get_char(buffer, i)? {
-			Some(('#', 1)) => {
-				fragment_len = Some(parse_fragment(buffer, i+1)?)
-			},
+			Some(('#', 1)) => fragment_len = Some(parse_fragment(buffer, i + 1)?),
 			Some(('?', 1)) => {
-				let len = parse_query(buffer, i+1)?;
+				let len = parse_query(buffer, i + 1)?;
 				query_len = Some(len);
 				match get_char(buffer, i + 1 + len)? {
-					Some(('#', 1)) => {
-						fragment_len = Some(parse_fragment(buffer, i + 1 + len + 1)?)
-					},
+					Some(('#', 1)) => fragment_len = Some(parse_fragment(buffer, i + 1 + len + 1)?),
 					Some(_) => return Err(Error::InvalidPath),
 					None => (),
 				}
-			},
+			}
 			Some(_) => return Err(Error::InvalidPath),
 			None => (),
 		}
 
 		Ok(ParsedIriRef {
-			scheme_len, authority, path_len, query_len, fragment_len
+			scheme_len,
+			authority,
+			path_len,
+			query_len,
+			fragment_len,
 		})
 	}
 
@@ -232,7 +232,7 @@ pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error>
 	match utf8::get_char(buffer, i) {
 		Ok(None) => Ok(None),
 		Ok(Some((c, len))) => Ok(Some((c, len as usize))),
-		Err(_) => Err(Error::InvalidEncoding)
+		Err(_) => Err(Error::InvalidEncoding),
 	}
 }
 
@@ -259,10 +259,13 @@ pub fn is_alphanumeric(c: char) -> bool {
 pub fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	loop {
 		match get_char(buffer, i)? {
-			Some((c, len)) if (i == 0 && is_alpha(c)) || (i > 0 && (is_alphanumeric(c) || c == '+' || c == '-' || c == '.')) => {
+			Some((c, len))
+				if (i == 0 && is_alpha(c))
+					|| (i > 0 && (is_alphanumeric(c) || c == '+' || c == '-' || c == '.')) =>
+			{
 				i += len
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 
@@ -271,28 +274,28 @@ pub fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 
 fn is_ucschar(c: char) -> bool {
 	let c = c as u32;
-	c >= 0xA0 && c <= 0xD7FF || c >= 0xF900 && c <= 0xFDCF || c >= 0xFDF0 && c <= 0xFFEF ||
-	c >= 0x10000 && c <= 0x1FFFD ||
-	c >= 0x20000 && c <= 0x2FFFD ||
-	c >= 0x30000 && c <= 0x3FFFD ||
-	c >= 0x40000 && c <= 0x4FFFD ||
-	c >= 0x50000 && c <= 0x5FFFD ||
-	c >= 0x60000 && c <= 0x6FFFD ||
-	c >= 0x70000 && c <= 0x7FFFD ||
-	c >= 0x80000 && c <= 0x8FFFD ||
-	c >= 0x90000 && c <= 0x9FFFD ||
-	c >= 0xA0000 && c <= 0xAFFFD ||
-	c >= 0xB0000 && c <= 0xBFFFD ||
-	c >= 0xC0000 && c <= 0xCFFFD ||
-	c >= 0xD0000 && c <= 0xDFFFD ||
-	c >= 0xE1000 && c <= 0xEFFFD
+	c >= 0xA0 && c <= 0xD7FF
+		|| c >= 0xF900 && c <= 0xFDCF
+		|| c >= 0xFDF0 && c <= 0xFFEF
+		|| c >= 0x10000 && c <= 0x1FFFD
+		|| c >= 0x20000 && c <= 0x2FFFD
+		|| c >= 0x30000 && c <= 0x3FFFD
+		|| c >= 0x40000 && c <= 0x4FFFD
+		|| c >= 0x50000 && c <= 0x5FFFD
+		|| c >= 0x60000 && c <= 0x6FFFD
+		|| c >= 0x70000 && c <= 0x7FFFD
+		|| c >= 0x80000 && c <= 0x8FFFD
+		|| c >= 0x90000 && c <= 0x9FFFD
+		|| c >= 0xA0000 && c <= 0xAFFFD
+		|| c >= 0xB0000 && c <= 0xBFFFD
+		|| c >= 0xC0000 && c <= 0xCFFFD
+		|| c >= 0xD0000 && c <= 0xDFFFD
+		|| c >= 0xE1000 && c <= 0xEFFFD
 }
 
 fn is_private(c: char) -> bool {
 	let c = c as u32;
-	c >= 0xE000 && c <= 0xF8FF ||
-	c >= 0xF0000 && c <= 0xFFFFD ||
-	c >= 0x100000 && c <= 0x10FFFD
+	c >= 0xE000 && c <= 0xF8FF || c >= 0xF0000 && c <= 0xFFFFD || c >= 0x100000 && c <= 0x10FFFD
 }
 
 fn is_unreserved(c: char) -> bool {
@@ -302,29 +305,27 @@ fn is_unreserved(c: char) -> bool {
 fn is_subdelim(c: char) -> bool {
 	match c {
 		'!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' => true,
-		_ => false
+		_ => false,
 	}
 }
 
 fn is_hex_digit(buffer: &[u8], i: usize) -> Result<bool, Error> {
 	match get_char(buffer, i)? {
-		Some((c, 1)) => {
-			Ok(c.to_digit(16).is_some())
-		},
-		_ => Ok(false)
+		Some((c, 1)) => Ok(c.to_digit(16).is_some()),
+		_ => Ok(false),
 	}
 }
 
 fn parse_pct_encoded(buffer: &[u8], i: usize) -> Result<Option<usize>, Error> {
 	match get_char(buffer, i)? {
 		Some(('%', 1)) => {
-			if is_hex_digit(buffer, i+1)? && is_hex_digit(buffer, i+2)? {
+			if is_hex_digit(buffer, i + 1)? && is_hex_digit(buffer, i + 2)? {
 				Ok(Some(3))
 			} else {
 				Err(Error::InvalidPercentEncoding)
 			}
-		},
-		_ => Ok(None)
+		}
+		_ => Ok(None),
 	}
 }
 
@@ -341,13 +342,11 @@ pub fn parse_userinfo(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 				if let Some(len) = parse_pct_encoded(buffer, i)? {
 					i += len
 				} else {
-					break
+					break;
 				}
-			},
-			Some((c, len)) if c == ':' || is_subdelim(c) || is_unreserved(c) => {
-				i += len
-			},
-			_ => break
+			}
+			Some((c, len)) if c == ':' || is_subdelim(c) || is_unreserved(c) => i += len,
+			_ => break,
 		}
 	}
 
@@ -364,13 +363,18 @@ pub fn parse_query(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 				if let Some(len) = parse_pct_encoded(buffer, i)? {
 					i += len
 				} else {
-					break
+					break;
 				}
-			},
-			Some((c, len)) if c == ':' || c == '@' || c == '/' || c == '?' || is_subdelim(c) || is_unreserved(c) || is_private(c) => {
+			}
+			Some((c, len))
+				if c == ':'
+					|| c == '@' || c == '/'
+					|| c == '?' || is_subdelim(c)
+					|| is_unreserved(c) || is_private(c) =>
+			{
 				i += len
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 
@@ -387,13 +391,18 @@ pub fn parse_fragment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 				if let Some(len) = parse_pct_encoded(buffer, i)? {
 					i += len
 				} else {
-					break
+					break;
 				}
-			},
-			Some((c, len)) if c == ':' || c == '@' || c == '/' || c == '?' || is_subdelim(c) || is_unreserved(c) => {
+			}
+			Some((c, len))
+				if c == ':'
+					|| c == '@' || c == '/'
+					|| c == '?' || is_subdelim(c)
+					|| is_unreserved(c) =>
+			{
 				i += len
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 
@@ -417,13 +426,13 @@ fn parse_dec_octet(buffer: &[u8], i: usize) -> Result<Option<(u32, usize)>, Erro
 					len += 1;
 
 					if len >= 3 || octet > 25 {
-						break
+						break;
 					}
 				} else {
-					break
+					break;
 				}
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 
@@ -453,7 +462,7 @@ fn parse_ipv4_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u32, usize)
 								i += olen;
 								let ipv4 = (a << 24) | (b << 16) | (c << 8) | d;
 								let len = i - offset;
-								return Ok(Some((ipv4, len)))
+								return Ok(Some((ipv4, len)));
 							}
 						}
 					}
@@ -476,13 +485,13 @@ fn parse_h16(buffer: &[u8], i: usize) -> Result<Option<(u16, usize)>, Error> {
 					h16 = (h16 << 4) | d as u16;
 					len += 1;
 					if len >= 4 {
-						break
+						break;
 					}
 				} else {
-					break
+					break;
 				}
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 
@@ -534,7 +543,7 @@ fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize
 				lit = (lit << 32) | ipv4 as u128;
 				// lit_count += 2;
 				i += len;
-				break
+				break;
 			}
 		}
 
@@ -544,12 +553,8 @@ fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize
 			i += len;
 
 			match get_char(buffer, i)? {
-				Some((']', 1)) => {
-					break
-				},
-				Some((':', 1)) => {
-					i += 1
-				},
+				Some((']', 1)) => break,
+				Some((':', 1)) => i += 1,
 				_ => {
 					return Ok(None); // Invalid IPv6 (unexpected char)
 				}
@@ -574,13 +579,13 @@ fn parse_ip_literal(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error>
 		if let Some((_, l)) = parse_ipv6_literal(buffer, i)? {
 			i += l;
 		} else {
-			return Ok(None) // TODO Ipv future
+			return Ok(None); // TODO Ipv future
 		}
 
 		if let Some((']', 1)) = get_char(buffer, i)? {
 			i += 1;
 			let len = i - offset;
-			return Ok(Some(len))
+			return Ok(Some(len));
 		}
 	}
 
@@ -595,13 +600,11 @@ fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 				if let Some(len) = parse_pct_encoded(buffer, i)? {
 					i += len
 				} else {
-					break
+					break;
 				}
-			},
-			Some((c, len)) if is_subdelim(c) || is_unreserved(c) => {
-				i += len
-			},
-			_ => break
+			}
+			Some((c, len)) if is_subdelim(c) || is_unreserved(c) => i += len,
+			_ => break,
 		}
 	}
 
@@ -628,10 +631,10 @@ pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 				if let Some(_) = c.to_digit(10) {
 					i += 1
 				} else {
-					break
+					break;
 				}
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 
@@ -658,12 +661,14 @@ pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, E
 		Some((':', 1)) => {
 			i += 1;
 			Some(parse_port(buffer, i)?)
-		},
-		_ => None
+		}
+		_ => None,
 	};
 
 	Ok(ParsedAuthority {
-		userinfo_len, host_len, port_len
+		userinfo_len,
+		host_len,
+		port_len,
 	})
 }
 
@@ -679,13 +684,15 @@ pub fn parse_path(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 				if let Some(len) = parse_pct_encoded(buffer, i)? {
 					i += len
 				} else {
-					break
+					break;
 				}
-			},
-			Some((c, len)) if is_subdelim(c) || is_unreserved(c) || c == '@' || c == ':' || c == '/' => {
+			}
+			Some((c, len))
+				if is_subdelim(c) || is_unreserved(c) || c == '@' || c == ':' || c == '/' =>
+			{
 				i += len
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 
@@ -704,13 +711,13 @@ pub fn parse_path_segment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 				if let Some(len) = parse_pct_encoded(buffer, i)? {
 					i += len
 				} else {
-					break
+					break;
 				}
-			},
+			}
 			Some((c, len)) if is_subdelim(c) || is_unreserved(c) || c == '@' || c == ':' => {
 				i += len
-			},
-			_ => break
+			}
+			_ => break,
 		}
 	}
 

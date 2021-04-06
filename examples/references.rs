@@ -1,7 +1,7 @@
 extern crate iref;
 
-use std::convert::TryInto;
 use iref::{Iri, IriRef, IriRefBuf};
+use std::convert::TryInto;
 
 fn main() -> Result<(), iref::Error> {
 	let mut iri_ref = IriRefBuf::default(); // an IRI reference can be empty.
@@ -13,5 +13,5 @@ fn main() -> Result<(), iref::Error> {
 	// An IRI can be safely converted into an IRI reference.
 	let _iri_ref: IriRef = iri.into();
 
-    Ok(())
+	Ok(())
 }
