@@ -64,7 +64,7 @@ impl<'a> IriRef<'a> {
 	/// This is unsafe since the input slice is not checked against the given parsing data.
 	#[inline]
 	pub const unsafe fn from_raw(data: &'a [u8], p: ParsedIriRef) -> IriRef<'a> {
-		IriRef { p: p, data: data }
+		IriRef { p, data }
 	}
 
 	/// Get the length is the IRI-reference, in bytes.

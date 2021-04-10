@@ -53,13 +53,9 @@ impl<'a> Authority<'a> {
 
 	#[inline]
 	pub fn userinfo(&self) -> Option<UserInfo> {
-		if let Some(len) = self.p.userinfo_len {
-			Some(UserInfo {
-				data: &self.data[0..len],
-			})
-		} else {
-			None
-		}
+		self.p.userinfo_len.map(|len| UserInfo {
+			data: &self.data[0..len],
+		})
 	}
 
 	#[inline]

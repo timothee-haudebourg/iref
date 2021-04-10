@@ -1,8 +1,5 @@
 pub fn get_byte(buffer: &[u8], i: usize) -> Option<u32> {
-	match buffer.get(i) {
-		Some(c) => Some(*c as u32),
-		None => None,
-	}
+	buffer.get(i).map(|c| *c as u32)
 }
 
 pub fn expect_byte(buffer: &[u8], i: usize) -> Result<u32, ()> {
@@ -32,7 +29,7 @@ pub fn get_codepoint(buffer: &[u8], i: usize) -> Result<Option<(u32, u8)>, ()> {
 
 		Ok(Some(r))
 	} else {
-		return Ok(None);
+		Ok(None)
 	}
 }
 

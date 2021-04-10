@@ -88,7 +88,7 @@ impl<'a> Path<'a> {
 	/// Returns `true` if the path is `` or `/`.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
-		self.data.is_empty() || self.data == &[0x2f]
+		self.data.is_empty() || self.data == [0x2f]
 	}
 
 	/// Checks if the path is absolute.
@@ -240,10 +240,7 @@ impl<'a> Path<'a> {
 	/// This does not consider the normalized version of the path, dot segments are preserved.
 	#[inline]
 	pub fn file_name(&self) -> Option<&'a str> {
-		match self.into_iter().next_back() {
-			Some(s) => Some(s.into_str()),
-			None => None,
-		}
+		self.into_iter().next_back().map(|s| s.into_str())
 	}
 
 	/// Returns the path without its final component, if there is one.
@@ -259,12 +256,10 @@ impl<'a> Path<'a> {
 			loop {
 				if self.data[i] == 0x2f {
 					break;
+				} else if i > 0 {
+					i -= 1;
 				} else {
-					if i > 0 {
-						i -= 1;
-					} else {
-						return None;
-					}
+					return None;
 				}
 			}
 
@@ -306,10 +301,7 @@ impl<'a> Path<'a> {
 		loop {
 			match (self_it.next(), prefix_it.next()) {
 				(Some(self_seg), Some(prefix_seg))
-					if self_seg.as_pct_str() == prefix_seg.as_pct_str() =>
-				{
-					()
-				}
+					if self_seg.as_pct_str() == prefix_seg.as_pct_str() => (),
 				(_, Some(_)) => return None,
 				(Some(seg), None) => buf.as_path_mut().push(seg),
 				(None, None) => break,
@@ -666,7 +658,7 @@ impl<'a> PathMut<'a> {
 
 	/// Add a segment at the end of the path.
 	#[inline]
-	pub fn push<'s>(&mut self, segment: Segment<'s>) {
+	pub fn push(&mut self, segment: Segment) {
 		if segment.is_empty() {
 			// if the whole IRI is of the form (1) `scheme:?query#fragment` or (2) `scheme:/?query#fragment`,
 			// we must add a `./` before this segment to make sure that

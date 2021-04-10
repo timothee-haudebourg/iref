@@ -157,7 +157,7 @@ impl IriRefBuf {
 		if let Some(authority) = self.p.authority.as_mut() {
 			Some(AuthorityMut {
 				data: &mut self.data,
-				offset: offset,
+				offset,
 				p: authority,
 			})
 		} else {
@@ -299,22 +299,20 @@ impl IriRefBuf {
 					if self.query().is_none() {
 						self.set_query(base_iri.query());
 					}
+				} else if self.path().is_absolute() {
+					self.path_mut().normalize();
 				} else {
-					if self.path().is_absolute() {
-						self.path_mut().normalize();
+					let mut path_buffer = IriRefBuf::default();
+					if base_iri.authority().is_some() && base_iri.path().is_empty() {
+						path_buffer.set_path("/".try_into().unwrap());
 					} else {
-						let mut path_buffer = IriRefBuf::default();
-						if base_iri.authority().is_some() && base_iri.path().is_empty() {
-							path_buffer.set_path("/".try_into().unwrap());
-						} else {
-							path_buffer.set_path(base_iri.path().directory());
-						}
-						path_buffer.path_mut().symbolic_append(self.path());
-						if self.path().is_open() {
-							path_buffer.path_mut().open();
-						}
-						self.set_path(path_buffer.path());
+						path_buffer.set_path(base_iri.path().directory());
 					}
+					path_buffer.path_mut().symbolic_append(self.path());
+					if self.path().is_open() {
+						path_buffer.path_mut().open();
+					}
+					self.set_path(path_buffer.path());
 				}
 				self.set_authority(base_iri.authority());
 			}

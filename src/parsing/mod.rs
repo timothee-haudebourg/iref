@@ -53,7 +53,7 @@ impl ParsedAuthority {
 
 		offset += self.host_len;
 
-		if let Some(_) = self.port_len {
+		if self.port_len.is_some() {
 			offset += 1;
 		}
 
@@ -204,7 +204,7 @@ impl ParsedIriRef {
 	pub fn query_offset(&self) -> usize {
 		let mut offset = self.path_offset() + self.path_len;
 
-		if let Some(_) = self.query_len {
+		if self.query_len.is_some() {
 			offset += 1;
 		}
 
@@ -219,7 +219,7 @@ impl ParsedIriRef {
 			offset += 1 + len;
 		}
 
-		if let Some(_) = self.fragment_len {
+		if self.fragment_len.is_some() {
 			offset += 1;
 		}
 
