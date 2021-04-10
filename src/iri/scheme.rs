@@ -1,31 +1,29 @@
-use std::{fmt, cmp};
-use std::cmp::{PartialOrd, Ord, Ordering};
-use std::hash::{Hash, Hasher};
-use std::convert::TryFrom;
-use crate::parsing;
 use super::Error;
+use crate::parsing;
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::convert::TryFrom;
+use std::hash::{Hash, Hasher};
+use std::{cmp, fmt};
 
 #[derive(Clone, Copy)]
 pub struct Scheme<'a> {
 	/// The scheme slice.
-	pub(crate) data: &'a [u8]
+	pub(crate) data: &'a [u8],
 }
 
 impl<'a> Scheme<'a> {
 	#[inline]
-    pub fn as_ref(&self) -> &[u8] {
+	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
-    /// Get the underlying scheme slice as a string slice.
+	/// Get the underlying scheme slice as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(&self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(&self.data) }
 	}
 
-    /// Checks if the scheme is empty.
+	/// Checks if the scheme is empty.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
@@ -41,9 +39,7 @@ impl<'a> TryFrom<&'a str> for Scheme<'a> {
 		if scheme_len < str.len() {
 			Err(Error::InvalidScheme)
 		} else {
-			Ok(Scheme {
-				data: str.as_ref()
-			})
+			Ok(Scheme { data: str.as_ref() })
 		}
 	}
 }
@@ -69,7 +65,7 @@ impl<'a> cmp::PartialEq for Scheme<'a> {
 	}
 }
 
-impl<'a> Eq for Scheme<'a> { }
+impl<'a> Eq for Scheme<'a> {}
 
 impl<'a> PartialOrd for Scheme<'a> {
 	#[inline]

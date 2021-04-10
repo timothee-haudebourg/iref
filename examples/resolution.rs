@@ -13,5 +13,5 @@ fn main() -> Result<(), iref::Error> {
 	iri_ref.resolve(base_iri);
 	assert_eq!(iri_ref, "http://a/b/c/y");
 
-    Ok(())
+	Ok(())
 }

@@ -1,17 +1,17 @@
-use std::{fmt, cmp};
-use std::cmp::{PartialOrd, Ord, Ordering};
-use std::hash::{Hash, Hasher};
-use std::convert::TryFrom;
-use pct_str::PctStr;
-use crate::parsing;
 use super::Error;
+use crate::parsing;
+use pct_str::PctStr;
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::convert::TryFrom;
+use std::hash::{Hash, Hasher};
+use std::{cmp, fmt};
 
 #[derive(Clone, Copy)]
 pub struct Segment<'a> {
 	/// The path segment slice.
 	pub(crate) data: &'a [u8],
 
-	pub(crate) open: bool
+	pub(crate) open: bool,
 }
 
 impl<'a> Segment<'a> {
@@ -20,7 +20,7 @@ impl<'a> Segment<'a> {
 	pub fn current() -> Segment<'static> {
 		Segment {
 			data: &[0x2e],
-			open: false
+			open: false,
 		}
 	}
 
@@ -29,7 +29,7 @@ impl<'a> Segment<'a> {
 	pub fn parent() -> Segment<'static> {
 		Segment {
 			data: &[0x2e, 0x2e],
-			open: false
+			open: false,
 		}
 	}
 
@@ -40,32 +40,26 @@ impl<'a> Segment<'a> {
 	}
 
 	#[inline]
-    pub fn as_ref(&self) -> &[u8] {
+	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
-    /// Get the underlying segment slice as a string slice.
+	/// Get the underlying segment slice as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
 	/// Get the underlying segment slice as a string slice by consuming the segment reference.
 	#[inline]
 	pub fn into_str(self) -> &'a str {
-		unsafe {
-			std::str::from_utf8_unchecked(self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
-    /// Get the underlying segment slice as a percent-encoded string slice.
+	/// Get the underlying segment slice as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
-		unsafe {
-			PctStr::new_unchecked(self.as_str())
-		}
+		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 
 	#[inline]
@@ -73,7 +67,7 @@ impl<'a> Segment<'a> {
 		self.open
 	}
 
-    /// Checks if the segment is empty.
+	/// Checks if the segment is empty.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
@@ -97,16 +91,13 @@ impl<'a> TryFrom<&'a str> for Segment<'a> {
 			if segment_len == data.len() - 1 && data[segment_len] == 0x2f {
 				Ok(Segment {
 					data: &data[0..segment_len],
-					open: true
+					open: true,
 				})
 			} else {
 				Err(Error::InvalidSegment)
 			}
 		} else {
-			Ok(Segment {
-				data,
-				open: false
-			})
+			Ok(Segment { data, open: false })
 		}
 	}
 }
@@ -140,7 +131,7 @@ impl<'a> cmp::PartialEq for Segment<'a> {
 	}
 }
 
-impl<'a> Eq for Segment<'a> { }
+impl<'a> Eq for Segment<'a> {}
 
 impl<'a> cmp::PartialEq<&'a str> for Segment<'a> {
 	#[inline]

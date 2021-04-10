@@ -11,5 +11,5 @@ fn main() -> Result<(), iref::Error> {
 	println!("query: {}", iri.query().unwrap());
 	println!("fragment: {}", iri.fragment().unwrap());
 
-    Ok(())
+	Ok(())
 }

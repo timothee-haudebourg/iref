@@ -1,31 +1,29 @@
-use std::{fmt, cmp};
-use std::cmp::{PartialOrd, Ord, Ordering};
-use std::hash::{Hash, Hasher};
-use std::convert::TryFrom;
-use crate::parsing;
 use super::Error;
+use crate::parsing;
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::convert::TryFrom;
+use std::hash::{Hash, Hasher};
+use std::{cmp, fmt};
 
 #[derive(Clone, Copy)]
 pub struct Port<'a> {
 	/// The path slice.
-	pub(crate) data: &'a [u8]
+	pub(crate) data: &'a [u8],
 }
 
 impl<'a> Port<'a> {
 	#[inline]
-    pub fn as_ref(&self) -> &[u8] {
+	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
-    /// Get the underlying port slice as a string slice.
+	/// Get the underlying port slice as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(&self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(&self.data) }
 	}
 
-    /// Checks if the port is empty.
+	/// Checks if the port is empty.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
@@ -41,9 +39,7 @@ impl<'a> TryFrom<&'a str> for Port<'a> {
 		if port_len < str.len() {
 			Err(Error::InvalidPort)
 		} else {
-			Ok(Port {
-				data: str.as_ref()
-			})
+			Ok(Port { data: str.as_ref() })
 		}
 	}
 }
@@ -69,7 +65,7 @@ impl<'a> cmp::PartialEq for Port<'a> {
 	}
 }
 
-impl<'a> Eq for Port<'a> { }
+impl<'a> Eq for Port<'a> {}
 
 impl<'a> cmp::PartialEq<&'a str> for Port<'a> {
 	#[inline]

@@ -1,40 +1,36 @@
-use std::{fmt, cmp};
-use std::cmp::{PartialOrd, Ord, Ordering};
-use std::hash::{Hash, Hasher};
-use std::convert::TryFrom;
-use pct_str::PctStr;
-use crate::parsing;
 use super::Error;
+use crate::parsing;
+use pct_str::PctStr;
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::convert::TryFrom;
+use std::hash::{Hash, Hasher};
+use std::{cmp, fmt};
 
 #[derive(Clone, Copy)]
 pub struct Query<'a> {
 	/// The path slice.
-	pub(crate) data: &'a [u8]
+	pub(crate) data: &'a [u8],
 }
 
 impl<'a> Query<'a> {
 	#[inline]
-    pub fn as_ref(&self) -> &[u8] {
+	pub fn as_ref(&self) -> &[u8] {
 		self.data
 	}
 
-    /// Get the underlying query slice as a string slice.
+	/// Get the underlying query slice as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(&self.data)
-		}
+		unsafe { std::str::from_utf8_unchecked(&self.data) }
 	}
 
-    /// Get the underlying query slice as a percent-encoded string slice.
+	/// Get the underlying query slice as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
-		unsafe {
-			PctStr::new_unchecked(self.as_str())
-		}
+		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 
-    /// Checks if the query is empty.
+	/// Checks if the query is empty.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
@@ -50,9 +46,7 @@ impl<'a> TryFrom<&'a str> for Query<'a> {
 		if query_len < str.len() {
 			Err(Error::InvalidQuery)
 		} else {
-			Ok(Query {
-				data: str.as_ref()
-			})
+			Ok(Query { data: str.as_ref() })
 		}
 	}
 }
@@ -78,7 +72,7 @@ impl<'a> cmp::PartialEq for Query<'a> {
 	}
 }
 
-impl<'a> Eq for Query<'a> { }
+impl<'a> Eq for Query<'a> {}
 
 impl<'a> cmp::PartialEq<&'a str> for Query<'a> {
 	#[inline]

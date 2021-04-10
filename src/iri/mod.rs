@@ -1,32 +1,32 @@
-mod scheme;
-mod userinfo;
-mod host;
-mod port;
 mod authority;
-mod segment;
-mod path;
 mod buffer;
-mod query;
 mod fragment;
+mod host;
+mod path;
+mod port;
+mod query;
+mod scheme;
+mod segment;
+mod userinfo;
 
-use std::ops::Deref;
+use crate::{IriRef, IriRefBuf};
+use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
 use std::fmt;
-use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
-use crate::{IriRef, IriRefBuf};
+use std::ops::Deref;
 
-pub use self::scheme::*;
-pub use self::userinfo::*;
-pub use self::host::*;
-pub use self::port::*;
 pub use self::authority::*;
-pub use self::segment::*;
-pub use self::path::*;
 pub use self::buffer::*;
-pub use self::query::*;
 pub use self::fragment::*;
+pub use self::host::*;
+pub use self::path::*;
+pub use self::port::*;
+pub use self::query::*;
+pub use self::scheme::*;
+pub use self::segment::*;
+pub use self::userinfo::*;
 
 /// Parsing errors.
 ///
@@ -80,26 +80,26 @@ pub enum Error {
 	InvalidQuery,
 
 	/// Occurs when a [`Fragment`] part is not syntactically valid.
-	InvalidFragment
+	InvalidFragment,
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Error::InvalidEncoding => "Invalid encoding",
-            Error::InvalidPercentEncoding => "Invalid percent encoding",
-            Error::MissingScheme => "Missing scheme",
-            Error::InvalidScheme => "Invalid scheme",
-            Error::InvalidAuthority => "Invalid authority",
-            Error::InvalidUserInfo => "Invalid user info",
-            Error::InvalidHost => "Invalid host",
-            Error::InvalidPort => "Invalid port",
-            Error::InvalidSegment => "Invalid segment",
-            Error::InvalidPath => "Invalid path",
-            Error::InvalidQuery => "Invalid query",
-            Error::InvalidFragment => "Invalid fragment"
-        })
-    }
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_str(match self {
+			Error::InvalidEncoding => "Invalid encoding",
+			Error::InvalidPercentEncoding => "Invalid percent encoding",
+			Error::MissingScheme => "Missing scheme",
+			Error::InvalidScheme => "Invalid scheme",
+			Error::InvalidAuthority => "Invalid authority",
+			Error::InvalidUserInfo => "Invalid user info",
+			Error::InvalidHost => "Invalid host",
+			Error::InvalidPort => "Invalid port",
+			Error::InvalidSegment => "Invalid segment",
+			Error::InvalidPath => "Invalid path",
+			Error::InvalidQuery => "Invalid query",
+			Error::InvalidFragment => "Invalid fragment",
+		})
+	}
 }
 
 impl StdError for Error {}
@@ -199,7 +199,7 @@ impl<'a> PartialEq for Iri<'a> {
 	}
 }
 
-impl<'a> Eq for Iri<'a> { }
+impl<'a> Eq for Iri<'a> {}
 
 impl<'a> PartialEq<IriRef<'a>> for Iri<'a> {
 	#[inline]

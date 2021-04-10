@@ -1,12 +1,15 @@
-use std::ops::Range;
+use super::IriRef;
+use crate::parsing::ParsedIriRef;
+use crate::{
+	AsIriRef, Authority, AuthorityMut, Error, Fragment, Iri, IriBuf, Path, PathBuf, PathMut, Query,
+	Scheme,
+};
+use pct_str::PctStr;
+use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryInto;
 use std::fmt;
-use std::cmp::{PartialOrd, Ord, Ordering};
 use std::hash::{Hash, Hasher};
-use pct_str::PctStr;
-use crate::parsing::ParsedIriRef;
-use crate::{Error, Iri, IriBuf, AsIriRef, Scheme, Authority, AuthorityMut, Path, PathMut, PathBuf, Query, Fragment};
-use super::IriRef;
+use std::ops::Range;
 
 /// Owned IRI-reference.
 ///
@@ -45,7 +48,7 @@ impl IriRefBuf {
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<IriRefBuf, Error> {
 		Ok(IriRefBuf {
 			data: Vec::from(buffer.as_ref()),
-			p: ParsedIriRef::new(buffer)?
+			p: ParsedIriRef::new(buffer)?,
 		})
 	}
 
@@ -72,7 +75,7 @@ impl IriRefBuf {
 	pub fn as_iri_ref(&self) -> IriRef {
 		IriRef {
 			data: self.data.as_ref(),
-			p: self.p
+			p: self.p,
 		}
 	}
 
@@ -89,16 +92,12 @@ impl IriRefBuf {
 
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe {
-			std::str::from_utf8_unchecked(&self.data[0..self.len()])
-		}
+		unsafe { std::str::from_utf8_unchecked(&self.data[0..self.len()]) }
 	}
 
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
-		unsafe {
-			PctStr::new_unchecked(self.as_str())
-		}
+		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 
 	#[inline]
@@ -110,7 +109,7 @@ impl IriRefBuf {
 	pub fn scheme(&self) -> Option<Scheme> {
 		if let Some(scheme_len) = self.p.scheme_len {
 			Some(Scheme {
-				data: &self.data[0..scheme_len]
+				data: &self.data[0..scheme_len],
 			})
 		} else {
 			None
@@ -131,7 +130,7 @@ impl IriRefBuf {
 			self.p.scheme_len = Some(new_scheme.as_ref().len());
 		} else {
 			if let Some(scheme_len) = self.p.scheme_len {
-				self.replace(0..(scheme_len+1), &[]);
+				self.replace(0..(scheme_len + 1), &[]);
 			}
 
 			self.p.scheme_len = None;
@@ -144,8 +143,8 @@ impl IriRefBuf {
 		if let Some(authority) = self.p.authority {
 			let offset = self.p.authority_offset();
 			Some(Authority {
-				data: &self.data[offset..(offset+authority.len())],
-				p: authority
+				data: &self.data[offset..(offset + authority.len())],
+				p: authority,
 			})
 		} else {
 			None
@@ -159,7 +158,7 @@ impl IriRefBuf {
 			Some(AuthorityMut {
 				data: &mut self.data,
 				offset: offset,
-				p: authority
+				p: authority,
 			})
 		} else {
 			None
@@ -176,7 +175,7 @@ impl IriRefBuf {
 
 		if let Some(new_authority) = authority {
 			if let Some(authority) = self.p.authority {
-				self.replace(offset..(offset+authority.len()), new_authority.as_ref());
+				self.replace(offset..(offset + authority.len()), new_authority.as_ref());
 			} else {
 				self.replace(offset..offset, new_authority.as_ref());
 				self.replace(offset..offset, &[0x2f, 0x2f]);
@@ -185,7 +184,7 @@ impl IriRefBuf {
 			self.p.authority = Some(new_authority.p);
 		} else {
 			if let Some(authority) = self.p.authority {
-				self.replace((offset-2)..(offset+authority.len()), &[]);
+				self.replace((offset - 2)..(offset + authority.len()), &[]);
 			}
 
 			self.p.authority = None;
@@ -197,21 +196,19 @@ impl IriRefBuf {
 	pub fn path(&self) -> Path {
 		let offset = self.p.path_offset();
 		Path {
-			data: &self.data[offset..(offset+self.p.path_len)]
+			data: &self.data[offset..(offset + self.p.path_len)],
 		}
 	}
 
 	#[inline]
 	pub fn path_mut(&mut self) -> PathMut {
-		PathMut {
-			buffer: self
-		}
+		PathMut { buffer: self }
 	}
 
 	#[inline]
 	pub fn set_path(&mut self, path: Path) {
 		let offset = self.p.path_offset();
-		self.replace(offset..(offset+self.p.path_len), path.as_ref());
+		self.replace(offset..(offset + self.p.path_len), path.as_ref());
 		self.p.path_len = path.as_ref().len()
 	}
 
@@ -220,7 +217,7 @@ impl IriRefBuf {
 		if let Some(len) = self.p.query_len {
 			let offset = self.p.query_offset();
 			Some(Query {
-				data: &self.data[offset..(offset+len)]
+				data: &self.data[offset..(offset + len)],
 			})
 		} else {
 			None
@@ -233,16 +230,16 @@ impl IriRefBuf {
 
 		if let Some(new_query) = query {
 			if let Some(query_len) = self.p.query_len {
-				self.replace(offset..(offset+query_len), new_query.as_ref());
+				self.replace(offset..(offset + query_len), new_query.as_ref());
 			} else {
 				self.replace(offset..offset, &[0x3f]);
-				self.replace((offset+1)..(offset+1), new_query.as_ref());
+				self.replace((offset + 1)..(offset + 1), new_query.as_ref());
 			}
 
 			self.p.query_len = Some(new_query.as_ref().len());
 		} else {
 			if let Some(query_len) = self.p.query_len {
-				self.replace((offset-1)..(offset+query_len), &[]);
+				self.replace((offset - 1)..(offset + query_len), &[]);
 			}
 
 			self.p.query_len = None;
@@ -254,7 +251,7 @@ impl IriRefBuf {
 		if let Some(len) = self.p.fragment_len {
 			let offset = self.p.fragment_offset();
 			Some(Fragment {
-				data: &self.data[offset..(offset+len)]
+				data: &self.data[offset..(offset + len)],
 			})
 		} else {
 			None
@@ -266,16 +263,16 @@ impl IriRefBuf {
 
 		if let Some(new_fragment) = fragment {
 			if let Some(fragment_len) = self.p.fragment_len {
-				self.replace(offset..(offset+fragment_len), new_fragment.as_ref());
+				self.replace(offset..(offset + fragment_len), new_fragment.as_ref());
 			} else {
 				self.replace(offset..offset, &[0x23]);
-				self.replace((offset+1)..(offset+1), new_fragment.as_ref());
+				self.replace((offset + 1)..(offset + 1), new_fragment.as_ref());
 			}
 
 			self.p.fragment_len = Some(new_fragment.as_ref().len());
 		} else {
 			if let Some(fragment_len) = self.p.fragment_len {
-				self.replace((offset-1)..(offset+fragment_len), &[]);
+				self.replace((offset - 1)..(offset + fragment_len), &[]);
 			}
 
 			self.p.fragment_len = None;
@@ -358,7 +355,7 @@ impl PartialEq for IriRefBuf {
 	}
 }
 
-impl Eq for IriRefBuf { }
+impl Eq for IriRefBuf {}
 
 impl<'a> PartialEq<IriRef<'a>> for IriRefBuf {
 	#[inline]
@@ -437,9 +434,7 @@ impl<'a> From<IriRef<'a>> for IriRefBuf {
 		data.resize(iri_ref.as_ref().len(), 0);
 		data.copy_from_slice(iri_ref.as_ref());
 
-		IriRefBuf {
-			p: iri_ref.p, data
-		}
+		IriRefBuf { p: iri_ref.p, data }
 	}
 }
 
@@ -514,9 +509,7 @@ mod tests {
 	fn unambiguous_resolution() {
 		let base_iri = Iri::new("http:/a/b").unwrap();
 
-		let tests = [
-			("../..//", "http:/.//")
-		];
+		let tests = [("../..//", "http:/.//")];
 
 		for (relative, absolute) in &tests {
 			// println!("{} => {}", relative, absolute);
@@ -552,7 +545,7 @@ mod tests {
 			("../g", "http://a/b/g"),
 			("../..", "http://a/"),
 			("../../", "http://a/"),
-			("../../g", "http://a/g")
+			("../../g", "http://a/g"),
 		];
 
 		for (relative, absolute) in &tests {
@@ -586,7 +579,7 @@ mod tests {
 			("g?y/../x", "http://a/b/c/g?y/../x"),
 			("g#s/./x", "http://a/b/c/g#s/./x"),
 			("g#s/../x", "http://a/b/c/g#s/../x"),
-			("http:g", "http:g")
+			("http:g", "http:g"),
 		];
 
 		for (relative, absolute) in &tests {

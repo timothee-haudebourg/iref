@@ -1,10 +1,13 @@
-use std::ops::Deref;
-use std::fmt;
-use std::cmp::{PartialOrd, Ord, Ordering};
-use std::hash::{Hash, Hasher};
-use std::convert::TryFrom;
+use super::{
+	AsIri, AsIriRef, Authority, AuthorityMut, Error, Fragment, Iri, IriRef, Path, PathMut, Query,
+	Scheme,
+};
 use crate::IriRefBuf;
-use super::{Iri, IriRef, AsIri, AsIriRef, Error, Scheme, Authority, AuthorityMut, Path, PathMut, Query, Fragment};
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::convert::TryFrom;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 /// Owned IRI.
 #[derive(Clone)]
@@ -129,7 +132,7 @@ impl PartialEq for IriBuf {
 	}
 }
 
-impl Eq for IriBuf { }
+impl Eq for IriBuf {}
 
 impl<'a> PartialEq<Iri<'a>> for IriBuf {
 	#[inline]
