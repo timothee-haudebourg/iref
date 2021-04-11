@@ -154,7 +154,7 @@ impl<'a> Iri<'a> {
 		Self::new(s)
 	}
 
-	/// Convert the slice-like [`Iri`] into the owned version [`IriRef`].
+	/// Convert the slice-like [`Iri`] into the owned version [`IriBuf`].
 	pub fn to_owned(self) -> IriBuf {
 		IriBuf(self.0.to_owned())
 	}
