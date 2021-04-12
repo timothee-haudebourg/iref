@@ -303,7 +303,7 @@ impl<'a> Path<'a> {
 		loop {
 			match (self_it.next(), prefix_it.next()) {
 				(Some(self_seg), Some(prefix_seg))
-					if self_seg.as_pct_str() == prefix_seg.as_pct_str() => (),
+					if self_seg.as_pct_str() == prefix_seg.as_pct_str() => {}
 				(_, Some(_)) => return None,
 				(Some(seg), None) => buf.as_path_mut().push(seg),
 				(None, None) => break,

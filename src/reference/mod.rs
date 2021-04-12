@@ -57,6 +57,7 @@ impl<'a> IriRef<'a> {
 	///
 	/// This replaces a [`std::str::FromStr`] implementation as the trait is
 	/// incompatiple with the result storing the input which [`IriRef`] does.
+	#[allow(clippy::should_implement_trait)]
 	pub fn from_str(s: &'a str) -> Result<Self, Error> {
 		Self::new(s)
 	}
@@ -78,7 +79,7 @@ impl<'a> IriRef<'a> {
 	/// Build an IRI reference from a slice and parsing data.
 	///
 	/// # Safety
-	/// 
+	///
 	/// This is unsafe since the input slice is not checked against the given parsing data.
 	/// The user must ensure that `data` is a correct IRI reference described by `p`.
 	#[inline]
@@ -275,7 +276,9 @@ impl<'a> IriRef<'a> {
 	) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
 		let prefix = prefix.into();
 		if self.scheme() == prefix.scheme() && self.authority() == prefix.authority() {
-			self.path().suffix(prefix.path()).map(|suffix_path| (suffix_path, self.query(), self.fragment()))
+			self.path()
+				.suffix(prefix.path())
+				.map(|suffix_path| (suffix_path, self.query(), self.fragment()))
 		} else {
 			None
 		}

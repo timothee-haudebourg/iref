@@ -150,6 +150,7 @@ impl<'a> Iri<'a> {
 	///
 	/// This replaces a [`std::str::FromStr`] implementation as the trait is
 	/// incompatiple with the result storing the input which [`Iri`] does.
+	#[allow(clippy::should_implement_trait)]
 	pub fn from_str(s: &'a str) -> Result<Self, Error> {
 		Self::new(s)
 	}

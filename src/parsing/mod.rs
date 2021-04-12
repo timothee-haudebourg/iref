@@ -172,7 +172,11 @@ impl ParsedIriRef {
 
 	#[inline]
 	pub fn is_empty(&self) -> bool {
-		self.scheme_len.is_none() && self.authority.is_none() && self.path_len == 0 && self.query_len.is_none() && self.fragment_len.is_none()
+		self.scheme_len.is_none()
+			&& self.authority.is_none()
+			&& self.path_len == 0
+			&& self.query_len.is_none()
+			&& self.fragment_len.is_none()
 	}
 
 	#[inline]
@@ -280,27 +284,29 @@ pub fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 fn is_ucschar(c: char) -> bool {
 	let c = c as u32;
 	(0xA0..=0xD7FF).contains(&c)
-	|| (0xF900..=0xFDCF).contains(&c)
-	|| (0xFDF0..=0xFFEF).contains(&c)
-	|| (0x10000..=0x1FFFD).contains(&c)
-	|| (0x20000..=0x2FFFD).contains(&c)
-	|| (0x30000..=0x3FFFD).contains(&c)
-	|| (0x40000..=0x4FFFD).contains(&c)
-	|| (0x50000..=0x5FFFD).contains(&c)
-	|| (0x60000..=0x6FFFD).contains(&c)
-	|| (0x70000..=0x7FFFD).contains(&c)
-	|| (0x80000..=0x8FFFD).contains(&c)
-	|| (0x90000..=0x9FFFD).contains(&c)
-	|| (0xA0000..=0xAFFFD).contains(&c)
-	|| (0xB0000..=0xBFFFD).contains(&c)
-	|| (0xC0000..=0xCFFFD).contains(&c)
-	|| (0xD0000..=0xDFFFD).contains(&c)
-	|| (0xE1000..=0xEFFFD).contains(&c)
+		|| (0xF900..=0xFDCF).contains(&c)
+		|| (0xFDF0..=0xFFEF).contains(&c)
+		|| (0x10000..=0x1FFFD).contains(&c)
+		|| (0x20000..=0x2FFFD).contains(&c)
+		|| (0x30000..=0x3FFFD).contains(&c)
+		|| (0x40000..=0x4FFFD).contains(&c)
+		|| (0x50000..=0x5FFFD).contains(&c)
+		|| (0x60000..=0x6FFFD).contains(&c)
+		|| (0x70000..=0x7FFFD).contains(&c)
+		|| (0x80000..=0x8FFFD).contains(&c)
+		|| (0x90000..=0x9FFFD).contains(&c)
+		|| (0xA0000..=0xAFFFD).contains(&c)
+		|| (0xB0000..=0xBFFFD).contains(&c)
+		|| (0xC0000..=0xCFFFD).contains(&c)
+		|| (0xD0000..=0xDFFFD).contains(&c)
+		|| (0xE1000..=0xEFFFD).contains(&c)
 }
 
 fn is_private(c: char) -> bool {
 	let c = c as u32;
-	(0xE000..=0xF8FF).contains(&c) || (0xF0000..=0xFFFFD).contains(&c) || (0x100000..=0x10FFFD).contains(&c)
+	(0xE000..=0xF8FF).contains(&c)
+		|| (0xF0000..=0xFFFFD).contains(&c)
+		|| (0x100000..=0x10FFFD).contains(&c)
 }
 
 fn is_unreserved(c: char) -> bool {
@@ -308,7 +314,10 @@ fn is_unreserved(c: char) -> bool {
 }
 
 fn is_subdelim(c: char) -> bool {
-	matches!(c, '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=')
+	matches!(
+		c,
+		'!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '='
+	)
 }
 
 fn is_hex_digit(buffer: &[u8], i: usize) -> Result<bool, Error> {
