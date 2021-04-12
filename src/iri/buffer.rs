@@ -1,13 +1,16 @@
-use super::{
-	AsIri, AsIriRef, Authority, AuthorityMut, Error, Fragment, Iri, IriRef, Path, PathMut, Query,
-	Scheme,
+use std::{
+	cmp::{Ord, Ordering, PartialOrd},
+	convert::TryFrom,
+	fmt,
+	hash::{Hash, Hasher},
+	ops::Deref,
+	str::FromStr,
 };
-use crate::IriRefBuf;
-use std::cmp::{Ord, Ordering, PartialOrd};
-use std::convert::TryFrom;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::ops::Deref;
+
+use crate::{
+	iri::Iri, AsIri, AsIriRef, Authority, AuthorityMut, Error, Fragment, IriRef, IriRefBuf, Path,
+	PathMut, Query, Scheme,
+};
 
 /// Owned IRI.
 #[derive(Clone)]
@@ -85,6 +88,14 @@ impl IriBuf {
 	#[inline]
 	pub fn set_fragment(&mut self, fragment: Option<Fragment>) {
 		self.0.set_fragment(fragment)
+	}
+}
+
+impl FromStr for IriBuf {
+	type Err = Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Self::new(s)
 	}
 }
 
