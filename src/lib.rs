@@ -196,6 +196,7 @@
 //! Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 //! percent encoded characters are correctly handled.
 //! The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
+#![allow(clippy::tabs_in_doc_comments)]
 
 mod iri;
 pub mod parsing;

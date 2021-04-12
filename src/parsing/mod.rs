@@ -171,6 +171,11 @@ impl ParsedIriRef {
 	}
 
 	#[inline]
+	pub fn is_empty(&self) -> bool {
+		self.scheme_len.is_none() && self.authority.is_none() && self.path_len == 0 && self.query_len.is_none() && self.fragment_len.is_none()
+	}
+
+	#[inline]
 	pub fn authority_offset(&self) -> usize {
 		let mut offset = 0;
 
@@ -239,19 +244,19 @@ pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error>
 #[inline]
 pub fn is_alpha(c: char) -> bool {
 	let c = c as u32;
-	(c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)
+	(0x41..=0x5a).contains(&c) || (0x61..=0x7a).contains(&c)
 }
 
 #[inline]
 pub fn is_digit(c: char) -> bool {
 	let c = c as u32;
-	c >= 0x30 && c <= 0x39
+	(0x30..=0x39).contains(&c)
 }
 
 #[inline]
 pub fn is_alphanumeric(c: char) -> bool {
 	let c = c as u32;
-	(c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)
+	(0x30..=0x39).contains(&c) || (0x41..=0x5a).contains(&c) || (0x61..=0x7a).contains(&c)
 }
 
 /// Parse the IRI scheme.
@@ -274,28 +279,28 @@ pub fn parse_scheme(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 
 fn is_ucschar(c: char) -> bool {
 	let c = c as u32;
-	c >= 0xA0 && c <= 0xD7FF
-		|| c >= 0xF900 && c <= 0xFDCF
-		|| c >= 0xFDF0 && c <= 0xFFEF
-		|| c >= 0x10000 && c <= 0x1FFFD
-		|| c >= 0x20000 && c <= 0x2FFFD
-		|| c >= 0x30000 && c <= 0x3FFFD
-		|| c >= 0x40000 && c <= 0x4FFFD
-		|| c >= 0x50000 && c <= 0x5FFFD
-		|| c >= 0x60000 && c <= 0x6FFFD
-		|| c >= 0x70000 && c <= 0x7FFFD
-		|| c >= 0x80000 && c <= 0x8FFFD
-		|| c >= 0x90000 && c <= 0x9FFFD
-		|| c >= 0xA0000 && c <= 0xAFFFD
-		|| c >= 0xB0000 && c <= 0xBFFFD
-		|| c >= 0xC0000 && c <= 0xCFFFD
-		|| c >= 0xD0000 && c <= 0xDFFFD
-		|| c >= 0xE1000 && c <= 0xEFFFD
+	(0xA0..=0xD7FF).contains(&c)
+	|| (0xF900..=0xFDCF).contains(&c)
+	|| (0xFDF0..=0xFFEF).contains(&c)
+	|| (0x10000..=0x1FFFD).contains(&c)
+	|| (0x20000..=0x2FFFD).contains(&c)
+	|| (0x30000..=0x3FFFD).contains(&c)
+	|| (0x40000..=0x4FFFD).contains(&c)
+	|| (0x50000..=0x5FFFD).contains(&c)
+	|| (0x60000..=0x6FFFD).contains(&c)
+	|| (0x70000..=0x7FFFD).contains(&c)
+	|| (0x80000..=0x8FFFD).contains(&c)
+	|| (0x90000..=0x9FFFD).contains(&c)
+	|| (0xA0000..=0xAFFFD).contains(&c)
+	|| (0xB0000..=0xBFFFD).contains(&c)
+	|| (0xC0000..=0xCFFFD).contains(&c)
+	|| (0xD0000..=0xDFFFD).contains(&c)
+	|| (0xE1000..=0xEFFFD).contains(&c)
 }
 
 fn is_private(c: char) -> bool {
 	let c = c as u32;
-	c >= 0xE000 && c <= 0xF8FF || c >= 0xF0000 && c <= 0xFFFFD || c >= 0x100000 && c <= 0x10FFFD
+	(0xE000..=0xF8FF).contains(&c) || (0xF0000..=0xFFFFD).contains(&c) || (0x100000..=0x10FFFD).contains(&c)
 }
 
 fn is_unreserved(c: char) -> bool {
@@ -303,15 +308,12 @@ fn is_unreserved(c: char) -> bool {
 }
 
 fn is_subdelim(c: char) -> bool {
-	match c {
-		'!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' => true,
-		_ => false,
-	}
+	matches!(c, '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=')
 }
 
 fn is_hex_digit(buffer: &[u8], i: usize) -> Result<bool, Error> {
 	match get_char(buffer, i)? {
-		Some((c, 1)) => Ok(c.to_digit(16).is_some()),
+		Some((c, 1)) => Ok(c.is_digit(16)),
 		_ => Ok(false),
 	}
 }
@@ -413,26 +415,21 @@ fn parse_dec_octet(buffer: &[u8], i: usize) -> Result<Option<(u32, usize)>, Erro
 	let mut octet = 0u32;
 	let mut len = 0;
 
-	loop {
-		match get_char(buffer, i + len)? {
-			Some((c, 1)) => {
-				if let Some(d) = c.to_digit(10) {
-					if octet == 25 && d > 5 {
-						return Ok(None);
-					} else {
-						octet = octet * 10 + d
-					}
-
-					len += 1;
-
-					if len >= 3 || octet > 25 {
-						break;
-					}
-				} else {
-					break;
-				}
+	while let Some((c, 1)) = get_char(buffer, i + len)? {
+		if let Some(d) = c.to_digit(10) {
+			if octet == 25 && d > 5 {
+				return Ok(None);
+			} else {
+				octet = octet * 10 + d
 			}
-			_ => break,
+
+			len += 1;
+
+			if len >= 3 || octet > 25 {
+				break;
+			}
+		} else {
+			break;
 		}
 	}
 
@@ -478,20 +475,15 @@ fn parse_h16(buffer: &[u8], i: usize) -> Result<Option<(u16, usize)>, Error> {
 	let mut len = 0;
 	let mut h16 = 0;
 
-	loop {
-		match get_char(buffer, i + len)? {
-			Some((c, 1)) => {
-				if let Some(d) = c.to_digit(16) {
-					h16 = (h16 << 4) | d as u16;
-					len += 1;
-					if len >= 4 {
-						break;
-					}
-				} else {
-					break;
-				}
+	while let Some((c, 1)) = get_char(buffer, i + len)? {
+		if let Some(d) = c.to_digit(16) {
+			h16 = (h16 << 4) | d as u16;
+			len += 1;
+			if len >= 4 {
+				break;
 			}
-			_ => break,
+		} else {
+			break;
 		}
 	}
 
@@ -565,7 +557,7 @@ fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize
 	}
 
 	if lhs_count > 0 {
-		lit = lit | (lhs << (16 * (8 - lhs_count)));
+		lit |= lhs << (16 * (8 - lhs_count));
 	}
 
 	let len = i - offset;
@@ -625,16 +617,12 @@ pub fn parse_host(buffer: &[u8], i: usize) -> Result<usize, Error> {
 #[inline]
 pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
-	loop {
-		match get_char(buffer, i)? {
-			Some((c, 1)) => {
-				if let Some(_) = c.to_digit(10) {
-					i += 1
-				} else {
-					break;
-				}
-			}
-			_ => break,
+
+	while let Some((c, 1)) = get_char(buffer, i)? {
+		if c.is_digit(10) {
+			i += 1
+		} else {
+			break;
 		}
 	}
 

@@ -12,8 +12,9 @@ pub struct Scheme<'a> {
 }
 
 impl<'a> Scheme<'a> {
+	/// Returns a reference to the byte representation of the scheme.
 	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
+	pub fn as_bytes(&self) -> &[u8] {
 		self.data
 	}
 
@@ -27,6 +28,13 @@ impl<'a> Scheme<'a> {
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
+	}
+}
+
+impl<'a> AsRef<[u8]> for Scheme<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

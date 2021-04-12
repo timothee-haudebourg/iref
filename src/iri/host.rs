@@ -13,8 +13,9 @@ pub struct Host<'a> {
 }
 
 impl<'a> Host<'a> {
+	/// Returns a reference to the byte representation of the host.
 	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
+	pub fn as_bytes(&self) -> &[u8] {
 		self.data
 	}
 
@@ -34,6 +35,13 @@ impl<'a> Host<'a> {
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
+	}
+}
+
+impl<'a> AsRef<[u8]> for Host<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

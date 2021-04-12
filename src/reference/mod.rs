@@ -61,7 +61,10 @@ impl<'a> IriRef<'a> {
 
 	/// Build an IRI reference from a slice and parsing data.
 	///
+	/// # Safety
+	/// 
 	/// This is unsafe since the input slice is not checked against the given parsing data.
+	/// The user must ensure that `data` is a correct IRI reference described by `p`.
 	#[inline]
 	pub const unsafe fn from_raw(data: &'a [u8], p: ParsedIriRef) -> IriRef<'a> {
 		IriRef { p, data }
@@ -73,15 +76,20 @@ impl<'a> IriRef<'a> {
 		self.data.len()
 	}
 
-	/// Get a reference to the underlying bytes slice representing the IRI-reference.
 	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
+	pub fn is_empty(&self) -> bool {
+		self.data.is_empty()
+	}
+
+	/// Returns a reference to the byte representation of the IRI-reference.
+	#[inline]
+	pub fn as_bytes(&self) -> &[u8] {
 		self.data
 	}
 
 	/// Convert the IRI-refrence into its underlying bytes slice.
 	#[inline]
-	pub fn into_ref(self) -> &'a [u8] {
+	pub fn into_bytes(self) -> &'a [u8] {
 		self.data
 	}
 
@@ -123,13 +131,9 @@ impl<'a> IriRef<'a> {
 	/// ```
 	#[inline]
 	pub fn scheme(&self) -> Option<Scheme> {
-		if let Some(scheme_len) = self.p.scheme_len {
-			Some(Scheme {
-				data: &self.data[0..scheme_len],
-			})
-		} else {
-			None
-		}
+		self.p.scheme_len.map(|len| Scheme {
+			data: &self.data[0..len],
+		})
 	}
 
 	/// Get the authority of the IRI-reference.
@@ -255,10 +259,7 @@ impl<'a> IriRef<'a> {
 	) -> Option<(PathBuf, Option<Query>, Option<Fragment>)> {
 		let prefix = prefix.into();
 		if self.scheme() == prefix.scheme() && self.authority() == prefix.authority() {
-			match self.path().suffix(prefix.path()) {
-				Some(suffix_path) => Some((suffix_path, self.query(), self.fragment())),
-				None => None,
-			}
+			self.path().suffix(prefix.path()).map(|suffix_path| (suffix_path, self.query(), self.fragment()))
 		} else {
 			None
 		}
@@ -345,7 +346,7 @@ impl<'a> IriRef<'a> {
 			}
 		}
 
-		while let Some(segment) = base_segments.next() {
+		for segment in base_segments {
 			if segment.is_open() {
 				result.path_mut().push(Segment::parent());
 				result.path_mut().open();
@@ -360,6 +361,13 @@ impl<'a> IriRef<'a> {
 		result.set_fragment(self.fragment());
 
 		result
+	}
+}
+
+impl<'a> AsRef<[u8]> for IriRef<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

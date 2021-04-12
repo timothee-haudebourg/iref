@@ -39,8 +39,9 @@ impl<'a> Segment<'a> {
 		self.data.len()
 	}
 
+	/// Returns a reference to the byte representation of the segment.
 	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
+	pub fn as_bytes(&self) -> &[u8] {
 		self.data
 	}
 
@@ -77,6 +78,13 @@ impl<'a> Segment<'a> {
 	#[inline]
 	pub fn open(&mut self) {
 		self.open = true
+	}
+}
+
+impl<'a> AsRef<[u8]> for Segment<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

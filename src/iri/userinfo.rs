@@ -13,8 +13,9 @@ pub struct UserInfo<'a> {
 }
 
 impl<'a> UserInfo<'a> {
+	/// Returns a reference to the byte representation of the user info.
 	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
+	pub fn as_bytes(&self) -> &[u8] {
 		self.data
 	}
 
@@ -34,6 +35,13 @@ impl<'a> UserInfo<'a> {
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
+	}
+}
+
+impl<'a> AsRef<[u8]> for UserInfo<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

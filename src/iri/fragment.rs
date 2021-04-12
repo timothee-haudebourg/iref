@@ -13,8 +13,9 @@ pub struct Fragment<'a> {
 }
 
 impl<'a> Fragment<'a> {
+	/// Returns a reference to the byte representation of the fragment.
 	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
+	pub fn as_bytes(&self) -> &[u8] {
 		self.data
 	}
 
@@ -34,6 +35,13 @@ impl<'a> Fragment<'a> {
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.data.is_empty()
+	}
+}
+
+impl<'a> AsRef<[u8]> for Fragment<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

@@ -31,13 +31,15 @@ impl<'a> Path<'a> {
 		}
 	}
 
+	/// Returns a reference to the byte representation of the path.
 	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
+	pub fn as_bytes(&self) -> &[u8] {
 		self.data
 	}
 
+	/// Converts this path into the underlying bytes slice.
 	#[inline]
-	pub fn into_ref(self) -> &'a [u8] {
+	pub fn into_bytes(self) -> &'a [u8] {
 		self.data
 	}
 
@@ -312,6 +314,13 @@ impl<'a> Path<'a> {
 	}
 }
 
+impl<'a> AsRef<[u8]> for Path<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
 impl<'a> AsIriRef for Path<'a> {
 	#[inline]
 	fn as_iri_ref(&self) -> IriRef {
@@ -554,18 +563,18 @@ pub struct PathMut<'a> {
 }
 
 impl<'a> PathMut<'a> {
+	/// Returns a reference to the bytes representation of the path.
+	#[inline]
+	pub fn as_bytes(&self) -> &[u8] {
+		let offset = self.buffer.p.path_offset();
+		let len = self.buffer.path().as_ref().len();
+		&self.buffer.data[offset..(offset + len)]
+	}
+
 	/// Get the inner path.
 	#[inline]
 	pub fn as_path(&self) -> Path {
 		self.buffer.path()
-	}
-
-	/// Get the underlying byte slice.
-	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
-		let offset = self.buffer.p.path_offset();
-		let len = self.buffer.path().as_ref().len();
-		&self.buffer.data[offset..(offset + len)]
 	}
 
 	/// Checks if the path is empty.
@@ -775,6 +784,13 @@ impl<'a> PathMut<'a> {
 	}
 }
 
+impl<'a> AsRef<[u8]> for PathMut<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
 impl<'a> AsIriRef for PathMut<'a> {
 	#[inline]
 	fn as_iri_ref(&self) -> IriRef {
@@ -812,16 +828,16 @@ impl PathBuf {
 		}
 	}
 
+	/// Returns a reference to the underlying bytes representation of the path.
+	#[inline]
+	pub fn as_bytes(&self) -> &[u8] {
+		self.data.path().into_bytes()
+	}
+
 	/// Consume the path and return its internal buffer.
 	#[inline]
 	pub fn into_bytes(self) -> Vec<u8> {
 		self.data.into_bytes()
-	}
-
-	/// Borrow the internal buffer storing this path.
-	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
-		self.data.path().into_ref()
 	}
 
 	#[inline]
@@ -849,6 +865,19 @@ impl PathBuf {
 	#[inline]
 	pub fn into_iri_ref(self) -> IriRefBuf {
 		self.data
+	}
+}
+
+impl Default for PathBuf {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
+impl<'a> AsRef<[u8]> for PathBuf {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

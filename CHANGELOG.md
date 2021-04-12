@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Rename all inherent `as_ref` methods into `as_bytes`
+  for `Iri`, `IriRef`, `Authority`, `Fragment`, `Host`,
+  `Path`, `Port`, `Query`, `Scheme`, `Segment` and `UserInfo`.
+- Rename `IriRef::into_ref` and `Path::into_ref` into `into_bytes`.
+- No more clippy warnings!
+
+### Added
+- Proper `AsRef<[u8]>` impl for `Iri`, `IriRef`, `Authority`,
+  `Fragment`, `Host`, `Path`, `Port`, `Query`, `Scheme`,
+  `Segment` and `UserInfo`.
+
 ## [1.4.3] - 2020-10-16
 ### Changed
 - Fixed corner case `IriRef::relative_to`

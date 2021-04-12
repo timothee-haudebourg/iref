@@ -26,11 +26,6 @@ impl<'a> Hash for Authority<'a> {
 }
 
 impl<'a> Authority<'a> {
-	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
-		self.data
-	}
-
 	/// Checks if the authority is empty.
 	///
 	/// It is empty if it has no user info, an empty host string, and no port.
@@ -39,6 +34,12 @@ impl<'a> Authority<'a> {
 	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.p.userinfo_len.is_none() && self.p.host_len == 0 && self.p.port_len.is_none()
+	}
+
+	/// Returns a reference to the byte representation of the authority.
+	#[inline]
+	pub fn as_bytes(&self) -> &[u8] {
+		self.data
 	}
 
 	#[inline]
@@ -77,6 +78,13 @@ impl<'a> Authority<'a> {
 		} else {
 			None
 		}
+	}
+}
+
+impl<'a> AsRef<[u8]> for Authority<'a> {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }
 

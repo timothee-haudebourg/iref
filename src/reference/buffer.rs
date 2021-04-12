@@ -65,12 +65,6 @@ impl IriRefBuf {
 		self.data
 	}
 
-	/// Borrow the internal buffer storing this IRI reference.
-	#[inline]
-	pub fn as_ref(&self) -> &[u8] {
-		self.data.as_ref()
-	}
-
 	#[inline]
 	pub fn as_iri_ref(&self) -> IriRef {
 		IriRef {
@@ -91,6 +85,16 @@ impl IriRefBuf {
 	}
 
 	#[inline]
+	pub fn is_empty(&self) -> bool {
+		self.p.is_empty()
+	}
+
+	#[inline]
+	pub fn as_bytes(&self) -> &[u8] {
+		self.data.as_ref()
+	}
+
+	#[inline]
 	pub fn as_str(&self) -> &str {
 		unsafe { std::str::from_utf8_unchecked(&self.data[0..self.len()]) }
 	}
@@ -107,13 +111,9 @@ impl IriRefBuf {
 
 	#[inline]
 	pub fn scheme(&self) -> Option<Scheme> {
-		if let Some(scheme_len) = self.p.scheme_len {
-			Some(Scheme {
-				data: &self.data[0..scheme_len],
-			})
-		} else {
-			None
-		}
+		self.p.scheme_len.map(|len| Scheme {
+			data: &self.data[0..len],
+		})
 	}
 
 	/// Set the scheme of the IRI.
@@ -325,6 +325,13 @@ impl IriRefBuf {
 	}
 }
 
+impl AsRef<[u8]> for IriRefBuf {
+	#[inline]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
 impl AsIriRef for IriRefBuf {
 	#[inline]
 	fn as_iri_ref(&self) -> IriRef {
@@ -474,7 +481,7 @@ impl<'a> From<Path<'a>> for IriRefBuf {
 impl From<PathBuf> for IriRefBuf {
 	#[inline]
 	fn from(path: PathBuf) -> IriRefBuf {
-		path.into_iri_ref().into()
+		path.into_iri_ref()
 	}
 }
 
