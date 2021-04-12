@@ -146,6 +146,19 @@ impl<'a> Iri<'a> {
 		}
 	}
 
+	/// Create a new IRI from a string.
+	///
+	/// This replaces a [`std::str::FromStr`] implementation as the trait is
+	/// incompatiple with the result storing the input which [`Iri`] does.
+	pub fn from_str(s: &'a str) -> Result<Self, Error> {
+		Self::new(s)
+	}
+
+	/// Convert the slice-like [`Iri`] into the owned version [`IriBuf`].
+	pub fn to_owned(self) -> IriBuf {
+		IriBuf(self.0.to_owned())
+	}
+
 	/// Build an IRI from an IRI reference.
 	#[inline]
 	pub const fn from_iri_ref(iri_ref: IriRef<'a>) -> Iri<'a> {

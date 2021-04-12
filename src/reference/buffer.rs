@@ -1,15 +1,18 @@
-use super::IriRef;
-use crate::parsing::ParsedIriRef;
-use crate::{
-	AsIriRef, Authority, AuthorityMut, Error, Fragment, Iri, IriBuf, Path, PathBuf, PathMut, Query,
-	Scheme,
+use std::{
+	cmp::{Ord, Ordering, PartialOrd},
+	convert::TryInto,
+	fmt,
+	hash::{Hash, Hasher},
+	ops::Range,
+	str::FromStr,
 };
+
 use pct_str::PctStr;
-use std::cmp::{Ord, Ordering, PartialOrd};
-use std::convert::TryInto;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::ops::Range;
+
+use crate::{
+	parsing::ParsedIriRef, AsIriRef, Authority, AuthorityMut, Error, Fragment, Iri, IriBuf, IriRef,
+	Path, PathBuf, PathMut, Query, Scheme,
+};
 
 /// Owned IRI-reference.
 ///
@@ -329,6 +332,14 @@ impl AsRef<[u8]> for IriRefBuf {
 	#[inline]
 	fn as_ref(&self) -> &[u8] {
 		self.as_bytes()
+	}
+}
+
+impl FromStr for IriRefBuf {
+	type Err = Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Self::new(s)
 	}
 }
 
