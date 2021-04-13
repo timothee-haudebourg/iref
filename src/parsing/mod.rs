@@ -247,20 +247,17 @@ pub fn get_char(buffer: &[u8], i: usize) -> Result<Option<(char, usize)>, Error>
 
 #[inline]
 pub fn is_alpha(c: char) -> bool {
-	let c = c as u32;
-	(0x41..=0x5a).contains(&c) || (0x61..=0x7a).contains(&c)
+	c.is_ascii_alphabetic()
 }
 
 #[inline]
 pub fn is_digit(c: char) -> bool {
-	let c = c as u32;
-	(0x30..=0x39).contains(&c)
+	c.is_ascii_digit()
 }
 
 #[inline]
 pub fn is_alphanumeric(c: char) -> bool {
-	let c = c as u32;
-	(0x30..=0x39).contains(&c) || (0x41..=0x5a).contains(&c) || (0x61..=0x7a).contains(&c)
+	c.is_ascii_alphanumeric()
 }
 
 /// Parse the IRI scheme.
