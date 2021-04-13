@@ -208,7 +208,7 @@ impl<'a> AuthorityMut<'a> {
 			if let Some(userinfo_len) = self.p.userinfo_len {
 				self.replace(offset..(offset + userinfo_len), new_userinfo.as_ref());
 			} else {
-				self.replace(offset..offset, &[0x40]);
+				self.replace(offset..offset, b"@");
 				self.replace(offset..offset, new_userinfo.as_ref());
 			}
 
@@ -258,7 +258,7 @@ impl<'a> AuthorityMut<'a> {
 			if let Some(port_len) = self.p.port_len {
 				self.replace(offset..(offset + port_len), new_port.as_ref());
 			} else {
-				self.replace(offset..offset, &[0x3a]);
+				self.replace(offset..offset, b":");
 				self.replace((offset + 1)..(offset + 1), new_port.as_ref());
 			}
 

@@ -90,7 +90,7 @@ impl<'a> Path<'a> {
 	/// Returns `true` if the path is `` or `/`.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
-		self.data.is_empty() || self.data == [0x2f]
+		self.data.is_empty() || self.data == b"/"
 	}
 
 	/// Checks if the path is absolute.
@@ -100,7 +100,7 @@ impl<'a> Path<'a> {
 	/// authority.
 	#[inline]
 	pub fn is_absolute(&self) -> bool {
-		!self.data.is_empty() && self.data[0] == 0x2f
+		!self.data.is_empty() && self.data.starts_with(b"/")
 	}
 
 	/// Checks if the path is relative.
@@ -109,13 +109,13 @@ impl<'a> Path<'a> {
 	/// A path cannot be relative if the IRI it is contained in contains a non-empty authority.
 	#[inline]
 	pub fn is_relative(&self) -> bool {
-		self.data.is_empty() || self.data[0] != 0x2f
+		!self.is_absolute()
 	}
 
 	/// Checks if the path ends with a `/` but is not equal to `/`.
 	#[inline]
 	pub fn is_open(&self) -> bool {
-		self.data.len() > 1 && self.data.last() == Some(&0x2f)
+		self.data.len() > 1 && self.data.ends_with(b"/")
 	}
 
 	#[inline]
@@ -164,7 +164,7 @@ impl<'a> Path<'a> {
 		(
 			Some(Segment {
 				data: &self.data[start..end],
-				open: self.data.get(end) == Some(&0x2f),
+				open: self.data.get(end) == Some(&b'/'),
 			}),
 			end,
 		)
@@ -187,7 +187,7 @@ impl<'a> Path<'a> {
 			let mut last = self.data.len() - 1;
 
 			loop {
-				if self.data[last] == 0x2f {
+				if self.data[last] == b'/' {
 					break;
 				}
 
@@ -256,7 +256,7 @@ impl<'a> Path<'a> {
 			i -= 1;
 
 			loop {
-				if self.data[i] == 0x2f {
+				if self.data[i] == b'/' {
 					break;
 				} else if i > 0 {
 					i -= 1;
@@ -396,7 +396,7 @@ impl<'a> DoubleEndedIterator for Segments<'a> {
 
 			loop {
 				if i > 0 {
-					if self.path.data[i] == 0x2f {
+					if self.path.data[i] == b'/' {
 						break;
 					} else {
 						i -= 1;
@@ -431,13 +431,13 @@ impl<'a> NormalizedSegments<'a> {
 		let relative = path.is_relative();
 		let mut stack: SmallVec<[Segment<'a>; NORMALIZE_STACK_SIZE]> = SmallVec::new();
 		for segment in path.into_iter() {
-			match segment.as_str() {
-				"." => {
+			match segment.data {
+				b"." => {
 					if let Some(last_segment) = stack.last_mut().as_mut() {
 						last_segment.open();
 					}
 				}
-				".." => {
+				b".." => {
 					if stack.pop().is_none() && relative {
 						stack.push(segment)
 					}
@@ -623,7 +623,7 @@ impl<'a> PathMut<'a> {
 		if !self.is_empty() && self.is_closed() {
 			// add a slash at the end.
 			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			self.buffer.replace(offset..offset, &[0x2f]);
+			self.buffer.replace(offset..offset, b"/");
 			self.buffer.p.path_len += 1;
 		}
 	}
@@ -652,14 +652,14 @@ impl<'a> PathMut<'a> {
 				|| (self.is_relative()
 					&& self.buffer.scheme().is_none()
 					&& self.buffer.authority().is_none()
-					&& first.as_ref().contains(&0x3a))
+					&& first.as_ref().contains(&b':'))
 			{
 				// add `./` at the begining.
 				let mut offset = self.buffer.p.path_offset();
 				if self.is_absolute() {
 					offset += 1;
 				}
-				self.buffer.replace(offset..offset, &[0x2e, 0x2f]);
+				self.buffer.replace(offset..offset, b"./");
 				self.buffer.p.path_len += 2;
 			}
 		}
@@ -682,7 +682,7 @@ impl<'a> PathMut<'a> {
 
 			// add a slash at the end.
 			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			self.buffer.replace(offset..offset, &[0x2f]);
+			self.buffer.replace(offset..offset, b"/");
 			self.buffer.p.path_len += 1;
 		} else {
 			// if the whole IRI is of the form `?query#fragment`, and we push a segment containing a `:`,
@@ -692,7 +692,7 @@ impl<'a> PathMut<'a> {
 				&& self.is_empty()
 				&& self.buffer.scheme().is_none()
 				&& self.buffer.authority().is_none()
-				&& segment.as_ref().contains(&0x3a)
+				&& segment.as_ref().contains(&b':')
 			{
 				self.push(Segment::current())
 			}
@@ -723,11 +723,11 @@ impl<'a> PathMut<'a> {
 			}
 
 			// Find the last segment start position.
-			while start > 0 && self.buffer.data[start] != 0x2f {
+			while start > 0 && self.buffer.data[start] != b'/' {
 				start -= 1;
 			}
 
-			if start > 0 || self.buffer.data[start] == 0x2f {
+			if start > 0 || self.buffer.data[start] == b'/' {
 				start += 1;
 			}
 
@@ -755,9 +755,9 @@ impl<'a> PathMut<'a> {
 	#[inline]
 	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) {
 		for segment in path {
-			match segment.as_str() {
-				"." => self.open(),
-				".." => {
+			match segment.data {
+				b"." => self.open(),
+				b".." => {
 					self.pop();
 					if segment.is_open() {
 						self.open()
