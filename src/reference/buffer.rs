@@ -286,7 +286,7 @@ impl IriRefBuf {
 	///
 	/// ## Abnormal use of dot segments.
 	///
-	/// https://www.rfc-editor.org/errata/eid4547
+	/// See <https://www.rfc-editor.org/errata/eid4547>
 	pub fn resolve<'b, Base: Into<Iri<'b>>>(&mut self, base_iri: Base) {
 		let base_iri: Iri<'b> = base_iri.into();
 
