@@ -235,7 +235,7 @@ impl IriRefBuf {
 			if let Some(query_len) = self.p.query_len {
 				self.replace(offset..(offset + query_len), new_query.as_ref());
 			} else {
-				self.replace(offset..offset, b":");
+				self.replace(offset..offset, b"?");
 				self.replace((offset + 1)..(offset + 1), new_query.as_ref());
 			}
 
@@ -601,6 +601,22 @@ mod tests {
 		for (relative, absolute) in &tests {
 			// println!("{} => {}", relative, absolute);
 			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+		}
+	}
+
+	#[test]
+	fn more_resolutions() {
+		let base_iri = Iri::new("http://a/bb/ccc/d;p?q").unwrap();
+
+		let tests = [
+			("#s", "http://a/bb/ccc/d;p?q#s"),
+			("", "http://a/bb/ccc/d;p?q")
+		];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
+			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
+			assert_eq!(buffer.as_str(), *absolute);
 		}
 	}
 }
