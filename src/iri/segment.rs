@@ -19,7 +19,7 @@ impl<'a> Segment<'a> {
 	#[inline]
 	pub fn current() -> Segment<'static> {
 		Segment {
-			data: &[0x2e],
+			data: b".",
 			open: false,
 		}
 	}
@@ -28,7 +28,7 @@ impl<'a> Segment<'a> {
 	#[inline]
 	pub fn parent() -> Segment<'static> {
 		Segment {
-			data: &[0x2e, 0x2e],
+			data: b"..",
 			open: false,
 		}
 	}
@@ -96,7 +96,7 @@ impl<'a> TryFrom<&'a str> for Segment<'a> {
 		let segment_len = parsing::parse_path_segment(str.as_ref(), 0)?;
 		let data: &[u8] = str.as_ref();
 		if segment_len < data.len() {
-			if segment_len == data.len() - 1 && data[segment_len] == 0x2f {
+			if segment_len == data.len() - 1 && data[segment_len] == b'/' {
 				Ok(Segment {
 					data: &data[0..segment_len],
 					open: true,

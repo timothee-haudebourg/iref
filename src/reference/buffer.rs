@@ -126,7 +126,7 @@ impl IriRefBuf {
 			if let Some(scheme_len) = self.p.scheme_len {
 				self.replace(0..scheme_len, new_scheme.as_ref());
 			} else {
-				self.replace(0..0, &[0x3a]);
+				self.replace(0..0, b":");
 				self.replace(0..0, new_scheme.as_ref());
 			}
 
@@ -181,7 +181,7 @@ impl IriRefBuf {
 				self.replace(offset..(offset + authority.len()), new_authority.as_ref());
 			} else {
 				self.replace(offset..offset, new_authority.as_ref());
-				self.replace(offset..offset, &[0x2f, 0x2f]);
+				self.replace(offset..offset, b"//");
 			}
 
 			self.p.authority = Some(new_authority.p);
@@ -235,7 +235,7 @@ impl IriRefBuf {
 			if let Some(query_len) = self.p.query_len {
 				self.replace(offset..(offset + query_len), new_query.as_ref());
 			} else {
-				self.replace(offset..offset, &[0x3f]);
+				self.replace(offset..offset, b":");
 				self.replace((offset + 1)..(offset + 1), new_query.as_ref());
 			}
 
@@ -268,7 +268,7 @@ impl IriRefBuf {
 			if let Some(fragment_len) = self.p.fragment_len {
 				self.replace(offset..(offset + fragment_len), new_fragment.as_ref());
 			} else {
-				self.replace(offset..offset, &[0x23]);
+				self.replace(offset..offset, b"#");
 				self.replace((offset + 1)..(offset + 1), new_fragment.as_ref());
 			}
 
