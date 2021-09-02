@@ -32,7 +32,7 @@ pub use self::userinfo::*;
 ///
 /// These are the different errors raised when some part of an IRI or IRI reference has an
 /// invalid syntax or encoding.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
 	/// The input data is not a valid UTF-8 encoded string.
 	InvalidEncoding,
