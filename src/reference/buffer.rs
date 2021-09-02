@@ -610,7 +610,7 @@ mod tests {
 
 		let tests = [
 			("#s", "http://a/bb/ccc/d;p?q#s"),
-			("", "http://a/bb/ccc/d;p?q")
+			("", "http://a/bb/ccc/d;p?q"),
 		];
 
 		for (relative, absolute) in &tests {
