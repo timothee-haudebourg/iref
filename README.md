@@ -31,12 +31,6 @@ Theses allows the easy access and manipulation of every components.
 
 ## Basic usage
 
-Import the crate by adding the following line to
-the `dependencies` section of the `Cargo.toml` file:
-```toml
-[dependencies]
-iref = "1.4"
-```
 You can parse IRI strings by wrapping an `Iri` instance around a `str` slice.
 Note that no memory allocation occurs using `Iri`, it only borrows the input data.
 Access to each component is done in constant time.
