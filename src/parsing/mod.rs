@@ -136,13 +136,25 @@ impl ParsedIriRef {
 			None => (),
 		}
 
-		Ok(ParsedIriRef {
+		let data = ParsedIriRef {
 			scheme_len,
 			authority,
 			path_len,
 			query_len,
 			fragment_len,
-		})
+		};
+
+		if data.len() == buffer.len() {
+			Ok(data)
+		} else {
+			if fragment_len.is_some() {
+				Err(Error::InvalidFragment)
+			} else if query_len.is_some() {
+				Err(Error::InvalidQuery)
+			} else {
+				Err(Error::InvalidPath)
+			}
+		}
 	}
 
 	#[inline]
