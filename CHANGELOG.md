@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.1] - 2021-09-02
 ### Changed
 - Fix `set_query` bug that used the `:` character instead of `?`.
 
-## [2.0.0] - 2021-09-02
+## [2.0.0] - 2021-09-02 [YANKED]
+### Yanking reason
+- Found a bug in the `set_query` function that uses the `:` character
+  instead of `?` to prefix the query. Introduced by #11.
+
 ### Changed
 - Fix #12 by checking that the entire input buffer has been parsed.
 - Rename all inherent `as_ref` methods into `as_bytes`
