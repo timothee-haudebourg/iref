@@ -85,3 +85,13 @@ fn test9() {
 
 	assert_eq!(iri1, iri2)
 }
+
+#[test]
+fn invalid_hash_in_fragment1() {
+	assert_eq!(Iri::new("http://example.com/rel1./rel2##fragment-works"), Err(iref::Error::InvalidFragment))
+}
+
+#[test]
+fn invalid_hash_in_fragment2() {
+	assert_eq!(Iri::new("http://example.com/rel1./rel2#fragment#-works"), Err(iref::Error::InvalidFragment))
+}
