@@ -22,7 +22,7 @@ impl<'a> Query<'a> {
 	/// Get the underlying query slice as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe { std::str::from_utf8_unchecked(&self.data) }
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
 	/// Get the underlying query slice as a percent-encoded string slice.

@@ -146,14 +146,12 @@ impl ParsedIriRef {
 
 		if data.len() == buffer.len() {
 			Ok(data)
+		} else if fragment_len.is_some() {
+			Err(Error::InvalidFragment)
+		} else if query_len.is_some() {
+			Err(Error::InvalidQuery)
 		} else {
-			if fragment_len.is_some() {
-				Err(Error::InvalidFragment)
-			} else if query_len.is_some() {
-				Err(Error::InvalidQuery)
-			} else {
-				Err(Error::InvalidPath)
-			}
+			Err(Error::InvalidPath)
 		}
 	}
 

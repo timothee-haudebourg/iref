@@ -21,7 +21,7 @@ impl<'a> Port<'a> {
 	/// Get the underlying port slice as a string slice.
 	#[inline]
 	pub fn as_str(&self) -> &str {
-		unsafe { std::str::from_utf8_unchecked(&self.data) }
+		unsafe { std::str::from_utf8_unchecked(self.data) }
 	}
 
 	/// Checks if the port is empty.
