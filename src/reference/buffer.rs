@@ -310,6 +310,7 @@ impl IriRefBuf {
 						path_buffer.set_path("/".try_into().unwrap());
 					} else {
 						path_buffer.set_path(base_iri.path().directory());
+						path_buffer.path_mut().normalize();
 					}
 					path_buffer.path_mut().symbolic_append(self.path());
 					if self.path().is_open() {
@@ -605,12 +606,32 @@ mod tests {
 	}
 
 	#[test]
-	fn more_resolutions() {
+	fn more_resolutions1() {
 		let base_iri = Iri::new("http://a/bb/ccc/d;p?q").unwrap();
 
 		let tests = [
 			("#s", "http://a/bb/ccc/d;p?q#s"),
 			("", "http://a/bb/ccc/d;p?q"),
+		];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
+			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
+			assert_eq!(buffer.as_str(), *absolute);
+		}
+	}
+
+	#[test]
+	fn more_resolutions2() {
+		let base_iri = Iri::new("http://a/bb/ccc/./d;p?q").unwrap();
+
+		let tests = [
+			("..", "http://a/bb/"),
+			("../", "http://a/bb/"),
+			("../g", "http://a/bb/g"),
+			("../..", "http://a/"),
+			("../../", "http://a/"),
+			("../../g", "http://a/g")
 		];
 
 		for (relative, absolute) in &tests {

@@ -752,6 +752,11 @@ impl<'a> PathMut<'a> {
 		self.buffer.p.path_len = offset - self.buffer.p.path_offset();
 	}
 
+	/// Append the given path to this path using the `.` and `..` segments semantics.
+	/// 
+	/// Note that this does not normalize the segments already in the path.
+	/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
+	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
 	#[inline]
 	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) {
 		for segment in path {
