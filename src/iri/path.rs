@@ -753,7 +753,7 @@ impl<'a> PathMut<'a> {
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
-	/// 
+	///
 	/// Note that this does not normalize the segments already in the path.
 	/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.

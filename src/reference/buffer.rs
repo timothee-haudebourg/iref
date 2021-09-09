@@ -631,7 +631,7 @@ mod tests {
 			("../g", "http://a/bb/g"),
 			("../..", "http://a/"),
 			("../../", "http://a/"),
-			("../../g", "http://a/g")
+			("../../g", "http://a/g"),
 		];
 
 		for (relative, absolute) in &tests {
