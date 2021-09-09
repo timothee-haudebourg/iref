@@ -306,6 +306,7 @@ impl IriRefBuf {
 					self.path_mut().normalize();
 				} else {
 					let mut path_buffer = IriRefBuf::default();
+					path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
 					if base_iri.authority().is_some() && base_iri.path().is_empty() {
 						path_buffer.set_path("/".try_into().unwrap());
 					} else {
@@ -632,6 +633,23 @@ mod tests {
 			("../..", "http://a/"),
 			("../../", "http://a/"),
 			("../../g", "http://a/g"),
+		];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
+			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
+			assert_eq!(buffer.as_str(), *absolute);
+		}
+	}
+
+	#[test]
+	fn more_resolutions3() {
+		let base_iri = Iri::new("http://ab//de//ghi").unwrap();
+
+		let tests = [
+			("xyz", "http://ab//de//xyz"),
+			("./xyz", "http://ab//de//xyz"),
+			("../xyz", "http://ab//de/xyz"),
 		];
 
 		for (relative, absolute) in &tests {
