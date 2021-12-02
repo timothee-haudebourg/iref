@@ -72,7 +72,7 @@ impl IriRefBuf {
 			let ptr = vec.as_mut_ptr();
 			let len = vec.len();
 			let capacity = vec.capacity();
-			std::mem::drop(vec);
+			std::mem::forget(vec);
 			(e, String::from_raw_parts(ptr, len, capacity))
 		})
 	}
