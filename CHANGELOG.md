@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2021-12-02
+### Added
+- `IriRefBuf::from_vec`/`from_string`.
+- `IriRefBuf::from_raw_parts`.
+- `IriBuf::from_vec`/`from_string`.
+- `IriBuf::into_raw_parts`/`from_raw_parts`.
+- Impl `TryFrom<Vec<u8>>` for `IriRefBuf` and `IriBuf`.
+- Impl `TryFrom<String>` for `IriRefBuf` and `IriBuf`.
+
 ## [2.0.3] - 2021-09-09
 ### Changed
 - Avoid unnecessary path disambiguation during IRI reference resolution.

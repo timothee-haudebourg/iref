@@ -8,8 +8,8 @@ use std::{
 };
 
 use crate::{
-	iri::Iri, AsIri, AsIriRef, Authority, AuthorityMut, Error, Fragment, IriRef, IriRefBuf, Path,
-	PathMut, Query, Scheme,
+	iri::Iri, parsing::ParsedIriRef, AsIri, AsIriRef, Authority, AuthorityMut, Error, Fragment,
+	IriRef, IriRefBuf, Path, PathMut, Query, Scheme,
 };
 
 /// Owned IRI.
@@ -17,18 +17,71 @@ use crate::{
 pub struct IriBuf(pub(crate) IriRefBuf);
 
 impl IriBuf {
+	/// Creates a new IRI reference by parsing and copying the input buffer.
 	#[inline]
-	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<IriBuf, Error> {
+	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<Self, Error> {
 		let iri_ref = IriRefBuf::new(buffer)?;
 		if iri_ref.scheme().is_some() {
-			Ok(IriBuf(iri_ref))
+			Ok(Self(iri_ref))
 		} else {
 			Err(Error::MissingScheme)
 		}
 	}
 
+	/// Creates a new IRI by parsing and the input buffer.
 	#[inline]
-	pub fn from_scheme(scheme: Scheme) -> IriBuf {
+	pub fn from_vec(buffer: Vec<u8>) -> Result<Self, (Error, Vec<u8>)> {
+		let iri_ref = IriRefBuf::from_vec(buffer)?;
+		if iri_ref.scheme().is_some() {
+			Ok(Self(iri_ref))
+		} else {
+			Err((Error::MissingScheme, iri_ref.into_bytes()))
+		}
+	}
+
+	/// Creates a new IRI by parsing and the input string buffer.
+	#[inline]
+	pub fn from_string(buffer: String) -> Result<Self, (Error, String)> {
+		let iri_ref = IriRefBuf::from_string(buffer)?;
+		if iri_ref.scheme().is_some() {
+			Ok(Self(iri_ref))
+		} else {
+			Err(unsafe {
+				let mut vec = iri_ref.into_bytes();
+				let ptr = vec.as_mut_ptr();
+				let len = vec.len();
+				let capacity = vec.capacity();
+				std::mem::drop(vec);
+				(
+					Error::MissingScheme,
+					String::from_raw_parts(ptr, len, capacity),
+				)
+			})
+		}
+	}
+
+	/// Consume the IRI and return its constituting parts:
+	/// the internal buffer and parsing data.
+	#[inline]
+	pub fn into_raw_parts(self) -> (Vec<u8>, ParsedIriRef) {
+		self.0.into_raw_parts()
+	}
+
+	/// Creates a new IRI using `buffer` and the parsing information `p`.
+	/// The parsing information is not checked against `buffer`.
+	///
+	/// ## Safety
+	///
+	/// The parsed data must match the given `buffer`.
+	/// The scheme must not be empty.
+	#[inline]
+	pub unsafe fn from_raw_parts(buffer: Vec<u8>, p: ParsedIriRef) -> Self {
+		let iri_ref = IriRefBuf::from_raw_parts(buffer, p);
+		Self(iri_ref)
+	}
+
+	#[inline]
+	pub fn from_scheme(scheme: Scheme) -> Self {
 		let mut iri_ref = IriRefBuf::default();
 		iri_ref.set_scheme(Some(scheme));
 		IriBuf(iri_ref)
@@ -88,6 +141,22 @@ impl IriBuf {
 	#[inline]
 	pub fn set_fragment(&mut self, fragment: Option<Fragment>) {
 		self.0.set_fragment(fragment)
+	}
+}
+
+impl TryFrom<Vec<u8>> for IriBuf {
+	type Error = (Error, Vec<u8>);
+
+	fn try_from(v: Vec<u8>) -> Result<Self, Self::Error> {
+		Self::from_vec(v)
+	}
+}
+
+impl TryFrom<String> for IriBuf {
+	type Error = (Error, String);
+
+	fn try_from(s: String) -> Result<Self, Self::Error> {
+		Self::from_string(s)
 	}
 }
 

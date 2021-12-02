@@ -1,6 +1,6 @@
 use std::{
 	cmp::{Ord, Ordering, PartialOrd},
-	convert::TryInto,
+	convert::{TryFrom, TryInto},
 	fmt,
 	hash::{Hash, Hasher},
 	ops::Range,
@@ -39,7 +39,7 @@ use crate::{
 /// # }
 /// ```
 ///
-/// See the [`IriRef`] type for more informations about IRI-references.
+/// See the [`IriRef`] type for more information about IRI-references.
 #[derive(Default, Clone)]
 pub struct IriRefBuf {
 	pub(crate) p: ParsedIriRef,
@@ -47,6 +47,7 @@ pub struct IriRefBuf {
 }
 
 impl IriRefBuf {
+	/// Creates a new IRI reference by parsing and copying the input buffer.
 	#[inline]
 	pub fn new<S: AsRef<[u8]> + ?Sized>(buffer: &S) -> Result<IriRefBuf, Error> {
 		Ok(IriRefBuf {
@@ -55,11 +56,43 @@ impl IriRefBuf {
 		})
 	}
 
-	/// Consume the IRI buffer and return its constituing parts:
+	/// Creates a new IRI reference by parsing and the input buffer.
+	#[inline]
+	pub fn from_vec(buffer: Vec<u8>) -> Result<IriRefBuf, (Error, Vec<u8>)> {
+		match ParsedIriRef::new(&buffer) {
+			Ok(p) => Ok(IriRefBuf { data: buffer, p }),
+			Err(e) => Err((e, buffer)),
+		}
+	}
+
+	/// Creates a new IRI reference by parsing and the input string buffer.
+	#[inline]
+	pub fn from_string(buffer: String) -> Result<IriRefBuf, (Error, String)> {
+		Self::from_vec(buffer.into_bytes()).map_err(|(e, mut vec)| unsafe {
+			let ptr = vec.as_mut_ptr();
+			let len = vec.len();
+			let capacity = vec.capacity();
+			std::mem::drop(vec);
+			(e, String::from_raw_parts(ptr, len, capacity))
+		})
+	}
+
+	/// Consume the IRI reference and return its constituting parts:
 	/// the internal buffer and parsing data.
 	#[inline]
 	pub fn into_raw_parts(self) -> (Vec<u8>, ParsedIriRef) {
 		(self.data, self.p)
+	}
+
+	/// Creates a new IRI reference using `buffer` and the parsing information `p`.
+	/// The parsing information is not checked against `buffer`.
+	///
+	/// ## Safety
+	///
+	/// The parsed data must match the given `buffer`.
+	#[inline]
+	pub unsafe fn from_raw_parts(buffer: Vec<u8>, p: ParsedIriRef) -> Self {
+		Self { data: buffer, p }
 	}
 
 	/// Consume the IRI reference and return its internal buffer.
@@ -442,6 +475,22 @@ impl PartialOrd<IriBuf> for IriRefBuf {
 	#[inline]
 	fn partial_cmp(&self, other: &IriBuf) -> Option<Ordering> {
 		self.as_iri_ref().partial_cmp(&other.as_iri_ref())
+	}
+}
+
+impl TryFrom<Vec<u8>> for IriRefBuf {
+	type Error = (Error, Vec<u8>);
+
+	fn try_from(v: Vec<u8>) -> Result<Self, Self::Error> {
+		Self::from_vec(v)
+	}
+}
+
+impl TryFrom<String> for IriRefBuf {
+	type Error = (Error, String);
+
+	fn try_from(s: String) -> Result<Self, Self::Error> {
+		Self::from_string(s)
 	}
 }
 
