@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - 2021-12-02
+## [2.1.1] - 2022-02-24
+### Fixed
+- Bug in the `parsing::utf8::tests::decode` function.
+
+## [2.1.0] - 2021-12-02 [YANKED]
 ### Added
 - `IriRefBuf::from_vec`/`from_string`.
 - `IriRefBuf::from_raw_parts`.
@@ -14,11 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Impl `TryFrom<Vec<u8>>` for `IriRefBuf` and `IriBuf`.
 - Impl `TryFrom<String>` for `IriRefBuf` and `IriBuf`.
 
-## [2.0.3] - 2021-09-09
+## [2.0.3] - 2021-09-09 [YANKED]
 ### Changed
 - Avoid unnecessary path disambiguation during IRI reference resolution.
 
-## [2.0.2] - 2021-09-09
+## [2.0.2] - 2021-09-09 [YANKED]
 ### Changed
 - Fix #13 (IRI reference resolution bug with `.` ending base IRI path).
 

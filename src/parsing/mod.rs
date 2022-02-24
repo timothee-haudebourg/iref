@@ -649,8 +649,6 @@ pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 #[inline]
 pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, Error> {
 	let mut userinfo_len = None;
-	let host_len;
-	let port_len;
 
 	let userinfo_tmp_len = parse_userinfo(buffer, i)?;
 	if let Some(('@', 1)) = get_char(buffer, i + userinfo_tmp_len)? {
@@ -658,10 +656,10 @@ pub fn parse_authority(buffer: &[u8], mut i: usize) -> Result<ParsedAuthority, E
 		i += userinfo_tmp_len + 1;
 	}
 
-	host_len = parse_host(buffer, i)?;
+	let host_len = parse_host(buffer, i)?;
 	i += host_len;
 
-	port_len = match get_char(buffer, i)? {
+	let port_len = match get_char(buffer, i)? {
 		Some((':', 1)) => {
 			i += 1;
 			Some(parse_port(buffer, i)?)
