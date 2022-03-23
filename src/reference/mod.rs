@@ -600,4 +600,14 @@ mod tests {
 			assert_eq!(input.relative_to(base), *expected)
 		}
 	}
+
+	// https://github.com/timothee-haudebourg/iref/issues/14
+	#[test]
+	fn reference_resolution_with_scheme_no_disambiguation() {
+		let base = Iri::new("scheme:a:b/").unwrap();
+		let mut iri = IriRefBuf::new("Foo").unwrap();
+		iri.resolve(base);
+
+		assert_eq!(iri.to_string(), "scheme:a:b/Foo")
+	}
 }

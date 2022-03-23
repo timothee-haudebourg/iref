@@ -338,7 +338,7 @@ impl IriRefBuf {
 				} else if self.path().is_absolute() {
 					self.path_mut().normalize();
 				} else {
-					let mut path_buffer = IriRefBuf::default();
+					let mut path_buffer = IriBuf::from_scheme(base_iri.scheme()); // we set the scheme to avoid path disambiguation.
 					path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
 					if base_iri.authority().is_some() && base_iri.path().is_empty() {
 						path_buffer.set_path("/".try_into().unwrap());
