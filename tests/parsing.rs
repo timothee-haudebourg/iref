@@ -101,3 +101,27 @@ fn invalid_hash_in_fragment2() {
 		Err(iref::Error::InvalidFragment)
 	)
 }
+
+#[test]
+fn valid_1_1_1_1a() {
+	assert_eq!(
+		Iri::new("http://1.1.1.1a").unwrap().authority().unwrap(),
+		"1.1.1.1a"
+	)
+}
+
+#[test]
+fn valid_1_1_1_1111() {
+	assert_eq!(
+		Iri::new("http://1.1.1.1111").unwrap().authority().unwrap(),
+		"1.1.1.1111"
+	)
+}
+
+#[test]
+fn valid_ipv6_1__() {
+	assert_eq!(
+		Iri::new("http://[1::]").unwrap().authority().unwrap(),
+		"[1::]"
+	)
+}

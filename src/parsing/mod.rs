@@ -457,7 +457,15 @@ fn parse_dec_octet(buffer: &[u8], i: usize) -> Result<Option<(u32, usize)>, Erro
 }
 
 /// Parse an IPv4 literal.
-fn parse_ipv4_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u32, usize)>, Error> {
+///
+/// If `host` is `true` then the successor of a `IPv4address` can be
+/// `:`, `/`, `?`, `#` or EOF.
+/// Otherwise, the successor can be ']'.
+fn parse_ipv4_literal(
+	buffer: &[u8],
+	mut i: usize,
+	host: bool,
+) -> Result<Option<(u32, usize)>, Error> {
 	let offset = i;
 	if let Some((a, olen)) = parse_dec_octet(buffer, i)? {
 		i += olen;
@@ -473,6 +481,14 @@ fn parse_ipv4_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u32, usize)
 							i += 1;
 							if let Some((d, olen)) = parse_dec_octet(buffer, i)? {
 								i += olen;
+
+								// Check the successor.
+								match get_char(buffer, i)? {
+									Some((':' | '/' | '?' | '#', 1)) | None if host => (),
+									Some((']', 1)) | None if !host => (),
+									_ => return Ok(None),
+								}
+
 								let ipv4 = (a << 24) | (b << 16) | (c << 8) | d;
 								let len = i - offset;
 								return Ok(Some((ipv4, len)));
@@ -491,103 +507,172 @@ fn parse_h16(buffer: &[u8], i: usize) -> Result<Option<(u16, usize)>, Error> {
 	let mut len = 0;
 	let mut h16 = 0;
 
-	while let Some((c, 1)) = get_char(buffer, i + len)? {
-		if let Some(d) = c.to_digit(16) {
-			h16 = (h16 << 4) | d as u16;
-			len += 1;
-			if len >= 4 {
-				break;
+	loop {
+		match get_char(buffer, i + len)? {
+			Some((':', 1)) | None if len > 0 => break Ok(Some((h16, len))),
+			Some((c, 1)) if len < 4 => {
+				if let Some(d) = c.to_digit(16) {
+					h16 = (h16 << 4) | d as u16;
+					len += 1;
+				} else {
+					break Ok(None);
+				}
 			}
-		} else {
-			break;
+			_ => break Ok(None),
 		}
 	}
-
-	Ok(Some((h16, len)))
 }
 
 /// Parse an IPv6 literal.
 /// Return the IPv6 and the string length.
+///
+/// Followed by `]`.
 fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize)>, Error> {
-	let mut lhs = 0u128;
-	let mut lhs_count = 0;
-
-	let mut lit = 0u128;
-	let mut lit_count = 0;
-
-	let mut is_lhs = true;
 	let offset = i;
 
-	loop {
-		if lhs_count + lit_count >= 8 {
-			return Ok(None);
+	let mut lhs_shift = 128;
+	let mut is_lhs = true;
+	let mut lhs = 0u128;
+	let mut rhs = 0u128;
+
+	let mut count = 0;
+
+	if let Some((':', 1)) = get_char(buffer, i)? {
+		i += 1;
+		match get_char(buffer, i)? {
+			Some((':', 1)) => (),
+			_ => return Ok(None),
 		}
+	}
 
-		if is_lhs {
-			if let Some((':', 1)) = get_char(buffer, i)? {
+	loop {
+		match get_char(buffer, i)? {
+			Some((':', 1)) if is_lhs => {
 				i += 1;
+				is_lhs = false;
+				count += 1;
 
-				if lhs_count == 0 {
-					if let Some((':', 1)) = get_char(buffer, i)? {
-						i += 1;
+				if let Some((']', 1)) | None = get_char(buffer, i)? {
+					break Ok(Some((lhs | rhs, i - offset)));
+				}
+			}
+			_ if count < 8 => match parse_h16(buffer, i)? {
+				Some((h16, len)) => {
+					i += len;
+					count += 1;
+
+					if is_lhs {
+						lhs_shift -= 16;
+						lhs |= (h16 as u128) << lhs_shift;
 					} else {
-						return Ok(None); // Invalid IPv6 (unexpected char)
+						rhs = (rhs << 16) | h16 as u128
+					}
+
+					if (!is_lhs && count <= 8) || count == 8 {
+						if let Some((']', 1)) | None = get_char(buffer, i)? {
+							break Ok(Some((lhs | rhs, i - offset)));
+						}
+					}
+
+					match get_char(buffer, i)? {
+						Some((':', 1)) if count < 8 => {
+							i += 1;
+						}
+						_ => break Ok(None),
 					}
 				}
+				None => {
+					if count <= 6 {
+						match parse_ipv4_literal(buffer, i, false)? {
+							Some((ipv4, len)) => {
+								i += len;
 
-				lhs = lit;
-				lhs_count += lit_count;
+								if is_lhs {
+									debug_assert_eq!(lhs_shift, 32);
+									lhs |= ipv4 as u128;
+								} else {
+									rhs = (rhs << 32) | ipv4 as u128
+								}
 
-				is_lhs = false;
-
-				lit = 0;
-				lit_count = 1;
-				continue;
-			}
-		}
-
-		if lhs_count + lit_count <= 6 {
-			if let Some((ipv4, len)) = parse_ipv4_literal(buffer, i)? {
-				lit = (lit << 32) | ipv4 as u128;
-				// lit_count += 2;
-				i += len;
-				break;
-			}
-		}
-
-		if let Some((n, len)) = parse_h16(buffer, i)? {
-			lit = (lit << 16) | n as u128;
-			lit_count += 1;
-			i += len;
-
-			match get_char(buffer, i)? {
-				Some((']', 1)) => break,
-				Some((':', 1)) => i += 1,
-				_ => {
-					return Ok(None); // Invalid IPv6 (unexpected char)
+								if let Some((']', 1)) | None = get_char(buffer, i)? {
+									break Ok(Some((lhs | rhs, i - offset)));
+								}
+							}
+							None => break Ok(None),
+						}
+					} else {
+						break Ok(None);
+					}
 				}
-			}
-		} else {
-			return Ok(None); // Invalid IPv6 (unexpected char)
+			},
+			_ => break Ok(None),
 		}
 	}
-
-	if lhs_count > 0 {
-		lit |= lhs << (16 * (8 - lhs_count));
-	}
-
-	let len = i - offset;
-	Ok(Some((lit, len)))
 }
 
+/// Parse an IPvFuture literal.
+///
+/// ```abnf
+/// IPvFuture  = "v" 1*HEXDIG "." 1*( unreserved / sub-delims / ":" )
+/// ```
+///
+/// Followed by `]`.
+/// Returns the string length.
+fn parse_ipvfuture_literal(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
+	let offset = i;
+	if let Some(('v', 1)) = get_char(buffer, i)? {
+		i += 1;
+		if is_hex_digit(buffer, i)? {
+			i += 1;
+			while is_hex_digit(buffer, i)? {
+				i += 1
+			}
+
+			if let Some(('.', 1)) = get_char(buffer, i)? {
+				i += 1;
+
+				match get_char(buffer, i)? {
+					Some((c, len)) if c == ':' || is_unreserved(c) || is_subdelim(c) => {
+						i += len;
+
+						loop {
+							match get_char(buffer, i)? {
+								Some((']', 1)) | None => {
+									let len = i - offset;
+									return Ok(Some(len));
+								}
+								Some((c, len))
+									if c == ':' || is_unreserved(c) || is_subdelim(c) =>
+								{
+									i += len;
+								}
+								_ => break,
+							}
+						}
+					}
+					_ => (),
+				}
+			}
+		}
+	}
+
+	Ok(None)
+}
+
+/// Parse a the `IP-literal` grammar rule:
+/// ```abnf
+/// IP-literal = "[" ( IPv6address / IPvFuture  ) "]"
+/// ```
 fn parse_ip_literal(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error> {
 	let offset = i;
 	if let Some(('[', 1)) = get_char(buffer, i)? {
 		i += 1;
 		if let Some((_, l)) = parse_ipv6_literal(buffer, i)? {
 			i += l;
+		} else if let Some(l) = parse_ipvfuture_literal(buffer, i)? {
+			i += l;
 		} else {
-			return Ok(None); // TODO Ipv future
+			return Ok(None);
 		}
 
 		if let Some((']', 1)) = get_char(buffer, i)? {
@@ -600,6 +685,11 @@ fn parse_ip_literal(buffer: &[u8], mut i: usize) -> Result<Option<usize>, Error>
 	Ok(None)
 }
 
+/// Parse a `reg-name`.
+///
+/// ```abnf
+/// reg-name = *( unreserved / pct-encoded / sub-delims )
+/// ```
 fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 	loop {
@@ -619,11 +709,17 @@ fn parse_ireg_name(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	Ok(i - offset)
 }
 
+/// Parse a the `host` grammar rule:
+/// ```abnf
+/// host = IP-literal / IPv4address / reg-name
+/// ```
+///
+/// The successor of a `host` can be `:`, `/`, `?`, `#` or EOF.
 #[inline]
 pub fn parse_host(buffer: &[u8], i: usize) -> Result<usize, Error> {
 	if let Some(len) = parse_ip_literal(buffer, i)? {
 		Ok(len)
-	} else if let Some((_, len)) = parse_ipv4_literal(buffer, i)? {
+	} else if let Some((_, len)) = parse_ipv4_literal(buffer, i, true)? {
 		Ok(len)
 	} else {
 		parse_ireg_name(buffer, i)
@@ -724,4 +820,97 @@ pub fn parse_path_segment(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	}
 
 	Ok(i - start)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn ipv6_rule1_1() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001:0db8:0000:0000:0000:ff00:0042:8329", 0).unwrap(),
+			Some((0x2001_0db8_0000_0000_0000_ff00_0042_8329, 39))
+		);
+	}
+
+	#[test]
+	fn ipv6_rule1_2() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001:0db8:0000:0000:0000:ff00:0.66.131.41", 0).unwrap(),
+			Some((0x2001_0db8_0000_0000_0000_ff00_0042_8329, 41))
+		);
+	}
+
+	#[test]
+	fn ipv6_rule2_1() {
+		assert_eq!(
+			parse_ipv6_literal(b"::0db8:0000:0000:0000:ff00:0042:8329", 0).unwrap(),
+			Some((0x0000_0db8_0000_0000_0000_ff00_0042_8329, 36))
+		);
+	}
+
+	#[test]
+	fn ipv6_rule2_2() {
+		assert_eq!(
+			parse_ipv6_literal(b"::0db8:0000:0000:0000:ff00:0.66.131.41", 0).unwrap(),
+			Some((0x0000_0db8_0000_0000_0000_ff00_0042_8329, 38))
+		);
+	}
+
+	#[test]
+	fn ipv6_rule3_1() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001::0000:0000:0000:ff00:0042:8329", 0).unwrap(),
+			Some((0x2001_0000_0000_0000_0000_ff00_0042_8329, 35))
+		);
+	}
+
+	#[test]
+	fn ipv6_rule3_2() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001::0000:0000:0000:ff00:0042:8329", 0).unwrap(),
+			Some((0x2001_0000_0000_0000_0000_ff00_0042_8329, 35))
+		);
+	}
+
+	#[test]
+	fn ipv6_rule4_1() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001::0000:0000:ff00:0042:8329", 0).unwrap(),
+			Some((0x2001_0000_0000_0000_0000_ff00_0042_8329, 30))
+		);
+	}
+
+	#[test]
+	fn ipv6_rule8_1() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001:0db8:0000:0000:0000:ff00::8329", 0).unwrap(),
+			Some((0x2001_0db8_0000_0000_0000_ff00_0000_8329, 35))
+		);
+	}
+
+	#[test]
+	fn ipv6_invalid1() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001:0db8:0000:0000:0000:ff00:0042:8329:", 0).unwrap(),
+			None
+		);
+	}
+
+	#[test]
+	fn ipv6_invalid2() {
+		assert_eq!(
+			parse_ipv6_literal(b"2001:0db8:0000:0000:0000:ff00:0042:8329:ffff", 0).unwrap(),
+			None
+		);
+	}
+
+	#[test]
+	fn ipvfuture_1() {
+		assert_eq!(
+			parse_ipvfuture_literal(b"v1234.abcdef:ghij:klmno:pqrst", 0).unwrap(),
+			Some(29)
+		);
+	}
 }
