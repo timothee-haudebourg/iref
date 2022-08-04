@@ -1,4 +1,5 @@
 use std::{
+	borrow::Borrow,
 	cmp::{Ord, Ordering, PartialOrd},
 	convert::TryFrom,
 	fmt,
@@ -327,5 +328,33 @@ impl Hash for IriBuf {
 	#[inline]
 	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.as_iri_ref().hash(hasher)
+	}
+}
+
+impl AsRef<str> for IriBuf {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl AsRef<[u8]> for IriBuf {
+	#[inline(always)]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl Borrow<str> for IriBuf {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl Borrow<[u8]> for IriBuf {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }

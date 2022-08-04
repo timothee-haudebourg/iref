@@ -1,5 +1,6 @@
 use super::Error;
 use crate::parsing;
+use std::borrow::Borrow;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -7,7 +8,7 @@ use std::{cmp, fmt};
 
 #[derive(Clone, Copy)]
 pub struct Port<'a> {
-	/// The path slice.
+	/// The Port slice.
 	pub(crate) data: &'a [u8],
 }
 
@@ -31,9 +32,30 @@ impl<'a> Port<'a> {
 	}
 }
 
+impl<'a> AsRef<str> for Port<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
 impl<'a> AsRef<[u8]> for Port<'a> {
-	#[inline]
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<'a> Borrow<str> for Port<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> Borrow<[u8]> for Port<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }

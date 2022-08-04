@@ -329,7 +329,7 @@ fn is_subdelim(c: char) -> bool {
 
 fn is_hex_digit(buffer: &[u8], i: usize) -> Result<bool, Error> {
 	match get_char(buffer, i)? {
-		Some((c, 1)) => Ok(c.is_digit(16)),
+		Some((c, 1)) => Ok(c.is_ascii_hexdigit()),
 		_ => Ok(false),
 	}
 }
@@ -509,7 +509,7 @@ fn parse_h16(buffer: &[u8], i: usize) -> Result<Option<(u16, usize)>, Error> {
 
 	loop {
 		match get_char(buffer, i + len)? {
-			Some((':', 1)) | None if len > 0 => break Ok(Some((h16, len))),
+			Some((':' | ']', 1)) | None if len > 0 => break Ok(Some((h16, len))),
 			Some((c, 1)) if len < 4 => {
 				if let Some(d) = c.to_digit(16) {
 					h16 = (h16 << 4) | d as u16;
@@ -731,7 +731,7 @@ pub fn parse_port(buffer: &[u8], mut i: usize) -> Result<usize, Error> {
 	let offset = i;
 
 	while let Some((c, 1)) = get_char(buffer, i)? {
-		if c.is_digit(10) {
+		if c.is_ascii_digit() {
 			i += 1
 		} else {
 			break;

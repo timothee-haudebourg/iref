@@ -10,6 +10,7 @@ mod segment;
 mod userinfo;
 
 use crate::{IriRef, IriRefBuf};
+use std::borrow::Borrow;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
@@ -357,5 +358,33 @@ impl<'a, T: AsIriRef> AsIriRef for &'a T {
 	#[inline]
 	fn as_iri_ref(&self) -> IriRef {
 		(*self).as_iri_ref()
+	}
+}
+
+impl<'a> AsRef<str> for Iri<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> AsRef<[u8]> for Iri<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<'a> Borrow<str> for Iri<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> Borrow<[u8]> for Iri<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
+		self.as_bytes()
 	}
 }

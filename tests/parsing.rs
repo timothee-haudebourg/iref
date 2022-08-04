@@ -103,7 +103,7 @@ fn invalid_hash_in_fragment2() {
 }
 
 #[test]
-fn valid_1_1_1_1a() {
+fn valid_ipv6_1() {
 	assert_eq!(
 		Iri::new("http://1.1.1.1a").unwrap().authority().unwrap(),
 		"1.1.1.1a"
@@ -111,7 +111,7 @@ fn valid_1_1_1_1a() {
 }
 
 #[test]
-fn valid_1_1_1_1111() {
+fn valid_ipv6_2() {
 	assert_eq!(
 		Iri::new("http://1.1.1.1111").unwrap().authority().unwrap(),
 		"1.1.1.1111"
@@ -119,9 +119,25 @@ fn valid_1_1_1_1111() {
 }
 
 #[test]
-fn valid_ipv6_1__() {
+fn valid_ipv6_3() {
 	assert_eq!(
 		Iri::new("http://[1::]").unwrap().authority().unwrap(),
 		"[1::]"
+	)
+}
+
+#[test]
+fn valid_ipv6_4() {
+	assert_eq!(
+		Iri::new("http://[::1]").unwrap().authority().unwrap(),
+		"[::1]"
+	)
+}
+
+#[test]
+fn valid_ipv6_5() {
+	assert_eq!(
+		Iri::new("http://[1::1]").unwrap().authority().unwrap(),
+		"[1::1]"
 	)
 }

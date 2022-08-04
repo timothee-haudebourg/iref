@@ -1,6 +1,7 @@
 use super::Error;
 use crate::parsing;
 use pct_str::PctStr;
+use std::borrow::Borrow;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -38,9 +39,30 @@ impl<'a> Fragment<'a> {
 	}
 }
 
+impl<'a> AsRef<str> for Fragment<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
 impl<'a> AsRef<[u8]> for Fragment<'a> {
-	#[inline]
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<'a> Borrow<str> for Fragment<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> Borrow<[u8]> for Fragment<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }

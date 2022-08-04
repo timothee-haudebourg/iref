@@ -2,6 +2,7 @@ use super::{Error, Segment};
 use crate::{parsing, AsIriRef, IriRef, IriRefBuf};
 use pct_str::PctStr;
 use smallvec::SmallVec;
+use std::borrow::Borrow;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -314,9 +315,30 @@ impl<'a> Path<'a> {
 	}
 }
 
+impl<'a> AsRef<str> for Path<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
 impl<'a> AsRef<[u8]> for Path<'a> {
-	#[inline]
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<'a> Borrow<str> for Path<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> Borrow<[u8]> for Path<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }
@@ -563,11 +585,17 @@ pub struct PathMut<'a> {
 }
 
 impl<'a> PathMut<'a> {
+	/// Returns a reference to the string representation of the path.
+	#[inline(always)]
+	pub fn as_str(&self) -> &str {
+		unsafe { std::str::from_utf8_unchecked(self.as_bytes()) }
+	}
+
 	/// Returns a reference to the bytes representation of the path.
 	#[inline]
 	pub fn as_bytes(&self) -> &[u8] {
 		let offset = self.buffer.p.path_offset();
-		let len = self.buffer.path().as_ref().len();
+		let len = self.buffer.path().as_bytes().len();
 		&self.buffer.data[offset..(offset + len)]
 	}
 
@@ -652,7 +680,7 @@ impl<'a> PathMut<'a> {
 				|| (self.is_relative()
 					&& self.buffer.scheme().is_none()
 					&& self.buffer.authority().is_none()
-					&& first.as_ref().contains(&b':'))
+					&& first.as_bytes().contains(&b':'))
 			{
 				// add `./` at the begining.
 				let mut offset = self.buffer.p.path_offset();
@@ -692,7 +720,7 @@ impl<'a> PathMut<'a> {
 				&& self.is_empty()
 				&& self.buffer.scheme().is_none()
 				&& self.buffer.authority().is_none()
-				&& segment.as_ref().contains(&b':')
+				&& segment.as_bytes().contains(&b':')
 			{
 				self.push(Segment::current())
 			}
@@ -741,7 +769,7 @@ impl<'a> PathMut<'a> {
 	#[inline]
 	pub fn clear(&mut self) {
 		let mut offset = self.buffer.p.path_offset();
-		let mut len = self.as_ref().len();
+		let mut len = self.as_bytes().len();
 
 		if self.is_absolute() {
 			offset += 1;
@@ -789,9 +817,30 @@ impl<'a> PathMut<'a> {
 	}
 }
 
+impl<'a> AsRef<str> for PathMut<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
 impl<'a> AsRef<[u8]> for PathMut<'a> {
-	#[inline]
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<'a> Borrow<str> for PathMut<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> Borrow<[u8]> for PathMut<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }
@@ -879,9 +928,30 @@ impl Default for PathBuf {
 	}
 }
 
-impl<'a> AsRef<[u8]> for PathBuf {
-	#[inline]
+impl AsRef<str> for PathBuf {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl AsRef<[u8]> for PathBuf {
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl Borrow<str> for PathBuf {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl Borrow<[u8]> for PathBuf {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }
@@ -891,7 +961,7 @@ impl<'a> From<Path<'a>> for PathBuf {
 	fn from(path: Path<'a>) -> PathBuf {
 		let mut buf = PathBuf::new();
 		buf.data.replace(0..0, path.as_ref());
-		buf.data.p.path_len = path.as_ref().len();
+		buf.data.p.path_len = path.as_bytes().len();
 		buf
 	}
 }

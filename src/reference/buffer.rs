@@ -1,4 +1,5 @@
 use std::{
+	borrow::Borrow,
 	cmp::{Ord, Ordering, PartialOrd},
 	convert::{TryFrom, TryInto},
 	fmt,
@@ -163,7 +164,7 @@ impl IriRefBuf {
 				self.replace(0..0, new_scheme.as_ref());
 			}
 
-			self.p.scheme_len = Some(new_scheme.as_ref().len());
+			self.p.scheme_len = Some(new_scheme.as_bytes().len());
 		} else {
 			if let Some(scheme_len) = self.p.scheme_len {
 				self.replace(0..(scheme_len + 1), &[]);
@@ -245,7 +246,7 @@ impl IriRefBuf {
 	pub fn set_path(&mut self, path: Path) {
 		let offset = self.p.path_offset();
 		self.replace(offset..(offset + self.p.path_len), path.as_ref());
-		self.p.path_len = path.as_ref().len()
+		self.p.path_len = path.as_bytes().len()
 	}
 
 	#[inline]
@@ -272,7 +273,7 @@ impl IriRefBuf {
 				self.replace((offset + 1)..(offset + 1), new_query.as_ref());
 			}
 
-			self.p.query_len = Some(new_query.as_ref().len());
+			self.p.query_len = Some(new_query.as_bytes().len());
 		} else {
 			if let Some(query_len) = self.p.query_len {
 				self.replace((offset - 1)..(offset + query_len), &[]);
@@ -305,7 +306,7 @@ impl IriRefBuf {
 				self.replace((offset + 1)..(offset + 1), new_fragment.as_ref());
 			}
 
-			self.p.fragment_len = Some(new_fragment.as_ref().len());
+			self.p.fragment_len = Some(new_fragment.as_bytes().len());
 		} else {
 			if let Some(fragment_len) = self.p.fragment_len {
 				self.replace((offset - 1)..(offset + fragment_len), &[]);
@@ -363,9 +364,30 @@ impl IriRefBuf {
 	}
 }
 
+impl AsRef<str> for IriRefBuf {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
 impl AsRef<[u8]> for IriRefBuf {
-	#[inline]
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl Borrow<str> for IriRefBuf {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl Borrow<[u8]> for IriRefBuf {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }
@@ -498,7 +520,7 @@ impl<'a> From<IriRef<'a>> for IriRefBuf {
 	#[inline]
 	fn from(iri_ref: IriRef<'a>) -> IriRefBuf {
 		let mut data = Vec::new();
-		data.resize(iri_ref.as_ref().len(), 0);
+		data.resize(iri_ref.as_bytes().len(), 0);
 		data.copy_from_slice(iri_ref.as_ref());
 
 		IriRefBuf { p: iri_ref.p, data }

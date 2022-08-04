@@ -1,6 +1,7 @@
 use super::Error;
 use crate::parsing;
 use pct_str::PctStr;
+use std::borrow::Borrow;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -8,7 +9,7 @@ use std::{cmp, fmt};
 
 #[derive(Clone, Copy)]
 pub struct Segment<'a> {
-	/// The path segment slice.
+	/// The Segment segment slice.
 	pub(crate) data: &'a [u8],
 
 	pub(crate) open: bool,
@@ -33,7 +34,7 @@ impl<'a> Segment<'a> {
 		}
 	}
 
-	/// Get the length of the path name.
+	/// Get the length of the Segment name.
 	#[inline]
 	pub fn len(&self) -> usize {
 		self.data.len()
@@ -74,16 +75,37 @@ impl<'a> Segment<'a> {
 		self.data.is_empty()
 	}
 
-	/// Open that path.
+	/// Open that Segment.
 	#[inline]
 	pub fn open(&mut self) {
 		self.open = true
 	}
 }
 
+impl<'a> AsRef<str> for Segment<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
 impl<'a> AsRef<[u8]> for Segment<'a> {
-	#[inline]
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<'a> Borrow<str> for Segment<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> Borrow<[u8]> for Segment<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }

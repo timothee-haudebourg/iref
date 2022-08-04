@@ -1,4 +1,5 @@
 use pct_str::PctStr;
+use std::borrow::Borrow;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -81,9 +82,30 @@ impl<'a> Authority<'a> {
 	}
 }
 
+impl<'a> AsRef<str> for Authority<'a> {
+	#[inline(always)]
+	fn as_ref(&self) -> &str {
+		self.as_str()
+	}
+}
+
 impl<'a> AsRef<[u8]> for Authority<'a> {
-	#[inline]
+	#[inline(always)]
 	fn as_ref(&self) -> &[u8] {
+		self.as_bytes()
+	}
+}
+
+impl<'a> Borrow<str> for Authority<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &str {
+		self.as_str()
+	}
+}
+
+impl<'a> Borrow<[u8]> for Authority<'a> {
+	#[inline(always)]
+	fn borrow(&self) -> &[u8] {
 		self.as_bytes()
 	}
 }
@@ -235,7 +257,7 @@ impl<'a> AuthorityMut<'a> {
 	pub fn set_host(&mut self, host: Host) {
 		let offset = self.offset + self.p.host_offset();
 		self.replace(offset..(offset + self.p.host_len), host.as_ref());
-		self.p.host_len = host.as_ref().len();
+		self.p.host_len = host.as_bytes().len();
 	}
 
 	#[inline]
@@ -262,7 +284,7 @@ impl<'a> AuthorityMut<'a> {
 				self.replace((offset + 1)..(offset + 1), new_port.as_ref());
 			}
 
-			self.p.port_len = Some(new_port.as_ref().len());
+			self.p.port_len = Some(new_port.as_bytes().len());
 		} else {
 			if let Some(port_len) = self.p.port_len {
 				self.replace((offset - 1)..(offset + port_len), &[]);
