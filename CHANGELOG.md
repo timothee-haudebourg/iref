@@ -5,8 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2022-12-20
+### Added
+- `IriRefBuf::into_string`, `IriBuf::into_bytes`, `IriBuf::into_string`.
+
 ## [2.2.1] - 2022-12-20
-- Add `serde` support for `Iri`, `IriRef`, `IriBuf` and `IriRefBuf` with the
+### Added
+- `serde` support for `Iri`, `IriRef`, `IriBuf` and `IriRefBuf` with the
   `serde` feature.
 
 ## [2.1.3] - 2022-04-16

@@ -102,6 +102,12 @@ impl IriRefBuf {
 		self.data
 	}
 
+	/// Consume the IRI reference and return its internal buffer as a string.
+	#[inline]
+	pub fn into_string(self) -> String {
+		unsafe { String::from_utf8_unchecked(self.data) }
+	}
+
 	#[inline]
 	pub fn as_iri_ref(&self) -> IriRef {
 		IriRef {

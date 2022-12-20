@@ -68,6 +68,18 @@ impl IriBuf {
 		self.0.into_raw_parts()
 	}
 
+	/// Consume the IRI and return its internal buffer.
+	#[inline]
+	pub fn into_bytes(self) -> Vec<u8> {
+		self.0.into_bytes()
+	}
+
+	/// Consume the IRI and return its internal buffer as a string.
+	#[inline]
+	pub fn into_string(self) -> String {
+		self.0.into_string()
+	}
+
 	/// Creates a new IRI using `buffer` and the parsing information `p`.
 	/// The parsing information is not checked against `buffer`.
 	///
