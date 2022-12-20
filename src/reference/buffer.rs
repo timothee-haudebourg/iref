@@ -576,6 +576,70 @@ impl Hash for IriRefBuf {
 	}
 }
 
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for IriRefBuf {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		struct Visitor;
+
+		impl<'de> serde::de::Visitor<'de> for Visitor {
+			type Value = IriRefBuf;
+
+			fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+				write!(formatter, "an IRI")
+			}
+
+			fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+			where
+				E: serde::de::Error,
+			{
+				IriRefBuf::new(v)
+					.map_err(|_| E::invalid_value(serde::de::Unexpected::Bytes(v), &self))
+			}
+
+			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+			where
+				E: serde::de::Error,
+			{
+				IriRefBuf::from_str(v)
+					.map_err(|_| E::invalid_value(serde::de::Unexpected::Str(v), &self))
+			}
+
+			fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+			where
+				E: serde::de::Error,
+			{
+				IriRefBuf::from_vec(v).map_err(|(_, b)| {
+					E::invalid_value(serde::de::Unexpected::Bytes(b.as_slice()), &self)
+				})
+			}
+
+			fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+			where
+				E: serde::de::Error,
+			{
+				IriRefBuf::from_string(v).map_err(|(_, s)| {
+					E::invalid_value(serde::de::Unexpected::Str(s.as_str()), &self)
+				})
+			}
+		}
+
+		deserializer.deserialize_string(Visitor)
+	}
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for IriRefBuf {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		serializer.serialize_str(self.as_str())
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::{Iri, IriRef, IriRefBuf};
