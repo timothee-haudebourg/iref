@@ -1,10 +1,11 @@
 # Internationalized Resource Identifiers and References
 
-<table><tr>
-	<td><a href="https://docs.rs/iref">Documentation</a></td>
-	<td><a href="https://crates.io/crates/iref">Crate informations</a></td>
-	<td><a href="https://github.com/timothee-haudebourg/iref">Repository</a></td>
-</tr></table>
+[![CI](https://github.com/timothee-haudebourg/iref/workflows/Continuous%20Integration/badge.svg)](https://github.com/timothee-haudebourg/iref/actions)
+[![Crate informations](https://img.shields.io/crates/v/iref.svg?style=flat-square)](https://crates.io/crates/iref)
+[![License](https://img.shields.io/crates/l/iref.svg?style=flat-square)](https://github.com/timothee-haudebourg/iref#license)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/iref)
+
+<!-- cargo-rdme start -->
 
 This crates gives an implementation of
 [Internationalized Resource Identifiers (IRIs)](https://en.wikipedia.org/wiki/Internationalized_resource_identifier) and IRI references following
@@ -18,7 +19,7 @@ used to uniquely identify objects across the web.
 An IRI is defined as a sequence of characters with distinguishable components:
 a scheme, an authority, a path, a query and a fragment.
 
-```
+```text
     foo://example.com:8042/over/there?name=ferret#nose
     \_/   \______________/\_________/ \_________/ \__/
      |           |            |            |        |
@@ -28,8 +29,18 @@ a scheme, an authority, a path, a query and a fragment.
 This crate provides the four types `Iri`, `IriBuf`, `IriRef` and `IriRefBuf`
 to manipulate byte/string slices and buffers as IRIs and IRI references.
 Theses allows the easy access and manipulation of every components.
+It features:
+  - borrowed and owned IRIs and IRI-reference;
+  - mutable IRI buffers (in-place);
+  - path normalization;
+  - comparison modulo normalization;
+  - IRI-reference resolution;
+  - static IRI parsing with the [`static-iref`] crate and its `iri` macro; and
+  - `serde` support (by enabling the `serde` feature).
 
-## Basic usage
+[`static-iref`]: https://crates.io/crates/static-iref
+
+### Basic usage
 
 You can parse IRI strings by wrapping an `Iri` instance around a `str` slice.
 Note that no memory allocation occurs using `Iri`, it only borrows the input data.
@@ -73,24 +84,9 @@ assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
 
 The `try_into` method is used to ensure that each string is syntactically correct with regard to its corresponding component (for instance, it is not possible to replace `"query"` with `"query?"` since `?` is not a valid query character).
 
-The [`static-iri`](https://docs.rs/static-iref) crate provides two macros,
-`iri!` and `iref!`, to build IRIs and IRI references with a `'static` lifetime
-at compile time.
+### Detailed Usage
 
-```rust
-extern crate iref;
-#[macro_use]
-extern crate static_iref;
-
-use iref::{Iri, IriRef};
-
-const IRI: Iri<'static> = iri!("https://www.rust-lang.org/foo/bar#frag");
-const IREF: IriRef<'static> = iref!("/foo/bar#frag");
-```
-
-## Detailed usage
-
-### Path manipulation
+#### Path manipulation
 
 The IRI path is accessed through the `path` or `path_mut` methods.
 It is possible to access the segments of a path using the iterator returned by the `segments` method.
@@ -106,17 +102,17 @@ version of the path where dot segments (`.` and `..`) are removed.
 In addition, it is possible to push or pop segments to a path using the
 corresponding methods:
 ```rust
-let mut iri = IriBuf::new("https://rust-lang.org/a/c");
+let mut iri = IriBuf::new("https://rust-lang.org/a/c")?;
 let mut path = iri.path_mut();
 
 path.pop();
 path.push("b".try_into()?);
 path.push("c/".try_into()?); // a `/` character is allowed at the end of a segment.
 
-assert_eq!(iri.path(), "/a/b/c/")
+assert_eq!(iri.path(), "/a/b/c/");
 ```
 
-### IRI references
+#### IRI references
 
 This crate provides the two types `IriRef` and `IriRefBuf` to represent
 IRI references. An IRI reference is either an IRI or a relative IRI.
@@ -156,11 +152,11 @@ abnormal use of dot segments in relative paths.
 This means that for instance, the path `a/b/../../../` is normalized into
 `../`.
 
-### IRI comparison
+#### IRI comparison
 
 Here are the features of the IRI comparison method implemented in this crate.
 
-#### Protocol agnostic
+##### Protocol agnostic
 
 This implementation does not know anything about existing protocols.
 For instance, even if the
@@ -168,11 +164,11 @@ For instance, even if the
 defines `80` as the default port,
 the two IRIs `http://example.org` and `http://example.org:80` are **not** equivalent.
 
-#### Every `/` counts
+##### Every `/` counts
 
 The path `/foo/bar` is **not** equivalent to `/foo/bar/`.
 
-#### Path normalization
+##### Path normalization
 
 Paths are normalized during comparison by removing dot segments (`.` and `..`).
 This means for instance that the paths `a/b/c` and `a/../a/./b/../b/c` **are**
@@ -183,11 +179,13 @@ abnormal use of dot segments in relative paths.
 This means that for instance, the IRI `http:a/b/../../../` is equivalent to
 `http:../` and **not** `http:`.
 
-#### Percent-encoded characters
+##### Percent-encoded characters
 
 Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 percent encoded characters are correctly handled.
 The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
+
+<!-- cargo-rdme end -->
 
 ## What is missing
 

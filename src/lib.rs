@@ -20,6 +20,16 @@
 //! This crate provides the four types `Iri`, `IriBuf`, `IriRef` and `IriRefBuf`
 //! to manipulate byte/string slices and buffers as IRIs and IRI references.
 //! Theses allows the easy access and manipulation of every components.
+//! It features:
+//!   - borrowed and owned IRIs and IRI-reference;
+//!   - mutable IRI buffers (in-place);
+//!   - path normalization;
+//!   - comparison modulo normalization;
+//!   - IRI-reference resolution;
+//!   - static IRI parsing with the [`static-iref`] crate and its `iri` macro; and
+//!   - `serde` support (by enabling the `serde` feature).
+//!
+//! [`static-iref`]: https://crates.io/crates/static-iref
 //!
 //! ## Basic usage
 //!
