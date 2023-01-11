@@ -575,6 +575,27 @@ impl<'a> Hash for IriRef<'a> {
 	}
 }
 
+#[cfg(feature = "hashbrown")]
+impl<'a> hashbrown::Equivalent<IriRefBuf> for IriRef<'a> {
+	fn equivalent(&self, key: &IriRefBuf) -> bool {
+		*self == *key
+	}
+}
+
+#[cfg(feature = "hashbrown")]
+impl<'a> hashbrown::Equivalent<IriBuf> for IriRef<'a> {
+	fn equivalent(&self, key: &IriBuf) -> bool {
+		*self == *key
+	}
+}
+
+#[cfg(feature = "hashbrown")]
+impl<'a, 'b> hashbrown::Equivalent<Iri<'b>> for IriRef<'a> {
+	fn equivalent(&self, key: &Iri<'b>) -> bool {
+		*self == *key
+	}
+}
+
 #[cfg(feature = "serde")]
 impl<'de: 'a, 'a> serde::Deserialize<'de> for IriRef<'a> {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

@@ -319,6 +319,27 @@ impl<'a> Hash for Iri<'a> {
 	}
 }
 
+#[cfg(feature = "hashbrown")]
+impl<'a> hashbrown::Equivalent<IriRefBuf> for Iri<'a> {
+	fn equivalent(&self, key: &IriRefBuf) -> bool {
+		*self == *key
+	}
+}
+
+#[cfg(feature = "hashbrown")]
+impl<'a> hashbrown::Equivalent<IriBuf> for Iri<'a> {
+	fn equivalent(&self, key: &IriBuf) -> bool {
+		*self == *key
+	}
+}
+
+#[cfg(feature = "hashbrown")]
+impl<'a, 'b> hashbrown::Equivalent<IriRef<'b>> for Iri<'a> {
+	fn equivalent(&self, key: &IriRef<'b>) -> bool {
+		*self == *key
+	}
+}
+
 impl<'a> AsIri for Iri<'a> {
 	#[inline]
 	fn as_iri(&self) -> Iri {
