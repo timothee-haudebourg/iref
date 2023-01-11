@@ -6,106 +6,192 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.2.2] - 2022-12-20
+
 ### Added
-- `IriRefBuf::into_string`, `IriBuf::into_bytes`, `IriBuf::into_string`.
+
+- [88f65d9] Add `into_string` functions.
 
 ## [2.2.1] - 2022-12-20
-### Added
-- `serde` support for `Iri`, `IriRef`, `IriBuf` and `IriRefBuf` with the
-  `serde` feature.
 
-## [2.1.3] - 2022-04-16
+### Added
+
+- [5bb37c8] Add missing `AsRef` & `Borrow` implementations.
+- [4265293] Add `serde` support.
+
+### Changed
+
+- [dcf2dd0] Move to version 2.2.1.
+
 ### Fixed
-- Bug in the IPv4/v6 parser.
 
-### Added
-- Support for IPvFuture.
+- [fdd4855] Fix #15 IPv4/6 parser bug.
+
+## [2.1.2] - 2022-03-23
+
+### Fixed
+
+- [b076269] Fix IRI reference resolution. Fixes #14
 
 ## [2.1.1] - 2022-02-24
+
 ### Fixed
-- Bug in the `parsing::utf8::tests::decode` function.
 
-## [2.1.0] - 2021-12-02 [YANKED]
-### Added
-- `IriRefBuf::from_vec`/`from_string`.
-- `IriRefBuf::from_raw_parts`.
-- `IriBuf::from_vec`/`from_string`.
-- `IriBuf::into_raw_parts`/`from_raw_parts`.
-- Impl `TryFrom<Vec<u8>>` for `IriRefBuf` and `IriBuf`.
-- Impl `TryFrom<String>` for `IriRefBuf` and `IriBuf`.
+- [8f51470] Fix UTF-8 decoder bug.
 
-## [2.0.3] - 2021-09-09 [YANKED]
-### Changed
-- Avoid unnecessary path disambiguation during IRI reference resolution.
-
-## [2.0.2] - 2021-09-09 [YANKED]
-### Changed
-- Fix #13 (IRI reference resolution bug with `.` ending base IRI path).
-
-## [2.0.1] - 2021-09-02 [YANKED]
-### Yanking reason
-- Found a bug in the IRI reference resolution algorithm. See #13.
-
-### Changed
-- Fix `set_query` bug that used the `:` character instead of `?`.
-
-## [2.0.0] - 2021-09-02 [YANKED]
-### Yanking reason
-- Found a bug in the `set_query` function that uses the `:` character
-  instead of `?` to prefix the query. Introduced by #11.
-
-### Changed
-- Fix #12 by checking that the entire input buffer has been parsed.
-- Rename all inherent `as_ref` methods into `as_bytes`
-  for `Iri`, `IriRef`, `Authority`, `Fragment`, `Host`,
-  `Path`, `Port`, `Query`, `Scheme`, `Segment` and `UserInfo`.
-- Rename `IriRef::into_ref` and `Path::into_ref` into `into_bytes`.
-- No more clippy warnings!
+## [2.1.0] - 2021-12-02
 
 ### Added
-- Proper `AsRef<[u8]>` impl for `IriRef`, `Authority`,
-  `Fragment`, `Host`, `Path`, `Port`, `Query`, `Scheme`,
-  `Segment` and `UserInfo`.
 
-## [1.4.3] - 2020-10-16
+- [8d80e7e] Add from_vec/string and from/to raw parts.
+
 ### Changed
-- Fixed corner case `IriRef::relative_to`
 
-## [1.4.2] - 2020-10-15
+- [2a1df9e] Move to version 2.0.3.
+
+## [2.0.2] - 2021-09-09
+
+### Changed
+
+- [deed1ca] Move to 2.0.2.
+
+### Fixed
+
+- [8e97fa5] Fix #13
+
+## [2.0.1] - 2021-09-02
+
+### Changed
+
+- [de909f9] Move to 2.0.1
+
+### Fixed
+
+- [f345670] Fix `set_query` bug.
+- [4c00407] Fix rust fmt.
+
+## [2.0.0] - 2021-09-02
+
 ### Added
-- Actual test for `IriRef::relative_to`
+
+- [4846893] impl AsIri/Ref for &'a T.
+- [fd6554b] Add CI to run test, rustfmt and clippy on push/PR
+- [56f18b0] Add CI to run test, rustfmt and clippy on push/PR
+- [350ae25] Add from_str and to_owned methods
+- [538fc8a] Add from_str and to_owned methods
+- [7a43a39] Impl `Eq` for `Error`.
+- [a3e8e33] Add tests for fragment parsing issue.
 
 ### Changed
-- Fixed `IriRef::relative_to`
 
-## [1.4.1] - 2020-10-15
-### Added
-- `IriRef::base`
-- `Path::len` and `Path::closed_len`
+- [63cbec1] Move to 1.4.0
+- [cabafde] Move to 2.0.0
 
-### Changed
-- Fixed `IriRef::relative_to`
+### Fixed
 
-## [1.4.0] - 2020-10-14
-### Added
-- `AsIri` and `AsIriRef`
+- [efbf824] Fix `IriRef::relative_to`. Version 1.4.1.
+- [5d42595] Fix `IriRef::relative_to` again + proper tests.
+- [d539b60] Fix corner case for `IriRef::relative_to`
+- [5aae749] Fixing some clippy warnings.
+- [4f0423a] Fix typo to link to correct type
+- [7bfb545] Fix FUNDING.yml
+- [fbfaaa5] Fixes #12
+- [64d2642] Fix doc link.
 
-## [1.3.1] - 2020-10-02
-### Changed
-- Use generic `Into<IriRef>` type parameter in `IriRef::suffix` and `IriRef::relative_to`.
+### Removed
+
+- [82cc03d] Remove warnings.
 
 ## [1.3.0] - 2020-10-02
-### Added
-- `Path::into_ref`
-- `PathBuf::as_ref, into_bytes`
-- `IriRefBuf::into_raw_parts, into_bytes, as_ref`
-- Convertions operations between `Path`/`PathBuf` and `IriRef`/`IriRefBuf`.
-- `IriRef::relative_to`
 
-### Changed
-- `#[inline]` almost all the API.
+### Added
+
+- [44b4f08] Impl From<Path> for IriRef.
+- [693da03] Impl From<&PathBuf> for IriRef.
+- [0805e2a] Add IriRef::relative_to.
 
 ## [1.2.0] - 2020-09-10
+
 ### Added
-- A `CHANGELOG.md` file.
-- Implementation of `Clone`, `Display` and `std::error::Error` for the `Error` type.
+
+- [4e8d67f] Implement Clone and Error for Error enum
+- [3c6c077] Implement Clone and Error for Error enum
+- [9493dc9] Add a changelog. Move to version 1.2.0.
+
+## [1.1.4] - 2020-04-19
+
+### Added
+
+- [6de9a3a] Add a new test catching issue #2.
+
+### Changed
+
+- [c2f57e5] Move to version 1.1.4.
+
+### Fixed
+
+- [b6d9389] Fix the path/segment parser.
+- [c541e07] Fix#2
+
+## [1.1.3] - 2020-03-31
+
+### Added
+
+- [6277102] Add into_* methods
+
+### Changed
+
+- [8b2541f] Move to version 1.1.3
+
+### Fixed
+
+- [df9cbfd] Fix lifetimes
+
+## [1.1.2] - 2020-03-31
+
+### Changed
+
+- [c2af478] Move to 1.1.2
+
+## [1.1.1] - 2020-03-31
+
+### Added
+
+- [ebf37fa] Add infos about `static-iref`.
+
+## [1.1.0] - 2020-03-31
+
+### Added
+
+- [b705b91] Add methods to inspect and build IRIs in `static-iref`.
+
+### Changed
+
+- [b614ead] Move to version 1.1
+
+### Fixed
+
+- [1d6adc7] Fix typo.
+
+## [1.0.1] - 2020-03-16
+
+### Removed
+
+- [d3de7bb] Remove build files
+
+## [1.0.0] - 2020-03-16
+
+### Added
+
+- [043a15e] Add gitignore.
+
+### Changed
+
+- [3afe663] Move percent-encoded strings in a dedicated crate.
+- [de90577] Refactoring.
+- [8f94dac] Refactoring.
+
+### Removed
+
+- [d76fd66] Remove useless files.
+- [3f05716] Remove warnings.
+
