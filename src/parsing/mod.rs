@@ -535,7 +535,7 @@ fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize
 	let mut lhs = 0u128;
 	let mut rhs = 0u128;
 
-	let mut count = 0;
+	let mut h16_count = 0;
 
 	if let Some((':', 1)) = get_char(buffer, i)? {
 		i += 1;
@@ -548,18 +548,20 @@ fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize
 	loop {
 		match get_char(buffer, i)? {
 			Some((':', 1)) if is_lhs => {
+				// `::` separator.
 				i += 1;
 				is_lhs = false;
-				count += 1;
+				h16_count += 1;
 
 				if let Some((']', 1)) | None = get_char(buffer, i)? {
 					break Ok(Some((lhs | rhs, i - offset)));
 				}
 			}
-			_ if count < 8 => match parse_h16(buffer, i)? {
+			_ if h16_count < 8 => match parse_h16(buffer, i)? {
+				// maybe `h16` group.
 				Some((h16, len)) => {
 					i += len;
-					count += 1;
+					h16_count += 1;
 
 					if is_lhs {
 						lhs_shift -= 16;
@@ -568,21 +570,23 @@ fn parse_ipv6_literal(buffer: &[u8], mut i: usize) -> Result<Option<(u128, usize
 						rhs = (rhs << 16) | h16 as u128
 					}
 
-					if (!is_lhs && count <= 8) || count == 8 {
+					if (!is_lhs && h16_count <= 8) || h16_count == 8 {
 						if let Some((']', 1)) | None = get_char(buffer, i)? {
 							break Ok(Some((lhs | rhs, i - offset)));
 						}
 					}
 
 					match get_char(buffer, i)? {
-						Some((':', 1)) if count < 8 => {
+						Some((':', 1)) if h16_count < 8 => {
 							i += 1;
 						}
 						_ => break Ok(None),
 					}
 				}
 				None => {
-					if count <= 6 {
+					// not a `h16` group.
+					if (is_lhs && h16_count == 6) || (!is_lhs && h16_count <= 6) {
+						// maybe an IPv4 literal.
 						match parse_ipv4_literal(buffer, i, false)? {
 							Some((ipv4, len)) => {
 								i += len;
@@ -904,6 +908,11 @@ mod tests {
 			parse_ipv6_literal(b"2001:0db8:0000:0000:0000:ff00:0042:8329:ffff", 0).unwrap(),
 			None
 		);
+	}
+
+	#[test]
+	fn ipv6_invalid3() {
+		assert_eq!(parse_ipv6_literal(b"1.1.1.1", 0).unwrap(), None);
 	}
 
 	#[test]
