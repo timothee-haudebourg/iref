@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+### Fixed
+
+- [ab8e85c] Fixes #16
+
+## [2.2.3] - 2023-01-11
+
 ### Added
 
 - [a3b99a5] Add `hashbrown` optional feature.
