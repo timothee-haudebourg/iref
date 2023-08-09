@@ -1,309 +1,160 @@
-use pct_str::PctStr;
-use std::borrow::Borrow;
-use std::cmp::{Ord, Ordering, PartialOrd};
-use std::convert::TryFrom;
-use std::hash::{Hash, Hasher};
-use std::ops::Range;
-use std::{cmp, fmt};
+use std::{
+	cmp, fmt,
+	hash::{self, Hash},
+};
 
-use super::{Error, Host, Port, UserInfo};
-use crate::parsing::{self, ParsedAuthority};
+use static_regular_grammar::RegularGrammar;
 
-pub struct Authority<'a> {
-	/// Authority slice.
-	pub(crate) data: &'a [u8],
+mod host;
+mod userinfo;
 
-	/// Authority positions.
-	pub(crate) p: ParsedAuthority,
+pub use crate::uri::{InvalidPort, Port, PortBuf};
+pub use crate::uri::{InvalidScheme, Scheme, SchemeBuf};
+pub use host::*;
+pub use userinfo::*;
+
+#[derive(RegularGrammar)]
+#[grammar(
+	file = "src/iri/grammar.abnf",
+	entry_point = "iauthority",
+	cache = "automata/iri/authority.aut.cbor"
+)]
+#[grammar(sized(
+	AuthorityBuf,
+	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
+))]
+#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
+pub struct Authority(str);
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AuthorityParts<'a> {
+	pub user_info: Option<&'a UserInfo>,
+	pub host: &'a Host,
+	pub port: Option<&'a Port>,
 }
 
-impl<'a> Hash for Authority<'a> {
-	#[inline]
-	fn hash<H: Hasher>(&self, hasher: &mut H) {
-		self.userinfo().hash(hasher);
-		self.host().hash(hasher);
-		self.port().hash(hasher);
-	}
-}
-
-impl<'a> Authority<'a> {
-	/// Checks if the authority is empty.
-	///
-	/// It is empty if it has no user info, an empty host string, and no port.
-	/// Note that empty user info or port is different from no user info and port.
-	/// For instance, the authorities `@`, `:` and `@:` are not empty.
-	#[inline]
-	pub fn is_empty(&self) -> bool {
-		self.p.userinfo_len.is_none() && self.p.host_len == 0 && self.p.port_len.is_none()
+impl Authority {
+	pub fn user_info(&self) -> Option<&UserInfo> {
+		todo!()
 	}
 
-	/// Returns a reference to the byte representation of the authority.
-	#[inline]
-	pub fn as_bytes(&self) -> &[u8] {
-		self.data
+	pub fn host(&self) -> &Host {
+		todo!()
 	}
 
-	#[inline]
-	pub fn as_str(&self) -> &str {
-		unsafe { std::str::from_utf8_unchecked(&self.data[0..self.p.len()]) }
+	pub fn port(&self) -> Option<&Port> {
+		todo!()
 	}
 
-	#[inline]
-	pub fn as_pct_str(&self) -> &PctStr {
-		unsafe { PctStr::new_unchecked(self.as_str()) }
-	}
+	pub fn parts(&self) -> AuthorityParts {
+		let mut user_info_end = None;
+		let mut host_start = 0;
+		let mut host_end = None;
+		let mut port_start = None;
 
-	#[inline]
-	pub fn userinfo(&self) -> Option<UserInfo> {
-		self.p.userinfo_len.map(|len| UserInfo {
-			data: &self.data[0..len],
-		})
-	}
+		for (i, c) in self.0.char_indices() {
+			match c {
+				'@' if user_info_end.is_none() => {
+					if port_start.is_some() {
+						port_start = None;
+						host_end = None
+					}
 
-	#[inline]
-	pub fn host(&self) -> Host {
-		let len = self.p.host_len;
-		let offset = self.p.host_offset();
-		Host {
-			data: &self.data[offset..(offset + len)],
+					user_info_end = Some(i);
+					host_start = i + 1
+				}
+				':' if port_start.is_none() => {
+					port_start = Some(i + 1);
+					host_end = Some(i)
+				}
+				_ => (),
+			}
 		}
-	}
 
-	#[inline]
-	pub fn port(&self) -> Option<Port> {
-		if let Some(len) = self.p.port_len {
-			let offset = self.p.port_offset();
-			Some(Port {
-				data: &self.data[offset..(offset + len)],
-			})
-		} else {
-			None
-		}
-	}
-}
-
-impl<'a> AsRef<str> for Authority<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> AsRef<[u8]> for Authority<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> Borrow<str> for Authority<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> Borrow<[u8]> for Authority<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> TryFrom<&'a str> for Authority<'a> {
-	type Error = Error;
-
-	#[inline]
-	fn try_from(str: &'a str) -> Result<Authority<'a>, Error> {
-		let parsed_authority = parsing::parse_authority(str.as_ref(), 0)?;
-		if parsed_authority.len() < str.len() {
-			Err(Error::InvalidAuthority)
-		} else {
-			Ok(Authority {
-				data: str.as_ref(),
-				p: parsed_authority,
-			})
+		AuthorityParts {
+			user_info: user_info_end.map(|e| unsafe { UserInfo::new_unchecked(&self.0[..e]) }),
+			host: unsafe {
+				Host::new_unchecked(&self.0[host_start..host_end.unwrap_or(self.0.len())])
+			},
+			port: port_start.map(|s| unsafe { Port::new_unchecked(&self.0.as_bytes()[s..]) }),
 		}
 	}
 }
 
-impl<'a> fmt::Display for Authority<'a> {
+impl fmt::Display for Authority {
 	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
-impl<'a> fmt::Debug for Authority<'a> {
+impl fmt::Debug for Authority {
 	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
-impl<'a> cmp::PartialEq for Authority<'a> {
+impl cmp::PartialEq for Authority {
 	#[inline]
 	fn eq(&self, other: &Authority) -> bool {
-		self.userinfo() == other.userinfo()
-			&& self.port() == other.port()
-			&& self.host() == other.host()
+		self.parts() == other.parts()
 	}
 }
 
-impl<'a> PartialOrd for Authority<'a> {
+impl Eq for Authority {}
+
+impl<'a> PartialEq<&'a str> for Authority {
 	#[inline]
-	fn partial_cmp(&self, other: &Authority<'a>) -> Option<Ordering> {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_str() == *other
+	}
+}
+
+impl PartialOrd for Authority {
+	#[inline]
+	fn partial_cmp(&self, other: &Authority) -> Option<cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl<'a> Ord for Authority<'a> {
+impl Ord for Authority {
 	#[inline]
-	fn cmp(&self, other: &Authority<'a>) -> Ordering {
-		self.as_pct_str().cmp(other.as_pct_str())
+	fn cmp(&self, other: &Authority) -> cmp::Ordering {
+		self.parts().cmp(&other.parts())
 	}
 }
 
-impl<'a> Eq for Authority<'a> {}
-
-impl<'a> cmp::PartialEq<&'a str> for Authority<'a> {
+impl Hash for Authority {
 	#[inline]
-	fn eq(&self, other: &&'a str) -> bool {
-		self.as_pct_str() == *other
-	}
-}
-
-pub struct AuthorityMut<'a> {
-	/// The whole IRI data.
-	pub(crate) data: &'a mut Vec<u8>,
-
-	pub(crate) offset: usize,
-
-	/// Authority positions.
-	pub(crate) p: &'a mut ParsedAuthority,
-}
-
-impl<'a> AuthorityMut<'a> {
-	#[inline]
-	pub fn as_authority(&'a self) -> Authority<'a> {
-		Authority {
-			data: self.data.as_slice(),
-			p: *self.p,
-		}
-	}
-
-	#[inline]
-	pub fn is_empty(&self) -> bool {
-		self.as_authority().is_empty()
-	}
-
-	#[inline]
-	pub fn as_str(&self) -> &str {
-		unsafe {
-			let offset = self.offset;
-			std::str::from_utf8_unchecked(&self.data[offset..(offset + self.p.len())])
-		}
-	}
-
-	#[inline]
-	fn replace(&mut self, range: Range<usize>, content: &[u8]) {
-		crate::replace(self.data, range, content)
-	}
-
-	#[inline]
-	pub fn userinfo(&self) -> Option<UserInfo> {
-		if let Some(len) = self.p.userinfo_len {
-			let offset = self.offset;
-			Some(UserInfo {
-				data: &self.data[offset..(offset + len)],
-			})
-		} else {
-			None
-		}
-	}
-
-	#[inline]
-	pub fn set_userinfo(&mut self, userinfo: Option<UserInfo>) {
-		let offset = self.offset;
-
-		if let Some(new_userinfo) = userinfo {
-			if let Some(userinfo_len) = self.p.userinfo_len {
-				self.replace(offset..(offset + userinfo_len), new_userinfo.as_ref());
-			} else {
-				self.replace(offset..offset, b"@");
-				self.replace(offset..offset, new_userinfo.as_ref());
-			}
-
-			self.p.userinfo_len = Some(new_userinfo.as_ref().len());
-		} else {
-			if let Some(userinfo_len) = self.p.userinfo_len {
-				self.replace(offset..(offset + userinfo_len + 1), &[]);
-			}
-
-			self.p.userinfo_len = None;
-		}
-	}
-
-	#[inline]
-	pub fn host(&self) -> Host {
-		let offset = self.offset + self.p.host_offset();
-		let len = self.p.host_len;
-		Host {
-			data: &self.data[offset..(offset + len)],
-		}
-	}
-
-	#[inline]
-	pub fn set_host(&mut self, host: Host) {
-		let offset = self.offset + self.p.host_offset();
-		self.replace(offset..(offset + self.p.host_len), host.as_ref());
-		self.p.host_len = host.as_bytes().len();
-	}
-
-	#[inline]
-	pub fn port(&self) -> Option<Port> {
-		if let Some(len) = self.p.port_len {
-			let offset = self.offset + self.p.port_offset();
-			Some(Port {
-				data: &self.data[offset..(offset + len)],
-			})
-		} else {
-			None
-		}
-	}
-
-	#[inline]
-	pub fn set_port(&mut self, port: Option<Port>) {
-		let offset = self.offset + self.p.port_offset();
-
-		if let Some(new_port) = port {
-			if let Some(port_len) = self.p.port_len {
-				self.replace(offset..(offset + port_len), new_port.as_ref());
-			} else {
-				self.replace(offset..offset, b":");
-				self.replace((offset + 1)..(offset + 1), new_port.as_ref());
-			}
-
-			self.p.port_len = Some(new_port.as_bytes().len());
-		} else {
-			if let Some(port_len) = self.p.port_len {
-				self.replace((offset - 1)..(offset + port_len), &[]);
-			}
-
-			self.p.port_len = None;
-		}
+	fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
+		self.parts().hash(hasher)
 	}
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::Iri;
+	use super::*;
 
 	#[test]
-	fn explicit_empty_with_authority_alike_path() {
-		let iri = Iri::new("scheme:////").unwrap();
-		let authority = iri.authority();
+	fn parts() {
+		let vectors = [
+			("host", (None, "host", None)),
+			("user@host", (Some("user"), "host", None)),
+			("host:123", (None, "host", Some("123"))),
+			("user@host:123", (Some("user"), "host", Some("123"))),
+			("a:b@host", (Some("a:b"), "host", None)),
+			("a:b@host:123", (Some("a:b"), "host", Some("123"))),
+		];
 
-		assert!(authority.unwrap().is_empty());
+		for (input, expected) in vectors {
+			eprintln!("{input} => {expected:?}");
+			let input = Authority::new(input).unwrap();
+			let parts = input.parts();
+
+			assert_eq!(parts.user_info.map(UserInfo::as_str), expected.0);
+			assert_eq!(parts.host.as_str(), expected.1);
+			assert_eq!(parts.port.map(Port::as_str), expected.2)
+		}
 	}
 }

@@ -7,17 +7,17 @@ use std::{
 
 use static_regular_grammar::RegularGrammar;
 
-/// IRI query.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "src/iri/grammar.abnf",
-	entry_point = "iquery",
+	file = "src/uri/grammar.abnf",
+	entry_point = "query",
+	ascii,
 	no_deref,
-	cache = "automata/iri/query.aut.cbor"
+	cache = "automata/uri/query.aut.cbor"
 )]
 #[grammar(sized(QueryBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
-pub struct Query(str);
+pub struct Query([u8]);
 
 impl Query {
 	/// Returns the query as a percent-encoded string slice.

@@ -7,27 +7,28 @@ use std::{
 
 use static_regular_grammar::RegularGrammar;
 
-/// IRI query.
+/// IRI authority host.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "src/iri/grammar.abnf",
-	entry_point = "iquery",
+	file = "src/uri/grammar.abnf",
+	entry_point = "host",
+	ascii,
 	no_deref,
-	cache = "automata/iri/query.aut.cbor"
+	cache = "automata/uri/host.aut.cbor"
 )]
-#[grammar(sized(QueryBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[grammar(sized(HostBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
-pub struct Query(str);
+pub struct Host([u8]);
 
-impl Query {
-	/// Returns the query as a percent-encoded string slice.
+impl Host {
+	/// Returns the host as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 }
 
-impl ops::Deref for Query {
+impl ops::Deref for Host {
 	type Target = PctStr;
 
 	fn deref(&self) -> &Self::Target {
@@ -35,58 +36,58 @@ impl ops::Deref for Query {
 	}
 }
 
-impl fmt::Display for Query {
+impl fmt::Display for Host {
 	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
-impl fmt::Debug for Query {
+impl fmt::Debug for Host {
 	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
-impl cmp::PartialEq for Query {
+impl cmp::PartialEq for Host {
 	#[inline]
-	fn eq(&self, other: &Query) -> bool {
+	fn eq(&self, other: &Host) -> bool {
 		self.as_pct_str() == other.as_pct_str()
 	}
 }
 
-impl Eq for Query {}
+impl Eq for Host {}
 
-impl<'a> PartialEq<&'a str> for Query {
+impl<'a> PartialEq<&'a str> for Host {
 	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_str() == *other
 	}
 }
 
-impl PartialOrd for Query {
+impl PartialOrd for Host {
 	#[inline]
-	fn partial_cmp(&self, other: &Query) -> Option<cmp::Ordering> {
+	fn partial_cmp(&self, other: &Host) -> Option<cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl Ord for Query {
+impl Ord for Host {
 	#[inline]
-	fn cmp(&self, other: &Query) -> cmp::Ordering {
+	fn cmp(&self, other: &Host) -> cmp::Ordering {
 		self.as_pct_str().cmp(other.as_pct_str())
 	}
 }
 
-impl Hash for Query {
+impl Hash for Host {
 	#[inline]
 	fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
 		self.as_pct_str().hash(hasher)
 	}
 }
 
-impl QueryBuf {
+impl HostBuf {
 	pub fn into_pct_string(self) -> PctString {
 		unsafe { PctString::new_unchecked(self.0) }
 	}

@@ -7,27 +7,31 @@ use std::{
 
 use static_regular_grammar::RegularGrammar;
 
-/// IRI query.
+/// URI fragment.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "src/iri/grammar.abnf",
-	entry_point = "iquery",
+	file = "src/uri/grammar.abnf",
+	entry_point = "fragment",
+	ascii,
 	no_deref,
-	cache = "automata/iri/query.aut.cbor"
+	cache = "automata/uri/fragment.aut.cbor"
 )]
-#[grammar(sized(QueryBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[grammar(sized(
+	FragmentBuf,
+	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
+))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
-pub struct Query(str);
+pub struct Fragment([u8]);
 
-impl Query {
-	/// Returns the query as a percent-encoded string slice.
+impl Fragment {
+	/// Returns the fragment as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
 }
 
-impl ops::Deref for Query {
+impl ops::Deref for Fragment {
 	type Target = PctStr;
 
 	fn deref(&self) -> &Self::Target {
@@ -35,58 +39,58 @@ impl ops::Deref for Query {
 	}
 }
 
-impl fmt::Display for Query {
+impl fmt::Display for Fragment {
 	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
-impl fmt::Debug for Query {
+impl fmt::Debug for Fragment {
 	#[inline]
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.as_str().fmt(f)
 	}
 }
 
-impl cmp::PartialEq for Query {
+impl cmp::PartialEq for Fragment {
 	#[inline]
-	fn eq(&self, other: &Query) -> bool {
+	fn eq(&self, other: &Fragment) -> bool {
 		self.as_pct_str() == other.as_pct_str()
 	}
 }
 
-impl Eq for Query {}
+impl Eq for Fragment {}
 
-impl<'a> PartialEq<&'a str> for Query {
+impl<'a> PartialEq<&'a str> for Fragment {
 	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_str() == *other
 	}
 }
 
-impl PartialOrd for Query {
+impl PartialOrd for Fragment {
 	#[inline]
-	fn partial_cmp(&self, other: &Query) -> Option<cmp::Ordering> {
+	fn partial_cmp(&self, other: &Fragment) -> Option<cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl Ord for Query {
+impl Ord for Fragment {
 	#[inline]
-	fn cmp(&self, other: &Query) -> cmp::Ordering {
+	fn cmp(&self, other: &Fragment) -> cmp::Ordering {
 		self.as_pct_str().cmp(other.as_pct_str())
 	}
 }
 
-impl Hash for Query {
+impl Hash for Fragment {
 	#[inline]
 	fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
 		self.as_pct_str().hash(hasher)
 	}
 }
 
-impl QueryBuf {
+impl FragmentBuf {
 	pub fn into_pct_string(self) -> PctString {
 		unsafe { PctString::new_unchecked(self.0) }
 	}

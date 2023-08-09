@@ -1,274 +1,283 @@
-use super::{Error, Segment};
-use crate::{parsing, AsIriRef, IriRef, IriRefBuf};
-use pct_str::PctStr;
 use smallvec::SmallVec;
-use std::borrow::Borrow;
-use std::cmp::{Ord, Ordering, PartialOrd};
-use std::convert::TryFrom;
-use std::hash::{Hash, Hasher};
-use std::iter::IntoIterator;
-use std::{cmp, fmt};
+use static_regular_grammar::RegularGrammar;
+use std::fmt;
 
-#[derive(Clone, Copy)]
-pub struct Path<'a> {
-	/// The path slice.
-	pub(crate) data: &'a [u8],
-}
+mod segment;
 
-impl<'a> Path<'a> {
-	/// Byte length of the path.
+pub use segment::*;
+
+use super::PathMut;
+
+/// IRI path.
+#[derive(RegularGrammar)]
+#[grammar(
+	file = "src/iri/grammar.abnf",
+	entry_point = "ipath",
+	cache = "automata/iri/path.aut.cbor"
+)]
+#[grammar(sized(PathBuf, derive(Debug, Display)))]
+#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
+pub struct Path(str);
+
+impl Path {
+	/// The empty absolute path `/`.
+	pub const EMPTY_ABSOLUTE: &'static Self = unsafe { Self::new_unchecked("/") };
+
+	/// Returns the number of segments in the path.
+	///
+	/// This computes in linear time w.r.t the number of segments. It is
+	/// equivalent to `path.segments().count()`.
 	#[inline]
 	pub fn len(&self) -> usize {
-		self.data.len()
-	}
-
-	/// The inner data length (in bytes), without the trailing `/` if the path is open.
-	#[inline]
-	pub fn closed_len(&self) -> usize {
-		if self.is_open() {
-			self.data.len() - 1
-		} else {
-			self.data.len()
-		}
-	}
-
-	/// Returns a reference to the byte representation of the path.
-	#[inline]
-	pub fn as_bytes(&self) -> &[u8] {
-		self.data
-	}
-
-	/// Converts this path into the underlying bytes slice.
-	#[inline]
-	pub fn into_bytes(self) -> &'a [u8] {
-		self.data
-	}
-
-	/// Get the underlying path slice as a string slice.
-	#[inline]
-	pub fn as_str(&self) -> &str {
-		unsafe { std::str::from_utf8_unchecked(self.data) }
-	}
-
-	/// Convert this path into the underlying path slice.
-	#[inline]
-	pub fn into_str(self) -> &'a str {
-		unsafe { std::str::from_utf8_unchecked(self.data) }
-	}
-
-	/// Get the underlying path slice as a percent-encoded string slice.
-	#[inline]
-	pub fn as_pct_str(&self) -> &PctStr {
-		unsafe { PctStr::new_unchecked(self.as_str()) }
-	}
-
-	/// Get the path slice as an IRI reference.
-	#[inline]
-	pub fn as_iri_ref(&self) -> IriRef {
-		IriRef {
-			p: parsing::ParsedIriRef {
-				path_len: self.data.len(),
-				..parsing::ParsedIriRef::default()
-			},
-			data: self.data,
-		}
-	}
-
-	/// Convert this path into an IRI reference.
-	#[inline]
-	pub fn into_iri_ref(self) -> IriRef<'a> {
-		IriRef {
-			p: parsing::ParsedIriRef {
-				path_len: self.data.len(),
-				..parsing::ParsedIriRef::default()
-			},
-			data: self.data,
-		}
+		self.segments().count()
 	}
 
 	/// Checks if the path is empty.
 	///
-	/// Returns `true` if the path is `` or `/`.
+	/// Returns `true` if the path has no segments.
+	/// The absolute path `/` is empty.
 	#[inline]
 	pub fn is_empty(&self) -> bool {
-		self.data.is_empty() || self.data == b"/"
+		self.0.is_empty() || self.0 == *"/"
 	}
 
 	/// Checks if the path is absolute.
 	///
 	/// A path is absolute if it starts with a `/`.
-	/// A path is necessarily absolute if the IRI it is contained in contains a non-empty
-	/// authority.
 	#[inline]
 	pub fn is_absolute(&self) -> bool {
-		!self.data.is_empty() && self.data.starts_with(b"/")
+		self.0.starts_with("/")
 	}
 
 	/// Checks if the path is relative.
 	///
 	/// A path is relative if it does not start with a `/`.
-	/// A path cannot be relative if the IRI it is contained in contains a non-empty authority.
 	#[inline]
 	pub fn is_relative(&self) -> bool {
 		!self.is_absolute()
 	}
 
-	/// Checks if the path ends with a `/` but is not equal to `/`.
-	#[inline]
-	pub fn is_open(&self) -> bool {
-		self.data.len() > 1 && self.data.ends_with(b"/")
+	fn first_segment_offset(&self) -> usize {
+		if self.is_absolute() {
+			1
+		} else {
+			0
+		}
 	}
 
-	#[inline]
-	pub fn is_closed(&self) -> bool {
-		!self.is_open()
+	pub fn first(&self) -> Option<&Segment> {
+		if self.is_empty() {
+			None
+		} else {
+			Some(unsafe { self.segment_at(self.first_segment_offset()).0 })
+		}
 	}
 
-	#[inline]
-	pub fn closed(self) -> Path<'a> {
-		if self.is_open() {
-			Path {
-				data: &self.data[0..(self.len() - 1)],
+	pub fn last(&self) -> Option<&Segment> {
+		if self.is_empty() {
+			None
+		} else {
+			unsafe {
+				self.previous_segment_from(self.len() + 1)
+					.map(|(segment, _)| segment)
+			}
+		}
+	}
+
+	/// Returns the segment starting at the given byte offset and the offset
+	/// of the next segment, if any.
+	///
+	/// # Safety
+	///
+	/// A segment must start at the given offset.
+	unsafe fn segment_at(&self, offset: usize) -> (&Segment, usize) {
+		let mut i = offset;
+
+		let bytes = self.as_bytes();
+		while i < bytes.len() && !matches!(bytes[i], b'/' | b'?' | b'#') {
+			i += 1
+		}
+
+		(Segment::new_unchecked(&self.0[offset..i]), i + 1)
+	}
+
+	/// Returns the segment following a previous segment ending at the given
+	/// offset.
+	///
+	/// # Safety
+	///
+	/// - as the start of a segment; or
+	/// - at `path.as_bytes().len() + 1`.
+	unsafe fn next_segment_from(&self, offset: usize) -> Option<(&Segment, usize)> {
+		let bytes = self.as_bytes();
+		if offset <= bytes.len() {
+			Some(self.segment_at(offset))
+		} else {
+			None
+		}
+	}
+
+	/// Returns the segment preceding the segment starting at the given offset,
+	/// and its offset.
+	///
+	/// # Safety
+	///
+	/// The offset must be either:
+	/// - as the start of a segment; or
+	/// - at `path.as_bytes().len() + 1`.
+	unsafe fn previous_segment_from(&self, offset: usize) -> Option<(&Segment, usize)> {
+		// //a/b
+		if offset >= 2 {
+			let first_offset = self.first_segment_offset();
+			let bytes = self.as_bytes();
+			// offset is at the end of a segment.
+			let mut i = offset - 2;
+			while i > first_offset && bytes[i] != b'/' {
+				i -= 1
+			}
+
+			if bytes[i] == b'/' {
+				let j = i + 1;
+				Some((self.segment_at(j).0, j))
+			} else {
+				Some((self.segment_at(first_offset).0, first_offset))
 			}
 		} else {
-			self
+			// offset is at the first segment.
+			None
 		}
 	}
 
-	fn segment_at(&self, offset: usize) -> (Option<Segment<'a>>, usize) {
-		let mut start = offset;
-		let mut end = offset;
-
-		loop {
-			match parsing::get_char(self.data, end).unwrap() {
-				Some(('/', 1)) => {
-					if end == offset {
-						start += 1;
-						end += 1;
-					} else {
-						break;
-					}
-				}
-				Some((_, len)) => {
-					end += len;
-				}
-				None => {
-					if end == start {
-						return (None, end);
-					} else {
-						break;
-					}
-				}
+	/// Produces an iterator over the segments of the IRI path.
+	///
+	/// Empty segments are preserved: the path `a//b` will raise the three
+	/// segments `a`, `` and `b`. The absolute path `/` has no segments, but
+	/// the path `/a/` has two segments, `a` and ``.
+	///
+	/// No normalization occurs with `.` and `..` segments. See the
+	/// [`Self::normalized_segments`] to iterate over the normalized segments
+	/// of a path.
+	#[inline]
+	pub fn segments(&self) -> Segments {
+		if self.is_empty() {
+			Segments::Empty
+		} else {
+			Segments::NonEmpty {
+				path: self,
+				offset: self.first_segment_offset(),
+				back_offset: self.as_bytes().len() + 1,
 			}
 		}
+	}
 
-		(
-			Some(Segment {
-				data: &self.data[start..end],
-				open: self.data.get(end) == Some(&b'/'),
-			}),
-			end,
-		)
+	/// Iterate over the normalized segments of the path.
+	///
+	/// Remove the special dot segments `..` and `.` from the iteration using
+	/// the usual path semantics for dot segments. This may be expensive for
+	/// large paths since it will need to internally normalize the path first.
+	#[inline]
+	pub fn normalized_segments(&self) -> NormalizedSegments {
+		NormalizedSegments::new(self)
 	}
 
 	#[inline]
-	pub fn first(&self) -> Option<Segment<'a>> {
-		let (segment, _) = self.segment_at(0);
-		segment
+	pub fn normalized(&self) -> PathBuf {
+		let mut result: PathBuf = if self.is_absolute() {
+			Path::EMPTY_ABSOLUTE.to_owned()
+		} else {
+			Path::EMPTY.to_owned()
+		};
+
+		for segment in self.segments() {
+			result.as_path_mut().symbolic_push(segment)
+		}
+
+		result
 	}
 
 	/// Return the path directory part.
 	///
 	/// This correspond to the path without everything after the right most `/`.
 	#[inline]
-	pub fn directory(&self) -> Path<'a> {
-		if self.data.is_empty() {
-			Path { data: &[] }
+	pub fn directory(&self) -> &Self {
+		if self.is_empty() {
+			Self::EMPTY
 		} else {
-			let mut last = self.data.len() - 1;
+			let bytes = self.as_bytes();
+			let mut last = bytes.len() - 1;
 
 			loop {
-				if self.data[last] == b'/' {
+				if bytes[last] == b'/' {
 					break;
 				}
 
 				if last == 0 {
-					return Path { data: &[] };
+					return Self::EMPTY;
 				}
 
 				last -= 1;
 			}
 
-			Path {
-				data: &self.data[0..(last + 1)],
-			}
+			unsafe { Self::new_unchecked(std::str::from_utf8_unchecked(&bytes[..=last])) }
 		}
 	}
 
-	/// Produces an iterator over the segments of the IRI path.
+	/// Returns the last segment of the path, if there is one, unless it is
+	/// empty.
 	///
-	/// Note that this is an IRI path, not an IRI reference path: no normalization occurs with
-	/// `.` and `..` segments. This is done by the IRI reference resolution function.
-	///
-	/// Empty segments are preserved: the path `a//b` will raise the three segments `a`, `` and
-	/// `b`.
-	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
+	/// This does not consider the normalized version of the path, dot segments
+	/// are preserved.
 	#[inline]
-	pub fn segments(&self) -> Segments<'a> {
-		Segments::new(*self)
+	pub fn file_name(&self) -> Option<&Segment> {
+		self.segments()
+			.next_back()
+			.map(|s| s)
+			.filter(|s| !s.is_empty())
 	}
 
-	/// Iterate over the normalized segments of the path.
+	/// Returns the path without its final segment, if there is one.
 	///
-	/// Remove the special dot segments `..` and `.` from the iteration using the usual path
-	/// semantics for dot segments.
-	/// This may be expensive for large paths since it will need to internally normalize the path
-	/// first.
+	/// ```
+	/// # use iref::iri::Path;
+	/// assert_eq!(Path::new("//foo").unwrap().parent().unwrap().as_str(), "/./");
+	/// assert_eq!(Path::new("/foo").unwrap().parent().unwrap().as_str(), "/")
+	/// ```
 	#[inline]
-	pub fn normalized_segments(&self) -> NormalizedSegments {
-		NormalizedSegments::new(*self)
-	}
-
-	/// Consume the path reference and return an iterator over its normalized segments.
-	#[inline]
-	pub fn into_normalized_segments(self) -> NormalizedSegments<'a> {
-		NormalizedSegments::new(self)
-	}
-
-	/// Returns the name of the final segment of the path, if there is one.
-	///
-	/// If the path is a normal file, this is the file name. If it's the path of a directory, this
-	/// is the directory name.
-	///
-	/// This does not consider the normalized version of the path, dot segments are preserved.
-	#[inline]
-	pub fn file_name(&self) -> Option<&'a str> {
-		self.into_iter().next_back().map(|s| s.into_str())
-	}
-
-	/// Returns the path without its final component, if there is one.
-	#[inline]
-	pub fn parent(&self) -> Option<Path<'a>> {
-		let mut i = self.closed_len();
-
+	pub fn parent(&self) -> Option<&Self> {
 		if self.is_empty() {
 			None
 		} else {
-			i -= 1;
+			let bytes = self.as_bytes();
+			let mut end = bytes.len() - 1;
 
 			loop {
-				if self.data[i] == b'/' {
+				if bytes[end] == b'/' {
+					if end == 0 {
+						return Some(Self::EMPTY_ABSOLUTE);
+					}
+
 					break;
-				} else if i > 0 {
-					i -= 1;
-				} else {
+				}
+
+				if end == 0 {
 					return None;
 				}
+
+				end -= 1;
 			}
 
-			Some(Path {
-				data: &self.data[0..(i + 1)],
-			})
+			if end == 1 && bytes[0] == b'/' && bytes[1] == b'/' {
+				// Ambiguous case `//foo` where returning the parent literally
+				// would mean returning `/`, dropping the empty path.
+				// Instead we return `/./`.
+				unsafe { Some(Self::new_unchecked("/./")) }
+			} else {
+				unsafe {
+					Some(Self::new_unchecked(std::str::from_utf8_unchecked(
+						&bytes[..end],
+					)))
+				}
+			}
 		}
 	}
 
@@ -283,21 +292,21 @@ impl<'a> Path<'a> {
 	/// # Example
 	/// ```
 	/// # use std::convert::TryFrom;
-	/// use iref::{Path, PathBuf};
+	/// use iref::iri::{Path, PathBuf};
 	///
-	/// let prefix = Path::try_from("/foo/bar").unwrap();
-	/// let path = Path::try_from("/foo/bar/baz").unwrap();
+	/// let prefix = Path::new("/foo/bar").unwrap();
+	/// let path = Path::new("/foo/bar/baz").unwrap();
 	/// let suffix: PathBuf = path.suffix(prefix).unwrap();
 	///
-	/// assert_eq!(suffix, "baz");
+	/// assert_eq!(suffix.as_str(), "baz");
 	/// ```
 	#[inline]
-	pub fn suffix(&self, prefix: Path) -> Option<PathBuf> {
+	pub fn suffix(&self, prefix: &Self) -> Option<PathBuf> {
 		if self.is_absolute() != prefix.is_absolute() {
 			return None;
 		}
 
-		let mut buf = PathBuf::new();
+		let mut buf = PathBuf::default();
 		let mut self_it = self.normalized_segments();
 		let mut prefix_it = prefix.normalized_segments();
 
@@ -315,240 +324,57 @@ impl<'a> Path<'a> {
 	}
 }
 
-impl<'a> AsRef<str> for Path<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> AsRef<[u8]> for Path<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> Borrow<str> for Path<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> Borrow<[u8]> for Path<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> AsIriRef for Path<'a> {
+impl fmt::Display for Path {
 	#[inline]
-	fn as_iri_ref(&self) -> IriRef {
-		self.as_iri_ref()
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_str().fmt(f)
 	}
 }
 
-impl<'a> TryFrom<&'a str> for Path<'a> {
-	type Error = Error;
-
+impl fmt::Debug for Path {
 	#[inline]
-	fn try_from(str: &'a str) -> Result<Path<'a>, Error> {
-		let path_len = parsing::parse_path(str.as_ref(), 0)?;
-		if path_len < str.len() {
-			Err(Error::InvalidPath)
-		} else {
-			Ok(Path { data: str.as_ref() })
-		}
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.as_str().fmt(f)
 	}
 }
 
-impl<'a> IntoIterator for Path<'a> {
-	type Item = Segment<'a>;
+impl<'a> IntoIterator for &'a Path {
+	type Item = &'a Segment;
 	type IntoIter = Segments<'a>;
 
 	#[inline]
 	fn into_iter(self) -> Segments<'a> {
-		Segments::new(self)
+		self.segments()
 	}
 }
 
-#[derive(Clone)]
-pub struct Segments<'a> {
-	path: Path<'a>,
-	offset: usize,
-	offset_back: usize,
-}
-
-impl<'a> Segments<'a> {
-	fn new(path: Path<'a>) -> Segments<'a> {
-		let offset_back = path.closed_len();
-		Segments {
-			path,
-			offset: 0,
-			offset_back,
-		}
-	}
-}
-
-impl<'a> Iterator for Segments<'a> {
-	type Item = Segment<'a>;
-
-	#[inline]
-	fn next(&mut self) -> Option<Segment<'a>> {
-		if self.offset >= self.offset_back {
-			None
-		} else {
-			let (segment, end) = self.path.segment_at(self.offset);
-			self.offset = end;
-			segment
-		}
-	}
-}
-
-impl<'a> DoubleEndedIterator for Segments<'a> {
-	#[inline]
-	fn next_back(&mut self) -> Option<Segment<'a>> {
-		if self.offset >= self.offset_back {
-			None
-		} else {
-			let mut i = self.offset_back - 1; // Note that `offset_back` cannot be 0 here, or we
-								  // wouldn't be in this branch.
-
-			loop {
-				if i > 0 {
-					if self.path.data[i] == b'/' {
-						break;
-					} else {
-						i -= 1;
-					}
-				} else {
-					break;
-				}
-			}
-
-			self.offset_back = i;
-			let (segment, _) = self.path.segment_at(self.offset_back);
-			segment
-		}
-	}
-}
-
-/// Stack size (in `Segment`) allocated for [`NormalizedSegments`] to normalize a `Path`.
-/// If it needs more space, it will allocate memory on the heap.
-const NORMALIZE_STACK_SIZE: usize = 16;
-
-/// Stack size (in bytes) allocated for the `normalize` method to normalize a `Path`.
-/// If it needs more space, it will allocate memory on the heap.
-const REMOVE_DOTS_BUFFER_LEN: usize = 512;
-
-pub struct NormalizedSegments<'a> {
-	stack: SmallVec<[Segment<'a>; NORMALIZE_STACK_SIZE]>,
-	i: usize,
-}
-
-impl<'a> NormalizedSegments<'a> {
-	fn new(path: Path<'a>) -> NormalizedSegments {
-		let relative = path.is_relative();
-		let mut stack: SmallVec<[Segment<'a>; NORMALIZE_STACK_SIZE]> = SmallVec::new();
-		for segment in path.into_iter() {
-			match segment.data {
-				b"." => {
-					if let Some(last_segment) = stack.last_mut().as_mut() {
-						last_segment.open();
-					}
-				}
-				b".." => {
-					if stack.pop().is_none() && relative {
-						stack.push(segment)
-					}
-				}
-				_ => stack.push(segment),
-			}
-		}
-
-		NormalizedSegments { stack, i: 0 }
-	}
-}
-
-impl<'a> Iterator for NormalizedSegments<'a> {
-	type Item = Segment<'a>;
-
-	#[inline]
-	fn next(&mut self) -> Option<Segment<'a>> {
-		if self.i < self.stack.len() {
-			let segment = self.stack[self.i];
-			self.i += 1;
-			Some(segment)
-		} else {
-			None
-		}
-	}
-}
-
-impl<'a> fmt::Display for Path<'a> {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl<'a> fmt::Debug for Path<'a> {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl<'a> cmp::PartialEq for Path<'a> {
+impl PartialEq for Path {
 	#[inline]
 	fn eq(&self, other: &Path) -> bool {
 		if self.is_absolute() == other.is_absolute() {
-			let mut self_segments = self.normalized_segments();
-			let mut other_segments = other.normalized_segments();
-
-			loop {
-				match (self_segments.next(), other_segments.next()) {
-					(None, None) => return true,
-					(Some(_), None) => return false,
-					(None, Some(_)) => return false,
-					(Some(a), Some(b)) => {
-						if a != b {
-							return false;
-						}
-					}
-				}
-			}
+			let self_segments = self.normalized_segments();
+			let other_segments = other.normalized_segments();
+			self_segments.len() == other_segments.len()
+				&& self_segments.zip(other_segments).all(|(a, b)| a == b)
 		} else {
 			false
 		}
 	}
 }
 
-impl<'a> Eq for Path<'a> {}
+impl Eq for Path {}
 
-impl<'a> cmp::PartialEq<&'a str> for Path<'a> {
+impl PartialOrd for Path {
 	#[inline]
-	fn eq(&self, other: &&'a str) -> bool {
-		if let Ok(other) = Path::try_from(*other) {
-			self == &other
-		} else {
-			false
-		}
-	}
-}
-
-impl<'a> PartialOrd for Path<'a> {
-	#[inline]
-	fn partial_cmp(&self, other: &Path<'a>) -> Option<Ordering> {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl<'a> Ord for Path<'a> {
+impl Ord for Path {
 	#[inline]
-	fn cmp(&self, other: &Path<'a>) -> Ordering {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		use std::cmp::Ordering;
 		if self.is_absolute() == other.is_absolute() {
 			let mut self_segments = self.normalized_segments();
 			let mut other_segments = other.normalized_segments();
@@ -573,211 +399,164 @@ impl<'a> Ord for Path<'a> {
 	}
 }
 
-impl<'a> Hash for Path<'a> {
+impl std::hash::Hash for Path {
 	#[inline]
-	fn hash<H: Hasher>(&self, hasher: &mut H) {
-		self.as_pct_str().hash(hasher)
+	fn hash<H: std::hash::Hasher>(&self, hasher: &mut H) {
+		self.is_absolute().hash(hasher);
+		self.normalized_segments().for_each(move |s| s.hash(hasher))
 	}
 }
 
-pub struct PathMut<'a> {
-	pub(crate) buffer: &'a mut IriRefBuf,
+pub enum Segments<'a> {
+	Empty,
+	NonEmpty {
+		path: &'a Path,
+		offset: usize,
+		back_offset: usize,
+	},
 }
 
-impl<'a> PathMut<'a> {
-	/// Returns a reference to the string representation of the path.
-	#[inline(always)]
-	pub fn as_str(&self) -> &str {
-		unsafe { std::str::from_utf8_unchecked(self.as_bytes()) }
-	}
+impl<'a> Iterator for Segments<'a> {
+	type Item = &'a Segment;
 
-	/// Returns a reference to the bytes representation of the path.
-	#[inline]
-	pub fn as_bytes(&self) -> &[u8] {
-		let offset = self.buffer.p.path_offset();
-		let len = self.buffer.path().as_bytes().len();
-		&self.buffer.data[offset..(offset + len)]
-	}
-
-	/// Get the inner path.
-	#[inline]
-	pub fn as_path(&self) -> Path {
-		self.buffer.path()
-	}
-
-	/// Checks if the path is empty.
-	///
-	/// Returns `true` if the path is `` or `/`.
-	#[inline]
-	pub fn is_empty(&self) -> bool {
-		self.buffer.path().is_empty()
-	}
-
-	/// Checks if the path is absolute.
-	///
-	/// A path is absolute if it starts with a `/`.
-	/// A path is necessarily absolute if the IRI it is contained in contains a non-empty
-	/// authority.
-	#[inline]
-	pub fn is_absolute(&self) -> bool {
-		self.buffer.path().is_absolute()
-	}
-
-	/// Checks if the path is relative.
-	///
-	/// A path is relative if it does not start with a `/`.
-	/// A path cannot be relative if the IRI it is contained in contains a non-empty authority.
-	#[inline]
-	pub fn is_relative(&self) -> bool {
-		self.buffer.path().is_relative()
-	}
-
-	/// Checks if the path ends with a `/` but is not equal to `/`.
-	#[inline]
-	pub fn is_open(&self) -> bool {
-		self.buffer.path().is_open()
-	}
-
-	#[inline]
-	pub fn is_closed(&self) -> bool {
-		self.buffer.path().is_closed()
-	}
-
-	/// Make sure the last segment is followed by a `/`.
-	///
-	/// This has no effect if the path is empty.
-	#[inline]
-	pub fn open(&mut self) {
-		if !self.is_empty() && self.is_closed() {
-			// add a slash at the end.
-			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			self.buffer.replace(offset..offset, b"/");
-			self.buffer.p.path_len += 1;
-		}
-	}
-
-	/// Produces an iterator over the segments of the IRI path.
-	///
-	/// Note that this is an IRI path, not an IRI reference path: no normalization occurs with
-	/// `.` and `..` segments. This is done by the IRI reference resolution function.
-	///
-	/// Empty segments are preserved: the path `a//b` will raise the three segments `a`, `` and
-	/// `b`.
-	/// The absolute path `/` has no segments, but the path `/a/` has two segments, `a` and ``.
-	#[inline]
-	pub fn segments(&self) -> Segments {
-		self.buffer.path().into_iter()
-	}
-
-	#[inline]
-	pub fn normalized_segments(&self) -> NormalizedSegments {
-		self.buffer.path().into_normalized_segments()
-	}
-
-	pub(crate) fn disambiguate(&mut self) {
-		if let Some(first) = self.as_path().first() {
-			if (first.is_empty() && self.buffer.authority().is_none())
-				|| (self.is_relative()
-					&& self.buffer.scheme().is_none()
-					&& self.buffer.authority().is_none()
-					&& first.as_bytes().contains(&b':'))
-			{
-				// add `./` at the begining.
-				let mut offset = self.buffer.p.path_offset();
-				if self.is_absolute() {
-					offset += 1;
+	fn next(&mut self) -> Option<Self::Item> {
+		match self {
+			Self::Empty => None,
+			Self::NonEmpty {
+				path,
+				offset,
+				back_offset,
+			} => {
+				if offset < back_offset {
+					match unsafe { path.next_segment_from(*offset) } {
+						Some((segment, i)) => {
+							*offset = i;
+							Some(segment)
+						}
+						None => None,
+					}
+				} else {
+					None
 				}
-				self.buffer.replace(offset..offset, b"./");
-				self.buffer.p.path_len += 2;
 			}
 		}
 	}
+}
 
-	/// Add a segment at the end of the path.
-	#[inline]
-	pub fn push(&mut self, segment: Segment) {
-		if segment.is_empty() {
-			// if the whole IRI is of the form (1) `scheme:?query#fragment` or (2) `scheme:/?query#fragment`,
-			// we must add a `./` before this segment to make sure that
-			// (1) we don't ambiguously add a `/` at the begining making the path absolute.
-			// (2) we don't make the path start with `//`, confusing it with the authority.
-			if self.is_empty() && self.buffer.authority().is_none() {
-				self.push(Segment::current())
+impl<'a> DoubleEndedIterator for Segments<'a> {
+	fn next_back(&mut self) -> Option<Self::Item> {
+		match self {
+			Segments::Empty => None,
+			Segments::NonEmpty {
+				path,
+				offset,
+				back_offset,
+			} => {
+				if offset < back_offset {
+					match unsafe { path.previous_segment_from(*back_offset) } {
+						Some((segment, i)) => {
+							*back_offset = i;
+							Some(segment)
+						}
+						None => None,
+					}
+				} else {
+					None
+				}
 			}
+		}
+	}
+}
 
-			// make sure it ends with a slash.
-			self.open();
+/// Stack size (in number of `&Segment`) allocated for [`NormalizedSegments`] to
+/// normalize a `Path`. If it needs more space, it will allocate memory on the
+/// heap.
+const NORMALIZE_STACK_SIZE: usize = 16;
 
-			// add a slash at the end.
-			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			self.buffer.replace(offset..offset, b"/");
-			self.buffer.p.path_len += 1;
-		} else {
-			// if the whole IRI is of the form `?query#fragment`, and we push a segment containing a `:`,
-			// it may be confused with the scheme.
-			// We must add a `./` before the first segment to remove the ambiguity.
-			if self.is_relative()
-				&& self.is_empty()
-				&& self.buffer.scheme().is_none()
-				&& self.buffer.authority().is_none()
-				&& segment.as_bytes().contains(&b':')
-			{
-				self.push(Segment::current())
+pub struct NormalizedSegments<'a>(smallvec::IntoIter<[&'a Segment; NORMALIZE_STACK_SIZE]>);
+
+impl<'a> NormalizedSegments<'a> {
+	fn new(path: &'a Path) -> NormalizedSegments {
+		let mut stack = SmallVec::<[&'a Segment; NORMALIZE_STACK_SIZE]>::new();
+
+		for segment in path.segments() {
+			match segment.as_bytes() {
+				b"." => (),
+				b".." => {
+					if stack.last().map(|s| *s == Segment::PARENT).unwrap_or(true) {
+						stack.push(segment)
+					} else {
+						stack.pop();
+					}
+				}
+				_ => stack.push(segment),
 			}
-
-			// make sure it ends with a slash.
-			self.open();
-
-			// add the segment at the end.
-			let offset = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			self.buffer.replace(offset..offset, segment.as_ref());
-			self.buffer.p.path_len += segment.len();
 		}
 
-		if segment.is_open() {
-			self.open();
-		}
+		NormalizedSegments(stack.into_iter())
+	}
+}
+
+impl<'a> Iterator for NormalizedSegments<'a> {
+	type Item = &'a Segment;
+
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		self.0.size_hint()
 	}
 
 	#[inline]
+	fn next(&mut self) -> Option<&'a Segment> {
+		self.0.next()
+	}
+}
+
+impl<'a> DoubleEndedIterator for NormalizedSegments<'a> {
+	#[inline]
+	fn next_back(&mut self) -> Option<Self::Item> {
+		self.0.next_back()
+	}
+}
+
+impl<'a> ExactSizeIterator for NormalizedSegments<'a> {}
+
+impl PathBuf {
+	/// Returns a mutable reference to the interior bytes.
+	///
+	/// # Safety
+	///
+	/// This function is unsafe because the returned `&mut Vec` allows writing
+	/// bytes which are not valid in a path. If this constraint is violated,
+	/// using the original `PathBuf` after dropping the `&mut Vec` may violate
+	/// memory safety, as the rest of the library assumes that `PathBuf` are
+	/// valid paths.
+	pub unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
+		self.0.as_mut_vec()
+	}
+
+	pub fn as_path_mut(&mut self) -> PathMut {
+		PathMut::from_path(self)
+	}
+
+	pub fn push(&mut self, segment: &Segment) {
+		self.as_path_mut().push(segment)
+	}
+
+	/// Pop the last non-`..` segment of the path.
+	///
+	/// If the path is empty or ends in `..`, then a `..` segment
+	/// will be added instead.
 	pub fn pop(&mut self) {
-		if !self.is_empty() {
-			let end = self.buffer.p.path_offset() + self.buffer.p.path_len;
-			let mut start = end - 1;
-
-			// We remove the terminating `/`.
-			if self.is_open() {
-				start -= 1;
-			}
-
-			// Find the last segment start position.
-			while start > 0 && self.buffer.data[start] != b'/' {
-				start -= 1;
-			}
-
-			if start > 0 || self.buffer.data[start] == b'/' {
-				start += 1;
-			}
-
-			self.buffer.replace(start..end, &[]);
-			self.buffer.p.path_len -= end - start;
-		} else if self.is_relative() {
-			self.push(Segment::parent());
-		}
+		self.as_path_mut().pop()
 	}
 
-	#[inline]
 	pub fn clear(&mut self) {
-		let mut offset = self.buffer.p.path_offset();
-		let mut len = self.as_bytes().len();
+		self.as_path_mut().clear()
+	}
 
-		if self.is_absolute() {
-			offset += 1;
-			len -= 1;
-		}
-
-		self.buffer.replace(offset..(offset + len), &[]);
-		self.buffer.p.path_len = offset - self.buffer.p.path_offset();
+	/// Push the given segment to this path using the `.` and `..` segments semantics.
+	#[inline]
+	pub fn symbolic_push(&mut self, segment: &Segment) {
+		self.as_path_mut().symbolic_push(segment)
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
@@ -786,564 +565,273 @@ impl<'a> PathMut<'a> {
 	/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
 	#[inline]
-	pub fn symbolic_append<'s, P: IntoIterator<Item = Segment<'s>>>(&mut self, path: P) {
-		for segment in path {
-			match segment.data {
-				b"." => self.open(),
-				b".." => {
-					self.pop();
-					if segment.is_open() {
-						self.open()
-					}
-				}
-				_ => self.push(segment),
-			}
-		}
+	pub fn symbolic_append<'s, P: IntoIterator<Item = &'s Segment>>(&mut self, path: P) {
+		self.as_path_mut().symbolic_append(path)
 	}
 
 	#[inline]
 	pub fn normalize(&mut self) {
-		let mut buffer: SmallVec<[u8; REMOVE_DOTS_BUFFER_LEN]> = SmallVec::new();
-		buffer.extend_from_slice(self.as_ref());
-		let old_path = Path {
-			data: buffer.as_ref(),
-		};
-
-		self.clear();
-
-		for segment in old_path.normalized_segments() {
-			self.push(segment);
-		}
-	}
-}
-
-impl<'a> AsRef<str> for PathMut<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> AsRef<[u8]> for PathMut<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> Borrow<str> for PathMut<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> Borrow<[u8]> for PathMut<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> AsIriRef for PathMut<'a> {
-	#[inline]
-	fn as_iri_ref(&self) -> IriRef {
-		self.as_path().into_iri_ref()
-	}
-}
-
-impl<'a> PartialEq<PathMut<'a>> for Path<'a> {
-	#[inline]
-	fn eq(&self, other: &PathMut<'a>) -> bool {
-		*self == other.as_path()
-	}
-}
-
-impl<'a> PartialEq<Path<'a>> for PathMut<'a> {
-	#[inline]
-	fn eq(&self, other: &Path<'a>) -> bool {
-		self.as_path() == *other
-	}
-}
-
-/// A path buffer, that can be manipulated independently of an IRI.
-#[derive(PartialEq, Eq, Hash, PartialOrd, Ord, Clone)]
-pub struct PathBuf {
-	/// We actually store the path as an IRI-reference.
-	data: IriRefBuf,
-}
-
-impl PathBuf {
-	/// Create a new empty path.
-	#[inline]
-	pub fn new() -> PathBuf {
-		PathBuf {
-			data: IriRefBuf::default(),
-		}
-	}
-
-	/// Returns a reference to the underlying bytes representation of the path.
-	#[inline]
-	pub fn as_bytes(&self) -> &[u8] {
-		self.data.path().into_bytes()
-	}
-
-	/// Consume the path and return its internal buffer.
-	#[inline]
-	pub fn into_bytes(self) -> Vec<u8> {
-		self.data.into_bytes()
-	}
-
-	#[inline]
-	pub fn as_str(&self) -> &str {
-		self.data.path().into_str()
-	}
-
-	#[inline]
-	pub fn as_path(&self) -> Path {
-		self.data.path()
-	}
-
-	#[inline]
-	pub fn as_path_mut(&mut self) -> PathMut {
-		self.data.path_mut()
-	}
-
-	/// Borrow the path as an IRI reference.
-	#[inline]
-	pub fn as_iri_ref(&self) -> IriRef {
-		self.data.as_iri_ref()
-	}
-
-	/// Convert the path into an IRI reference.
-	#[inline]
-	pub fn into_iri_ref(self) -> IriRefBuf {
-		self.data
-	}
-}
-
-impl Default for PathBuf {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-
-impl AsRef<str> for PathBuf {
-	#[inline(always)]
-	fn as_ref(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl AsRef<[u8]> for PathBuf {
-	#[inline(always)]
-	fn as_ref(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl Borrow<str> for PathBuf {
-	#[inline(always)]
-	fn borrow(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl Borrow<[u8]> for PathBuf {
-	#[inline(always)]
-	fn borrow(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> From<Path<'a>> for PathBuf {
-	#[inline]
-	fn from(path: Path<'a>) -> PathBuf {
-		let mut buf = PathBuf::new();
-		buf.data.replace(0..0, path.as_ref());
-		buf.data.p.path_len = path.as_bytes().len();
-		buf
-	}
-}
-
-impl<'a> From<NormalizedSegments<'a>> for PathBuf {
-	#[inline]
-	fn from(segments: NormalizedSegments<'a>) -> PathBuf {
-		let mut buf = PathBuf::new();
-		let mut path = buf.as_path_mut();
-		for seg in segments {
-			path.push(seg)
-		}
-
-		buf
-	}
-}
-
-impl fmt::Display for PathBuf {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for PathBuf {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl<'a> PartialEq<Path<'a>> for PathBuf {
-	#[inline]
-	fn eq(&self, other: &Path<'a>) -> bool {
-		self.data.path() == *other
-	}
-}
-
-impl<'a> PartialEq<PathMut<'a>> for PathBuf {
-	#[inline]
-	fn eq(&self, other: &PathMut<'a>) -> bool {
-		self.data.path() == *other
-	}
-}
-
-impl<'a> PartialEq<&'a str> for PathBuf {
-	#[inline]
-	fn eq(&self, other: &&'a str) -> bool {
-		self.data.path() == *other
+		self.as_path_mut().normalize()
 	}
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::{Iri, IriBuf, IriRefBuf, Path, PathBuf};
-	use std::convert::{TryFrom, TryInto};
+	use super::*;
 
 	#[test]
 	fn empty() {
-		let iri = Iri::new("scheme:").unwrap();
-		let path = iri.path();
-
+		let path = Path::EMPTY;
 		assert!(path.is_empty());
 		assert!(!path.is_absolute());
-		assert!(path.is_closed());
 		assert!(path.segments().next().is_none());
 	}
 
 	#[test]
 	fn empty_absolute() {
-		let iri = Iri::new("scheme:/").unwrap();
-		let path = iri.path();
-
+		let path = Path::EMPTY_ABSOLUTE;
 		assert!(path.is_empty());
 		assert!(path.is_absolute());
-		assert!(path.is_closed());
 		assert!(path.segments().next().is_none());
 	}
 
 	#[test]
 	fn non_empty() {
-		let iri = Iri::new("scheme:a/b").unwrap();
-		let path = iri.path();
+		let path = Path::new("a/b").unwrap();
 
 		assert!(!path.is_empty());
 		assert!(!path.is_absolute());
-		assert!(path.is_closed());
 
 		let mut segments = path.segments();
-		assert!(segments.next().unwrap() == "a");
-		assert!(segments.next().unwrap() == "b");
+		assert!(segments.next().unwrap().as_str() == "a");
+		assert!(segments.next().unwrap().as_str() == "b");
 		assert!(segments.next().is_none());
 	}
 
 	#[test]
 	fn non_empty_absolute() {
-		let iri = Iri::new("scheme:/foo/bar").unwrap();
-		let path = iri.path();
-
+		let path = Path::new("/foo/bar").unwrap();
 		assert!(!path.is_empty());
 		assert!(path.is_absolute());
-		assert!(path.is_closed());
 
 		let mut segments = path.segments();
-		assert!(segments.next().unwrap() == "foo");
-		assert!(segments.next().unwrap() == "bar");
+		assert!(segments.next().unwrap().as_str() == "foo");
+		assert!(segments.next().unwrap().as_str() == "bar");
 		assert!(segments.next().is_none());
 	}
 
 	#[test]
-	fn is_open() {
-		let iri = Iri::new("scheme:/red/green/blue/").unwrap();
-		let path = iri.path();
+	fn next_segment() {
+		let vectors = [
+			("foo/bar", 0, Some(("foo", 4))),
+			("foo/bar", 4, Some(("bar", 8))),
+			("foo/bar", 8, None),
+			("foo/bar/", 8, Some(("", 9))),
+			("foo/bar/", 9, None),
+			("//foo", 1, Some(("", 2))),
+		];
 
-		assert!(!path.is_empty());
-		assert!(path.is_absolute());
-		assert!(path.is_open());
-
-		let mut segments = path.segments();
-		assert!(segments.next().unwrap() == "red");
-		assert!(segments.next().unwrap() == "green");
-		assert!(segments.next().unwrap() == "blue");
-		assert!(segments.next().is_none());
+		for (input, offset, expected) in vectors {
+			unsafe {
+				assert_eq!(
+					Path::new(input).unwrap().next_segment_from(offset),
+					expected.map(|(e, i)| (Segment::new(e).unwrap(), i))
+				)
+			}
+		}
 	}
 
 	#[test]
-	fn push() {
-		let mut iri = IriBuf::new("scheme:foo").unwrap();
-		let mut path = iri.path_mut();
+	fn previous_segment() {
+		let vectors = [
+			("/foo/bar", 1, None),
+			("foo/bar", 0, None),
+			("foo/bar", 4, Some(("foo", 0))),
+			("foo/bar", 8, Some(("bar", 4))),
+			("foo/bar/", 8, Some(("bar", 4))),
+			("foo/bar/", 9, Some(("", 8))),
+			("//a/b", 4, Some(("a", 2))),
+		];
 
-		path.push("bar".try_into().unwrap());
-
-		assert_eq!(iri.as_str(), "scheme:foo/bar");
+		for (input, offset, expected) in vectors {
+			unsafe {
+				assert_eq!(
+					Path::new(input).unwrap().previous_segment_from(offset),
+					expected.map(|(e, i)| (Segment::new(e).unwrap(), i))
+				)
+			}
+		}
 	}
 
 	#[test]
-	fn push_empty_segment() {
-		let mut iri = IriBuf::new("scheme:foo/bar").unwrap();
-		let mut path = iri.path_mut();
+	fn first_segment() {
+		let vectors = [
+			("", None),
+			("/", None),
+			("//", Some("")),
+			("/foo/bar", Some("foo")),
+		];
 
-		path.push("".try_into().unwrap());
-
-		assert_eq!(iri.as_str(), "scheme:foo/bar//");
-	}
-
-	#[test]
-	fn push_empty_segment_edge_case1() {
-		let mut iri = IriBuf::new("scheme:").unwrap();
-		let mut path = iri.path_mut();
-
-		path.push("".try_into().unwrap());
-
-		assert_eq!(iri, "scheme:.//");
-	}
-
-	#[test]
-	fn push_empty_segment_edge_case2() {
-		let mut iri = IriBuf::new("scheme:/").unwrap();
-		let mut path = iri.path_mut();
-
-		path.push("".try_into().unwrap());
-
-		assert_eq!(iri, "scheme:/.//");
-	}
-
-	#[test]
-	fn push_scheme_edge_case() {
-		let mut iri_ref = IriRefBuf::new("").unwrap();
-		let mut path = iri_ref.path_mut();
-
-		path.push("a:b".try_into().unwrap());
-
-		assert_eq!(iri_ref.as_str(), "./a:b");
-	}
-
-	#[test]
-	fn pop() {
-		let mut iri = IriBuf::new("scheme:foo/bar").unwrap();
-		let mut path = iri.path_mut();
-
-		path.pop();
-
-		assert_eq!(iri.as_str(), "scheme:foo/");
-	}
-
-	#[test]
-	fn pop_open() {
-		let mut iri = IriBuf::new("scheme:foo/bar/").unwrap();
-		let mut path = iri.path_mut();
-
-		path.pop();
-
-		assert_eq!(iri.as_str(), "scheme:foo/");
-	}
-
-	#[test]
-	fn pop_open_empty_segment() {
-		let mut iri = IriBuf::new("scheme:foo//").unwrap();
-		let mut path = iri.path_mut();
-
-		path.pop();
-
-		assert_eq!(iri.as_str(), "scheme:foo/");
-	}
-
-	#[test]
-	fn pop_open_empty_segment_edge_case() {
-		let mut iri = IriBuf::new("scheme:////").unwrap();
-		let mut path = iri.path_mut();
-
-		path.pop();
-
-		assert_eq!(iri.as_str(), "scheme:///");
-	}
-
-	#[test]
-	fn open() {
-		let mut iri = IriBuf::new("scheme:/a").unwrap();
-		let mut path = iri.path_mut();
-
-		path.open();
-
-		assert_eq!(iri.as_str(), "scheme:/a/");
-	}
-
-	#[test]
-	fn compare() {
-		assert_eq!(Path::try_from("a/b/c").unwrap(), "a/b/c");
-		assert_eq!(Path::try_from("a/b/c/").unwrap(), "a/b/c/.");
-		assert_eq!(Path::try_from("a/b/c/").unwrap(), "a/b/c/./");
-		assert_eq!(Path::try_from("a/b/c").unwrap(), "a/b/../b/c");
-		assert_eq!(Path::try_from("a/b/c/..").unwrap(), "a/b/");
-		assert_eq!(Path::try_from("a/..").unwrap(), "");
-		assert_eq!(Path::try_from("/a/..").unwrap(), "/");
-		assert_eq!(Path::try_from("a/../..").unwrap(), "..");
-		assert_eq!(Path::try_from("/a/../..").unwrap(), "/..");
-
-		assert_ne!(Path::try_from("a/b/c").unwrap(), "a/b/c/");
-		assert_ne!(Path::try_from("a/b/c").unwrap(), "a/b/c/.");
-		assert_ne!(Path::try_from("a/b/c/..").unwrap(), "a/b");
+		for (input, expected) in vectors {
+			assert_eq!(
+				Path::new(input).unwrap().first(),
+				expected.map(|e| Segment::new(e).unwrap())
+			)
+		}
 	}
 
 	#[test]
 	fn segments() {
-		let path = Path::try_from("//a/b/foo//bar/").unwrap();
-		let mut segments = path.into_iter();
+		let vectors: [(&str, &[&str]); 8] = [
+			("", &[]),
+			("foo", &["foo"]),
+			("/foo", &["foo"]),
+			("foo/", &["foo", ""]),
+			("/foo/", &["foo", ""]),
+			("a/b/c/d", &["a", "b", "c", "d"]),
+			("a/b//c/d", &["a", "b", "", "c", "d"]),
+			("//a/b/foo//bar/", &["", "a", "b", "foo", "", "bar", ""]),
+		];
 
-		assert_eq!(segments.next().unwrap(), "");
-		assert_eq!(segments.next().unwrap(), "a");
-		assert_eq!(segments.next().unwrap(), "b");
-		assert_eq!(segments.next().unwrap(), "foo");
-		assert_eq!(segments.next().unwrap(), "");
-		assert_eq!(segments.next().unwrap(), "bar");
-		assert_eq!(segments.next(), None);
+		for (input, expected) in vectors {
+			let path = Path::new(input).unwrap();
+			let segments: Vec<_> = path.segments().collect();
+			assert_eq!(segments.len(), expected.len());
+			assert!(segments
+				.into_iter()
+				.zip(expected)
+				.all(|(a, b)| a.as_str() == *b))
+		}
 	}
 
 	#[test]
-	fn empty_segments() {
-		let path = Path::try_from("").unwrap();
-		let mut segments = path.into_iter();
+	fn segments_rev() {
+		let vectors: [(&str, &[&str]); 8] = [
+			("", &[]),
+			("foo", &["foo"]),
+			("/foo", &["foo"]),
+			("foo/", &["foo", ""]),
+			("/foo/", &["foo", ""]),
+			("a/b/c/d", &["a", "b", "c", "d"]),
+			("a/b//c/d", &["a", "b", "", "c", "d"]),
+			("//a/b/foo//bar/", &["", "a", "b", "foo", "", "bar", ""]),
+		];
 
-		assert_eq!(segments.next(), None);
+		for (input, expected) in vectors {
+			let path = Path::new(input).unwrap();
+			let segments: Vec<_> = path.segments().rev().collect();
+			assert_eq!(segments.len(), expected.len());
+			assert!(segments
+				.into_iter()
+				.zip(expected.into_iter().rev())
+				.all(|(a, b)| a.as_str() == *b))
+		}
 	}
 
 	#[test]
-	fn reverse_segments() {
-		let path = Path::try_from("//a/b/foo//bar/").unwrap();
-		let mut segments = path.into_iter();
+	fn normalized() {
+		let vectors = [
+			("", ""),
+			("a/b/c", "a/b/c"),
+			("a/..", ""),
+			("a/b/..", "a"),
+			("a/b/../", "a/"),
+			("a/b/c/..", "a/b"),
+			("a/b/c/.", "a/b/c"),
+			("a/../..", ".."),
+			("/a/../..", "/.."),
+		];
 
-		assert_eq!(segments.next_back().unwrap(), "bar");
-		assert_eq!(segments.next_back().unwrap(), "");
-		assert_eq!(segments.next_back().unwrap(), "foo");
-		assert_eq!(segments.next_back().unwrap(), "b");
-		assert_eq!(segments.next_back().unwrap(), "a");
-		assert_eq!(segments.next_back().unwrap(), "");
-		assert_eq!(segments.next_back(), None);
+		for (input, expected) in vectors {
+			eprintln!("{input}, {expected}");
+			let path = Path::new(input).unwrap();
+			let output = path.normalized();
+			assert_eq!(output.as_str(), expected);
+		}
 	}
 
 	#[test]
-	fn empty_reverse_segments() {
-		let path = Path::try_from("").unwrap();
-		let mut segments = path.into_iter();
+	fn eq() {
+		let vectors = [
+			("a/b/c", "a/b/c"),
+			("a/b/c", "a/b/c/."),
+			("a/b/c/", "a/b/c/./"),
+			("a/b/c", "a/b/../b/c"),
+			("a/b/c/..", "a/b"),
+			("a/..", ""),
+			("/a/..", "/"),
+			("a/../..", ".."),
+			("/a/../..", "/.."),
+			("a/b/c/./", "a/b/c/"),
+			("a/b/c/../", "a/b/"),
+		];
 
-		assert_eq!(segments.next_back(), None);
+		for (a, b) in vectors {
+			let a = Path::new(a).unwrap();
+			let b = Path::new(b).unwrap();
+			assert_eq!(a, b)
+		}
 	}
 
 	#[test]
-	fn double_ended_segments() {
-		let path = Path::try_from("//a/b/foo//bar/").unwrap();
-		let mut segments = path.into_iter();
+	fn ne() {
+		let vectors = [
+			("a/b/c", "a/b/c/"),
+			("a/b/c/", "a/b/c/."),
+			("a/b/c/../", "a/b"),
+		];
 
-		assert_eq!(segments.next_back().unwrap(), "bar");
-		assert_eq!(segments.next().unwrap(), "");
-		assert_eq!(segments.next_back().unwrap(), "");
-		assert_eq!(segments.next().unwrap(), "a");
-		assert_eq!(segments.next_back().unwrap(), "foo");
-		assert_eq!(segments.next().unwrap(), "b");
-		assert_eq!(segments.next_back(), None);
-		assert_eq!(segments.next(), None);
+		for (a, b) in vectors {
+			let a = Path::new(a).unwrap();
+			let b = Path::new(b).unwrap();
+			assert_ne!(a, b)
+		}
 	}
 
 	#[test]
 	fn file_name() {
-		let path = Path::try_from("//a/b/foo//bar/").unwrap();
-		assert_eq!(path.file_name().unwrap(), "bar");
+		let vectors = [("//a/b/foo//bar/", None), ("//a/b/foo//bar", Some("bar"))];
+
+		for (input, expected) in vectors {
+			let input = Path::new(input).unwrap();
+			assert_eq!(input.file_name().map(Segment::as_str), expected)
+		}
 	}
 
 	#[test]
-	fn parent1() {
-		let path = Path::try_from("//a/b/foo//bar/").unwrap();
-		assert_eq!(
-			path.parent().unwrap(),
-			Path::try_from("//a/b/foo//").unwrap()
-		);
+	fn parent() {
+		let vectors = [
+			("", None),
+			("/", None),
+			(".", None),
+			("//a/b/foo//bar", Some("//a/b/foo/")),
+			("//a/b/foo//", Some("//a/b/foo/")),
+			("//a/b/foo/", Some("//a/b/foo")),
+			("//a/b/foo", Some("//a/b")),
+			("//a/b", Some("//a")),
+			("//a", Some("/./")),
+			("/./", Some("/.")),
+			("/.", Some("/")),
+		];
+
+		for (input, expected) in vectors {
+			let input = Path::new(input).unwrap();
+			assert_eq!(input.parent().map(Path::as_str), expected)
+		}
 	}
 
 	#[test]
-	fn parent1_closed() {
-		let path = Path::try_from("//a/b/foo//bar").unwrap();
-		assert_eq!(
-			path.parent().unwrap(),
-			Path::try_from("//a/b/foo//").unwrap()
-		);
-	}
+	fn suffix() {
+		let vectors = [
+			("/foo/bar/baz", "/foo/bar", Some("baz")),
+			("//foo", "/", Some(".//foo")),
+			("/a/b/baz", "/foo/bar", None),
+		];
 
-	#[test]
-	fn parent2() {
-		let path = Path::try_from("//a/b/foo//").unwrap();
-		assert_eq!(
-			path.parent().unwrap(),
-			Path::try_from("//a/b/foo/").unwrap()
-		);
-	}
-
-	#[test]
-	fn parent3() {
-		let path = Path::try_from("//a/b/foo/").unwrap();
-		assert_eq!(path.parent().unwrap(), Path::try_from("//a/b/").unwrap());
-	}
-
-	#[test]
-	fn parent4() {
-		let path = Path::try_from("//a/b/").unwrap();
-		assert_eq!(path.parent().unwrap(), Path::try_from("//a/").unwrap());
-	}
-
-	#[test]
-	fn parent5() {
-		let path = Path::try_from("//a/").unwrap();
-		assert_eq!(path.parent().unwrap(), Path::try_from("//").unwrap());
-	}
-
-	#[test]
-	fn parent6() {
-		let path = Path::try_from("//").unwrap();
-		assert_eq!(path.parent().unwrap(), Path::try_from("/").unwrap());
-	}
-
-	#[test]
-	fn parent7() {
-		let path = Path::try_from("/").unwrap();
-		assert_eq!(path.parent(), None);
-	}
-
-	#[test]
-	fn parent_empty() {
-		let path = Path::try_from("").unwrap();
-		assert_eq!(path.parent(), None);
-	}
-
-	#[test]
-	fn suffix_simple() {
-		let prefix = Path::try_from("/foo/bar").unwrap();
-		let path = Path::try_from("/foo/bar/baz").unwrap();
-		let suffix: PathBuf = path.suffix(prefix).unwrap();
-		assert_eq!(suffix, "baz");
-	}
-
-	#[test]
-	fn suffix_not() {
-		let prefix = Path::try_from("/foo/bar").unwrap();
-		let path = Path::try_from("/a/b/baz").unwrap();
-		assert!(path.suffix(prefix).is_none());
+		for (path, prefix, expected_suffix) in vectors {
+			let path = Path::new(path).unwrap();
+			let suffix = path.suffix(Path::new(prefix).unwrap());
+			assert_eq!(suffix.as_deref().map(Path::as_str), expected_suffix)
+		}
 	}
 }
