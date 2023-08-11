@@ -7,6 +7,8 @@ use std::{
 
 use static_regular_grammar::RegularGrammar;
 
+use crate::common::FragmentImpl;
+
 /// IRI fragment.
 #[derive(RegularGrammar)]
 #[grammar(
@@ -21,6 +23,16 @@ use static_regular_grammar::RegularGrammar;
 ))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Fragment(str);
+
+impl FragmentImpl for Fragment {
+	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+	}
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
+}
 
 impl Fragment {
 	/// Returns the fragment as a percent-encoded string slice.

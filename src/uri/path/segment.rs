@@ -12,34 +12,35 @@ use crate::common::path::SegmentImpl;
 /// IRI path segment.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "src/iri/grammar.abnf",
-	entry_point = "isegment",
+	file = "src/uri/grammar.abnf",
+	entry_point = "segment",
+	ascii,
 	no_deref,
-	cache = "automata/iri/segment.aut.cbor"
+	cache = "automata/uri/segment.aut.cbor"
 )]
 #[grammar(sized(
 	SegmentBuf,
 	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
 ))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
-pub struct Segment(str);
+pub struct Segment([u8]);
 
 impl SegmentImpl for Segment {
 	const PARENT: &'static Self = Self::PARENT;
 
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
-		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+		Self::new_unchecked(bytes)
 	}
 
 	fn as_bytes(&self) -> &[u8] {
-		self.0.as_bytes()
+		&self.0
 	}
 }
 
 impl Segment {
-	pub const CURRENT: &'static Self = unsafe { Segment::new_unchecked(".") };
+	pub const CURRENT: &'static Self = unsafe { Segment::new_unchecked(b".") };
 
-	pub const PARENT: &'static Self = unsafe { Segment::new_unchecked("..") };
+	pub const PARENT: &'static Self = unsafe { Segment::new_unchecked(b"..") };
 
 	/// Returns the segment as a percent-encoded string slice.
 	#[inline]

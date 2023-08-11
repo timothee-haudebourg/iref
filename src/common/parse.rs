@@ -66,6 +66,8 @@ pub fn scheme(bytes: &[u8], mut i: usize) -> Range<usize> {
 		if bytes[i] == b':' {
 			break
 		}
+
+		i += 1
 	}
 
 	start..i
@@ -136,15 +138,119 @@ pub fn authority_or_path(bytes: &[u8], mut i: usize) -> (AuthorityOrPath, usize)
 	(component, i)
 }
 
-pub fn find_authority(bytes: &[u8], i: usize) -> Option<Range<usize>> {
+pub fn find_authority(bytes: &[u8], i: usize) -> Result<Range<usize>, usize> {
 	match self::scheme_authority_or_path(bytes, i) {
 		(SchemeAuthorityOrPath::Scheme, scheme_end) => match self::authority_or_path(bytes, scheme_end+1) {
-			(AuthorityOrPath::Authority, end) => Some((scheme_end+3)..end),
-			(AuthorityOrPath::Path, _) => None
+			(AuthorityOrPath::Authority, end) => Ok((scheme_end+3)..end),
+			(AuthorityOrPath::Path, _) => Err(scheme_end+1)
 		}
-		(SchemeAuthorityOrPath::Authority, end) => Some(2..end),
-		(SchemeAuthorityOrPath::Path, _) => None
+		(SchemeAuthorityOrPath::Authority, end) => Ok(2..end),
+		(SchemeAuthorityOrPath::Path, _) => Err(0)
 	}
+}
+
+pub enum UserInfoOrHost {
+	UserInfo,
+	Host
+}
+
+/// Find the user info or host part starting an authority.
+/// 
+/// `bytes` must end at the end of the authority.
+pub fn user_info_or_host(bytes: &[u8], mut i: usize) -> (UserInfoOrHost, usize) {
+	while i < bytes.len() {
+		match bytes[i] {
+			b'@' => return (UserInfoOrHost::UserInfo, i),
+			b':' => {
+				// end of the host, or still in the user-info.
+				let end = i;
+
+				while i < bytes.len() {
+					if bytes[i] == b'@' {
+						return (UserInfoOrHost::UserInfo, i)
+					}
+					
+					i += 1
+				}
+
+				return (UserInfoOrHost::Host, end)
+			}
+			_ => i += 1
+		}
+	}
+
+	(UserInfoOrHost::Host, i)
+}
+
+/// Find the user info part in an authority.
+/// 
+/// `bytes` must end at the end of the authority.
+pub fn find_user_info(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
+	let start = i;
+	while i < bytes.len() {
+		if bytes[i] == b'@' {
+			return Some(start..i)
+		}
+
+		i += 1;
+	}
+
+	None
+}
+
+pub fn host(bytes: &[u8], mut i: usize) -> usize {
+	while i < bytes.len() && bytes[i] != b':' {
+		i += 1
+	}
+
+	i
+}
+
+pub fn find_host(bytes: &[u8], i: usize) -> Range<usize> {
+	match user_info_or_host(bytes, i) {
+		(UserInfoOrHost::UserInfo, i) => {
+			let end = host(bytes, i);
+			i..end
+		}
+		(UserInfoOrHost::Host, end) => {
+			i..end
+		}
+	}
+}
+
+/// Parse a port starting a the given position.
+/// 
+/// `bytes` must end at the end of the authority.
+pub fn port(bytes: &[u8], i: usize) -> (bool, usize) {
+	if i < bytes.len() && bytes[i] == b':' {
+		(true, bytes.len())
+	} else {
+		(false, i)
+	}
+}
+
+/// Find the port part in an authority.
+/// 
+/// `bytes` must end at the end of the authority.
+pub fn find_port(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
+	'host: while i < bytes.len() {
+		if bytes[i] == b':' {
+			let start = i;
+
+			while i < bytes.len() {
+				if bytes[i] == b'@' {
+					i += 1;
+					continue 'host
+				}
+			}
+
+			return Some(start..i)
+		}
+
+		i += 1
+	}
+
+	None
 }
 
 pub fn path(bytes: &[u8], mut i: usize) -> usize {
@@ -189,7 +295,7 @@ pub fn query(bytes: &[u8], mut i: usize) -> (bool, usize) {
 	}
 }
 
-pub fn find_query(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
+pub fn find_query(bytes: &[u8], mut i: usize) -> Result<Range<usize>, usize> {
 	while i < bytes.len() {
 		match bytes[i] {
 			b'#' => break,
@@ -200,7 +306,7 @@ pub fn find_query(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
 					i += 1;
 				}
 
-				return Some(start..i)
+				return Ok(start..i)
 			}
 			_ => {
 				i += 1;
@@ -208,7 +314,7 @@ pub fn find_query(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
 		}
 	}
 
-	None
+	Err(i)
 }
 
 pub fn fragment(bytes: &[u8], i: usize) -> (bool, usize) {
@@ -219,11 +325,11 @@ pub fn fragment(bytes: &[u8], i: usize) -> (bool, usize) {
 	}
 }
 
-pub fn find_fragment(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
+pub fn find_fragment(bytes: &[u8], mut i: usize) -> Result<Range<usize>, usize> {
 	while i < bytes.len() {
 		match bytes[i] {
 			b'#' => {
-				return Some((i+1)..bytes.len())
+				return Ok((i+1)..bytes.len())
 			}
 			_ => {
 				i += 1;
@@ -231,7 +337,7 @@ pub fn find_fragment(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
 		}
 	}
 
-	None
+	Err(i)
 }
 
 pub struct ReferenceParts {

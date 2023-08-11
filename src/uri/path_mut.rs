@@ -15,14 +15,6 @@ impl<'a> Deref for PathMut<'a> {
 }
 
 impl<'a> PathMut<'a> {
-	pub unsafe fn new(
-		buffer: &'a mut Vec<u8>,
-		start: usize,
-		end: usize,
-	) -> Self {
-		Self(PathMutImpl::new(buffer, start, end))
-	}
-
 	pub fn from_path(path: &'a mut PathBuf) -> Self {
 		Self(PathMutImpl::from_path(path))
 	}
@@ -31,7 +23,7 @@ impl<'a> PathMut<'a> {
 	///
 	/// # Ambiguities
 	///
-	/// Adding a segment to an empty path may introduce ambiguities in several
+	/// Adding a segment to an empty path may introduce ambiguities and several
 	/// cases. Here is how this function deals with those cases.
 	///
 	/// ## Empty segment
@@ -100,68 +92,68 @@ mod tests {
 
 	#[test]
 	fn push() {
-		let vectors = [
-			("", "foo", "foo"),
-			("/", "foo", "/foo"),
-			("", "", "./"),
-			("/", "", "/./"),
-			("foo", "bar", "foo/bar"),
-			("/foo", "bar", "/foo/bar"),
-			("foo", "", "foo/"),
-			("foo/bar", "", "foo/bar/"),
-			("foo/", "", "foo//"),
-			("a/b/c", "d", "a/b/c/d"),
-			("/a/b/c", "d", "/a/b/c/d"),
-			("a/b/c/", "d", "a/b/c//d"),
+		let vectors: [(&[u8], &[u8], &[u8]); 12] = [
+			(b"", b"foo", b"foo"),
+			(b"/", b"foo", b"/foo"),
+			(b"", b"", b"./"),
+			(b"/", b"", b"/./"),
+			(b"foo", b"bar", b"foo/bar"),
+			(b"/foo", b"bar", b"/foo/bar"),
+			(b"foo", b"", b"foo/"),
+			(b"foo/bar", b"", b"foo/bar/"),
+			(b"foo/", b"", b"foo//"),
+			(b"a/b/c", b"d", b"a/b/c/d"),
+			(b"/a/b/c", b"d", b"/a/b/c/d"),
+			(b"a/b/c/", b"d", b"a/b/c//d"),
 		];
 
 		for (path, segment, expected) in vectors {
-			let mut path = PathBuf::new(path.to_string()).unwrap();
+			let mut path = PathBuf::new(path.to_vec()).unwrap();
 			let mut path_mut = PathMut::from_path(&mut path);
 			let segment = Segment::new(&segment).unwrap();
 			path_mut.push(segment);
-			assert_eq!(path_mut.as_str(), expected)
+			assert_eq!(path_mut.as_bytes(), expected)
 		}
 	}
 
 	#[test]
 	fn pop() {
-		let vectors = [
-			("", ".."),
-			("/", "/.."),
-			("/..", "/../.."),
-			("foo", ""),
-			("foo/bar", "foo"),
-			("foo/bar/", "foo/bar"),
+		let vectors: [(&[u8], &[u8]); 6] = [
+			(b"", b".."),
+			(b"/", b"/.."),
+			(b"/..", b"/../.."),
+			(b"foo", b""),
+			(b"foo/bar", b"foo"),
+			(b"foo/bar/", b"foo/bar"),
 		];
 
 		for (path, expected) in vectors {
-			let mut path = PathBuf::new(path.to_string()).unwrap();
+			let mut path = PathBuf::new(path.to_vec()).unwrap();
 			let mut path_mut = PathMut::from_path(&mut path);
 			path_mut.pop();
-			assert_eq!(path_mut.as_str(), expected)
+			assert_eq!(path_mut.as_bytes(), expected)
 		}
 	}
 
 	#[test]
 	fn normalized() {
-		let vectors = [
-			("", ""),
-			("a/b/c", "a/b/c"),
-			("a/..", ""),
-			("a/b/..", "a"),
-			("a/b/../", "a/"),
-			("a/b/c/..", "a/b"),
-			("a/b/c/.", "a/b/c"),
-			("a/../..", ".."),
-			("/a/../..", "/.."),
+		let vectors: [(&[u8], &[u8]); 9] = [
+			(b"", b""),
+			(b"a/b/c", b"a/b/c"),
+			(b"a/..", b""),
+			(b"a/b/..", b"a"),
+			(b"a/b/../", b"a/"),
+			(b"a/b/c/..", b"a/b"),
+			(b"a/b/c/.", b"a/b/c"),
+			(b"a/../..", b".."),
+			(b"/a/../..", b"/.."),
 		];
 
 		for (input, expected) in vectors {
-			let mut path = PathBuf::new(input.to_string()).unwrap();
+			let mut path = PathBuf::new(input.to_vec()).unwrap();
 			let mut path_mut = PathMut::from_path(&mut path);
 			path_mut.normalize();
-			assert_eq!(path_mut.as_str(), expected);
+			assert_eq!(path_mut.as_bytes(), expected);
 		}
 	}
 }

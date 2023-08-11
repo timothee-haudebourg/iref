@@ -4,13 +4,17 @@ mod authority;
 mod fragment;
 mod query;
 mod scheme;
+mod path;
+mod path_mut;
 
 pub use authority::*;
 pub use fragment::*;
 pub use query::*;
 pub use scheme::*;
+pub use path::*;
+pub use path_mut::*;
 
-use crate::parse;
+use crate::common::{parse, RiImpl, RiRefImpl};
 
 #[derive(RegularGrammar)]
 #[grammar(
@@ -23,10 +27,23 @@ use crate::parse;
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Uri([u8]);
 
+impl RiRefImpl for Uri {
+	type Authority = Authority;
+	type Path = Path;
+	type Query = Query;
+	type Fragment = Fragment;
+
+	fn as_bytes(&self) -> &[u8] {
+		&self.0
+	}
+}
+
+impl RiImpl for Uri {}
+
 pub struct UriParts<'a> {
 	pub scheme: &'a Scheme,
 	pub authority: Option<&'a Authority>,
-	// pub path: &'a Path,
+	pub path: &'a Path,
 	pub query: Option<&'a Query>,
 	pub fragment: Option<&'a Fragment>,
 }
@@ -40,7 +57,7 @@ impl Uri {
 			scheme: unsafe { Scheme::new_unchecked(&bytes[ranges.scheme]) },
 			authority: ranges.authority
 				.map(|r| unsafe { Authority::new_unchecked(&self.0[r]) }),
-			// path: unsafe { Path::new_unchecked(&self.0[ranges.path]) },
+			path: unsafe { Path::new_unchecked(&self.0[ranges.path]) },
 			query: ranges.query
 				.map(|r| unsafe { Query::new_unchecked(&self.0[r]) }),
 			fragment: ranges.fragment
@@ -48,40 +65,27 @@ impl Uri {
 		}
 	}
 
-	/// Returns the scheme of the IRI.
+	/// Returns the scheme of the URI.
 	#[inline]
 	pub fn scheme(&self) -> &Scheme {
-		let bytes = self.as_bytes();
-		let range = parse::scheme(bytes, 0);
-		unsafe {
-			Scheme::new_unchecked(&bytes[range])
-		}
+		RiImpl::scheme(self)
 	}
 
-	/// Returns the authority part of the IRI reference, if any.
+	/// Returns the authority part of the URI, if any.
 	pub fn authority(&self) -> Option<&Authority> {
-		parse::find_authority(self.as_bytes(), 0).map(|range| unsafe {
-			Authority::new_unchecked(&self.0[range])
-		})
+		RiRefImpl::authority(self)
 	}
 
-	// /// Returns the path of the IRI reference.
-	// pub fn path(&self) -> &Path {
-	// 	let range = parse::find_path(self.as_bytes(), 0);
-	// 	unsafe {
-	// 		Path::new_unchecked(&self.0[range])
-	// 	}
-	// }
+	/// Returns the path of the URI.
+	pub fn path(&self) -> &Path {
+		RiRefImpl::path(self)
+	}
 
 	pub fn query(&self) -> Option<&Query> {
-		parse::find_query(self.as_bytes(), 0).map(|range| {
-			unsafe { Query::new_unchecked(&self.0[range]) }
-		})
+		RiRefImpl::query(self)
 	}
 
 	pub fn fragment(&self) -> Option<&Fragment> {
-		parse::find_fragment(self.as_bytes(), 0).map(|range| {
-			unsafe { Fragment::new_unchecked(&self.0[range]) }
-		})
+		RiRefImpl::fragment(self)
 	}
 }

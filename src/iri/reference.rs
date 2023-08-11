@@ -1,7 +1,7 @@
 use core::fmt;
 use static_regular_grammar::RegularGrammar;
 
-use crate::parse::{self, SchemeAuthorityOrPath, AuthorityOrPath};
+use crate::{common::{parse, RiRefImpl, RiRefBufImpl}, Iri, IriBuf, RiRefParts};
 
 use super::{Authority, Fragment, Path, Query, Scheme};
 
@@ -16,13 +16,18 @@ use super::{Authority, Fragment, Path, Query, Scheme};
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct IriRef(str);
 
-pub struct IriRefParts<'a> {
-	pub scheme: Option<&'a Scheme>,
-	pub authority: Option<&'a Authority>,
-	pub path: &'a Path,
-	pub query: Option<&'a Query>,
-	pub fragment: Option<&'a Fragment>,
+impl RiRefImpl for IriRef {
+	type Authority = Authority;
+	type Path = Path;
+	type Query = Query;
+	type Fragment = Fragment;
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
 }
+
+pub type IriRefParts<'a> = RiRefParts<'a, IriRef>;
 
 impl IriRef {
 	pub fn parts(&self) -> IriRefParts {
@@ -53,7 +58,7 @@ impl IriRef {
 
 	/// Returns the authority part of the IRI reference, if any.
 	pub fn authority(&self) -> Option<&Authority> {
-		parse::find_authority(self.as_bytes(), 0).map(|range| unsafe {
+		parse::find_authority(self.as_bytes(), 0).ok().map(|range| unsafe {
 			Authority::new_unchecked(&self.0[range])
 		})
 	}
@@ -67,13 +72,13 @@ impl IriRef {
 	}
 
 	pub fn query(&self) -> Option<&Query> {
-		parse::find_query(self.as_bytes(), 0).map(|range| {
+		parse::find_query(self.as_bytes(), 0).ok().map(|range| {
 			unsafe { Query::new_unchecked(&self.0[range]) }
 		})
 	}
 
 	pub fn fragment(&self) -> Option<&Fragment> {
-		parse::find_fragment(self.as_bytes(), 0).map(|range| {
+		parse::find_fragment(self.as_bytes(), 0).ok().map(|range| {
 			unsafe { Fragment::new_unchecked(&self.0[range]) }
 		})
 	}
@@ -82,6 +87,50 @@ impl IriRef {
 impl fmt::Display for IriRef {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		self.0.fmt(f)
+	}
+}
+
+impl RiRefImpl for IriRefBuf {
+	type Authority = Authority;
+	type Path = Path;
+	type Query = Query;
+	type Fragment = Fragment;
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
+}
+
+impl RiRefBufImpl for IriRefBuf {
+	type Ri = Iri;
+	type RiBuf = IriBuf;
+
+	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
+		self.0.as_mut_vec()
+	}
+}
+
+impl IriRefBuf {
+	#[inline]
+	pub fn as_iri(&self) -> Option<&Iri> {
+		if self.scheme().is_some() {
+			Some(unsafe { Iri::new_unchecked(&self.0) })
+		} else {
+			None
+		}
+	}
+
+	pub unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
+		self.0.as_mut_vec()
+	}
+
+	/// Resolve the IRI reference.
+	///
+	/// ## Abnormal use of dot segments.
+	///
+	/// See <https://www.rfc-editor.org/errata/eid4547>
+	pub fn resolve(&mut self, base_iri: &impl AsRef<Iri>) {
+		RiRefBufImpl::resolve(self, base_iri.as_ref())
 	}
 }
 

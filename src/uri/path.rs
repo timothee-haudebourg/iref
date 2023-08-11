@@ -12,13 +12,14 @@ use super::PathMut;
 /// IRI path.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "src/iri/grammar.abnf",
-	entry_point = "ipath",
-	cache = "automata/iri/path.aut.cbor"
+	file = "src/uri/grammar.abnf",
+	entry_point = "path",
+	ascii,
+	cache = "automata/uri/path.aut.cbor"
 )]
 #[grammar(sized(PathBuf, derive(Debug, Display)))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
-pub struct Path(str);
+pub struct Path([u8]);
 
 impl PathImpl for Path {
 	const EMPTY: &'static Self = Self::EMPTY;
@@ -30,7 +31,7 @@ impl PathImpl for Path {
 	type Owned = PathBuf;
 
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
-		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+		Self::new_unchecked(bytes)
 	}
 
 	#[inline(always)]
@@ -40,7 +41,7 @@ impl PathImpl for Path {
 
 	fn to_path_buf(&self) -> Self::Owned {
 		unsafe {
-			PathBuf::new_unchecked(self.to_string())
+			PathBuf::new_unchecked(self.as_bytes().to_vec())
 		}
 	}
 }
@@ -49,13 +50,13 @@ impl PathBufImpl for PathBuf {
 	type Borrowed = Path;
 
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
-		self.0.as_mut_vec()
+		&mut self.0
 	}
 }
 
 impl Path {
 	/// The empty absolute path `/`.
-	pub const EMPTY_ABSOLUTE: &'static Self = unsafe { Self::new_unchecked("/") };
+	pub const EMPTY_ABSOLUTE: &'static Self = unsafe { Self::new_unchecked(b"/") };
 
 	/// Returns the number of segments in the path.
 	///
@@ -317,7 +318,7 @@ impl PathBuf {
 	/// memory safety, as the rest of the library assumes that `PathBuf` are
 	/// valid paths.
 	pub unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
-		self.0.as_mut_vec()
+		PathBufImpl::as_mut_vec(self)
 	}
 
 	pub fn as_path_mut(&mut self) -> PathMut {
@@ -384,7 +385,7 @@ mod tests {
 
 	#[test]
 	fn non_empty() {
-		let path = Path::new("a/b").unwrap();
+		let path = Path::new(b"a/b").unwrap();
 
 		assert!(!path.is_empty());
 		assert!(!path.is_absolute());
@@ -397,25 +398,25 @@ mod tests {
 
 	#[test]
 	fn non_empty_absolute() {
-		let path = Path::new("/foo/bar").unwrap();
+		let path = Path::new(b"/foo/bar").unwrap();
 		assert!(!path.is_empty());
 		assert!(path.is_absolute());
 
 		let mut segments = path.segments();
-		assert!(segments.next().unwrap().as_str() == "foo");
-		assert!(segments.next().unwrap().as_str() == "bar");
+		assert!(segments.next().unwrap().as_bytes() == b"foo");
+		assert!(segments.next().unwrap().as_bytes() == b"bar");
 		assert!(segments.next().is_none());
 	}
 
 	#[test]
 	fn next_segment() {
-		let vectors = [
-			("foo/bar", 0, Some(("foo", 4))),
-			("foo/bar", 4, Some(("bar", 8))),
-			("foo/bar", 8, None),
-			("foo/bar/", 8, Some(("", 9))),
-			("foo/bar/", 9, None),
-			("//foo", 1, Some(("", 2))),
+		let vectors: [(&[u8], usize, Option<(&[u8], usize)>); 6] = [
+			(b"foo/bar", 0, Some((b"foo", 4))),
+			(b"foo/bar", 4, Some((b"bar", 8))),
+			(b"foo/bar", 8, None),
+			(b"foo/bar/", 8, Some((b"", 9))),
+			(b"foo/bar/", 9, None),
+			(b"//foo", 1, Some((b"", 2))),
 		];
 
 		for (input, offset, expected) in vectors {
@@ -430,14 +431,14 @@ mod tests {
 
 	#[test]
 	fn previous_segment() {
-		let vectors = [
-			("/foo/bar", 1, None),
-			("foo/bar", 0, None),
-			("foo/bar", 4, Some(("foo", 0))),
-			("foo/bar", 8, Some(("bar", 4))),
-			("foo/bar/", 8, Some(("bar", 4))),
-			("foo/bar/", 9, Some(("", 8))),
-			("//a/b", 4, Some(("a", 2))),
+		let vectors: [(&[u8], usize, Option<(&[u8], usize)>); 7] = [
+			(b"/foo/bar", 1, None),
+			(b"foo/bar", 0, None),
+			(b"foo/bar", 4, Some((b"foo", 0))),
+			(b"foo/bar", 8, Some((b"bar", 4))),
+			(b"foo/bar/", 8, Some((b"bar", 4))),
+			(b"foo/bar/", 9, Some((b"", 8))),
+			(b"//a/b", 4, Some((b"a", 2))),
 		];
 
 		for (input, offset, expected) in vectors {
@@ -452,11 +453,11 @@ mod tests {
 
 	#[test]
 	fn first_segment() {
-		let vectors = [
-			("", None),
-			("/", None),
-			("//", Some("")),
-			("/foo/bar", Some("foo")),
+		let vectors: [(&[u8], Option<&[u8]>); 4] = [
+			(b"", None),
+			(b"/", None),
+			(b"//", Some(b"")),
+			(b"/foo/bar", Some(b"foo")),
 		];
 
 		for (input, expected) in vectors {
@@ -469,15 +470,15 @@ mod tests {
 
 	#[test]
 	fn segments() {
-		let vectors: [(&str, &[&str]); 8] = [
-			("", &[]),
-			("foo", &["foo"]),
-			("/foo", &["foo"]),
-			("foo/", &["foo", ""]),
-			("/foo/", &["foo", ""]),
-			("a/b/c/d", &["a", "b", "c", "d"]),
-			("a/b//c/d", &["a", "b", "", "c", "d"]),
-			("//a/b/foo//bar/", &["", "a", "b", "foo", "", "bar", ""]),
+		let vectors: [(&[u8], &[&[u8]]); 8] = [
+			(b"", &[]),
+			(b"foo", &[b"foo"]),
+			(b"/foo", &[b"foo"]),
+			(b"foo/", &[b"foo", b""]),
+			(b"/foo/", &[b"foo", b""]),
+			(b"a/b/c/d", &[b"a", b"b", b"c", b"d"]),
+			(b"a/b//c/d", &[b"a", b"b", b"", b"c", b"d"]),
+			(b"//a/b/foo//bar/", &[b"", b"a", b"b", b"foo", b"", b"bar", b""]),
 		];
 
 		for (input, expected) in vectors {
@@ -487,21 +488,21 @@ mod tests {
 			assert!(segments
 				.into_iter()
 				.zip(expected)
-				.all(|(a, b)| a.as_str() == *b))
+				.all(|(a, b)| a.as_bytes() == *b))
 		}
 	}
 
 	#[test]
 	fn segments_rev() {
-		let vectors: [(&str, &[&str]); 8] = [
-			("", &[]),
-			("foo", &["foo"]),
-			("/foo", &["foo"]),
-			("foo/", &["foo", ""]),
-			("/foo/", &["foo", ""]),
-			("a/b/c/d", &["a", "b", "c", "d"]),
-			("a/b//c/d", &["a", "b", "", "c", "d"]),
-			("//a/b/foo//bar/", &["", "a", "b", "foo", "", "bar", ""]),
+		let vectors: [(&[u8], &[&[u8]]); 8] = [
+			(b"", &[]),
+			(b"foo", &[b"foo"]),
+			(b"/foo", &[b"foo"]),
+			(b"foo/", &[b"foo", b""]),
+			(b"/foo/", &[b"foo", b""]),
+			(b"a/b/c/d", &[b"a", b"b", b"c", b"d"]),
+			(b"a/b//c/d", &[b"a", b"b", b"", b"c", b"d"]),
+			(b"//a/b/foo//bar/", &[b"", b"a", b"b", b"foo", b"", b"bar", b""]),
 		];
 
 		for (input, expected) in vectors {
@@ -511,46 +512,45 @@ mod tests {
 			assert!(segments
 				.into_iter()
 				.zip(expected.into_iter().rev())
-				.all(|(a, b)| a.as_str() == *b))
+				.all(|(a, b)| a.as_bytes() == *b))
 		}
 	}
 
 	#[test]
 	fn normalized() {
-		let vectors = [
-			("", ""),
-			("a/b/c", "a/b/c"),
-			("a/..", ""),
-			("a/b/..", "a"),
-			("a/b/../", "a/"),
-			("a/b/c/..", "a/b"),
-			("a/b/c/.", "a/b/c"),
-			("a/../..", ".."),
-			("/a/../..", "/.."),
+		let vectors: [(&[u8], &[u8]); 9] = [
+			(b"", b""),
+			(b"a/b/c", b"a/b/c"),
+			(b"a/..", b""),
+			(b"a/b/..", b"a"),
+			(b"a/b/../", b"a/"),
+			(b"a/b/c/..", b"a/b"),
+			(b"a/b/c/.", b"a/b/c"),
+			(b"a/../..", b".."),
+			(b"/a/../..", b"/.."),
 		];
 
 		for (input, expected) in vectors {
-			eprintln!("{input}, {expected}");
 			let path = Path::new(input).unwrap();
 			let output = path.normalized();
-			assert_eq!(output.as_str(), expected);
+			assert_eq!(output.as_bytes(), expected);
 		}
 	}
 
 	#[test]
 	fn eq() {
-		let vectors = [
-			("a/b/c", "a/b/c"),
-			("a/b/c", "a/b/c/."),
-			("a/b/c/", "a/b/c/./"),
-			("a/b/c", "a/b/../b/c"),
-			("a/b/c/..", "a/b"),
-			("a/..", ""),
-			("/a/..", "/"),
-			("a/../..", ".."),
-			("/a/../..", "/.."),
-			("a/b/c/./", "a/b/c/"),
-			("a/b/c/../", "a/b/"),
+		let vectors: [(&[u8], &[u8]); 11] = [
+			(b"a/b/c", b"a/b/c"),
+			(b"a/b/c", b"a/b/c/."),
+			(b"a/b/c/", b"a/b/c/./"),
+			(b"a/b/c", b"a/b/../b/c"),
+			(b"a/b/c/..", b"a/b"),
+			(b"a/..", b""),
+			(b"/a/..", b"/"),
+			(b"a/../..", b".."),
+			(b"/a/../..", b"/.."),
+			(b"a/b/c/./", b"a/b/c/"),
+			(b"a/b/c/../", b"a/b/"),
 		];
 
 		for (a, b) in vectors {
@@ -562,10 +562,10 @@ mod tests {
 
 	#[test]
 	fn ne() {
-		let vectors = [
-			("a/b/c", "a/b/c/"),
-			("a/b/c/", "a/b/c/."),
-			("a/b/c/../", "a/b"),
+		let vectors: [(&[u8], &[u8]); 3] = [
+			(b"a/b/c", b"a/b/c/"),
+			(b"a/b/c/", b"a/b/c/."),
+			(b"a/b/c/../", b"a/b"),
 		];
 
 		for (a, b) in vectors {
@@ -577,48 +577,48 @@ mod tests {
 
 	#[test]
 	fn file_name() {
-		let vectors = [("//a/b/foo//bar/", None), ("//a/b/foo//bar", Some("bar"))];
+		let vectors: [(&[u8], Option<&[u8]>); 2] = [(b"//a/b/foo//bar/", None), (b"//a/b/foo//bar", Some(b"bar"))];
 
 		for (input, expected) in vectors {
 			let input = Path::new(input).unwrap();
-			assert_eq!(input.file_name().map(Segment::as_str), expected)
+			assert_eq!(input.file_name().map(Segment::as_bytes), expected)
 		}
 	}
 
 	#[test]
 	fn parent() {
-		let vectors = [
-			("", None),
-			("/", None),
-			(".", None),
-			("//a/b/foo//bar", Some("//a/b/foo/")),
-			("//a/b/foo//", Some("//a/b/foo/")),
-			("//a/b/foo/", Some("//a/b/foo")),
-			("//a/b/foo", Some("//a/b")),
-			("//a/b", Some("//a")),
-			("//a", Some("/./")),
-			("/./", Some("/.")),
-			("/.", Some("/")),
+		let vectors: [(&[u8], Option<&[u8]>); 11] = [
+			(b"", None),
+			(b"/", None),
+			(b".", None),
+			(b"//a/b/foo//bar", Some(b"//a/b/foo/")),
+			(b"//a/b/foo//", Some(b"//a/b/foo/")),
+			(b"//a/b/foo/", Some(b"//a/b/foo")),
+			(b"//a/b/foo", Some(b"//a/b")),
+			(b"//a/b", Some(b"//a")),
+			(b"//a", Some(b"/./")),
+			(b"/./", Some(b"/.")),
+			(b"/.", Some(b"/")),
 		];
 
 		for (input, expected) in vectors {
 			let input = Path::new(input).unwrap();
-			assert_eq!(input.parent().map(Path::as_str), expected)
+			assert_eq!(input.parent().map(Path::as_bytes), expected)
 		}
 	}
 
 	#[test]
 	fn suffix() {
-		let vectors = [
-			("/foo/bar/baz", "/foo/bar", Some("baz")),
-			("//foo", "/", Some(".//foo")),
-			("/a/b/baz", "/foo/bar", None),
+		let vectors: [(&[u8], &[u8], Option<&[u8]>); 3] = [
+			(b"/foo/bar/baz", b"/foo/bar", Some(b"baz")),
+			(b"//foo", b"/", Some(b".//foo")),
+			(b"/a/b/baz", b"/foo/bar", None),
 		];
 
 		for (path, prefix, expected_suffix) in vectors {
 			let path = Path::new(path).unwrap();
 			let suffix = path.suffix(Path::new(prefix).unwrap());
-			assert_eq!(suffix.as_deref().map(Path::as_str), expected_suffix)
+			assert_eq!(suffix.as_deref().map(Path::as_bytes), expected_suffix)
 		}
 	}
 }

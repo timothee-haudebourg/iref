@@ -8,6 +8,7 @@ use static_regular_grammar::RegularGrammar;
 mod host;
 mod userinfo;
 
+use crate::common::authority::AuthorityImpl;
 pub use crate::uri::{InvalidPort, Port, PortBuf};
 pub use crate::uri::{InvalidScheme, Scheme, SchemeBuf};
 pub use host::*;
@@ -26,6 +27,19 @@ pub use userinfo::*;
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Authority(str);
 
+impl AuthorityImpl for Authority {
+	type UserInfo = UserInfo;
+	type Host = Host;
+
+	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+	}
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AuthorityParts<'a> {
 	pub user_info: Option<&'a UserInfo>,
@@ -35,48 +49,26 @@ pub struct AuthorityParts<'a> {
 
 impl Authority {
 	pub fn user_info(&self) -> Option<&UserInfo> {
-		todo!()
+		AuthorityImpl::user_info(self)
 	}
 
 	pub fn host(&self) -> &Host {
-		todo!()
+		AuthorityImpl::host(self)
 	}
 
 	pub fn port(&self) -> Option<&Port> {
-		todo!()
+		AuthorityImpl::port(self)
 	}
 
 	pub fn parts(&self) -> AuthorityParts {
-		let mut user_info_end = None;
-		let mut host_start = 0;
-		let mut host_end = None;
-		let mut port_start = None;
-
-		for (i, c) in self.0.char_indices() {
-			match c {
-				'@' if user_info_end.is_none() => {
-					if port_start.is_some() {
-						port_start = None;
-						host_end = None
-					}
-
-					user_info_end = Some(i);
-					host_start = i + 1
-				}
-				':' if port_start.is_none() => {
-					port_start = Some(i + 1);
-					host_end = Some(i)
-				}
-				_ => (),
-			}
-		}
+		let ranges = AuthorityImpl::parts(self);
 
 		AuthorityParts {
-			user_info: user_info_end.map(|e| unsafe { UserInfo::new_unchecked(&self.0[..e]) }),
+			user_info: ranges.user_info.map(|r| unsafe { UserInfo::new_unchecked(&self.0[r]) }),
 			host: unsafe {
-				Host::new_unchecked(&self.0[host_start..host_end.unwrap_or(self.0.len())])
+				Host::new_unchecked(&self.0[ranges.host])
 			},
-			port: port_start.map(|s| unsafe { Port::new_unchecked(&self.0.as_bytes()[s..]) }),
+			port: ranges.port.map(|r| unsafe { Port::new_unchecked(&self.0.as_bytes()[r]) }),
 		}
 	}
 }

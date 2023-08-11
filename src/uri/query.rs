@@ -7,6 +7,8 @@ use std::{
 
 use static_regular_grammar::RegularGrammar;
 
+use crate::common::QueryImpl;
+
 #[derive(RegularGrammar)]
 #[grammar(
 	file = "src/uri/grammar.abnf",
@@ -18,6 +20,16 @@ use static_regular_grammar::RegularGrammar;
 #[grammar(sized(QueryBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Query([u8]);
+
+impl QueryImpl for Query {
+	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+		Self::new_unchecked(bytes)
+	}
+
+	fn as_bytes(&self) -> &[u8] {
+		&self.0
+	}
+}
 
 impl Query {
 	/// Returns the query as a percent-encoded string slice.

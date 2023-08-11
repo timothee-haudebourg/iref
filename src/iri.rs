@@ -1,8 +1,7 @@
-use std::ops::Range;
-
 use static_regular_grammar::RegularGrammar;
 
 mod authority;
+mod authority_mut;
 mod fragment;
 mod path;
 mod path_mut;
@@ -10,13 +9,14 @@ mod query;
 mod reference;
 
 pub use authority::*;
+pub use authority_mut::*;
 pub use fragment::*;
 pub use path::*;
 pub use path_mut::*;
 pub use query::*;
 pub use reference::*;
 
-use crate::parse;
+use crate::common::{parse, RiImpl, RiRefImpl, RiBufImpl, RiRefBufImpl};
 
 /// IRI.
 ///
@@ -59,6 +59,19 @@ pub struct IriParts<'a> {
 	pub fragment: Option<&'a Fragment>,
 }
 
+impl RiRefImpl for Iri {
+	type Authority = Authority;
+	type Path = Path;
+	type Query = Query;
+	type Fragment = Fragment;
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
+}
+
+impl RiImpl for Iri {}
+
 impl Iri {
 	pub fn parts(&self) -> IriParts {
 		let bytes = self.as_bytes();
@@ -79,37 +92,58 @@ impl Iri {
 	/// Returns the scheme of the IRI.
 	#[inline]
 	pub fn scheme(&self) -> &Scheme {
-		let bytes = self.as_bytes();
-		let range = parse::scheme(bytes, 0);
-		unsafe {
-			Scheme::new_unchecked(&bytes[range])
-		}
+		RiImpl::scheme(self)
 	}
 
 	/// Returns the authority part of the IRI reference, if any.
 	pub fn authority(&self) -> Option<&Authority> {
-		parse::find_authority(self.as_bytes(), 0).map(|range| unsafe {
-			Authority::new_unchecked(&self.0[range])
-		})
+		RiRefImpl::authority(self)
 	}
 
 	/// Returns the path of the IRI reference.
 	pub fn path(&self) -> &Path {
-		let range = parse::find_path(self.as_bytes(), 0);
-		unsafe {
-			Path::new_unchecked(&self.0[range])
-		}
+		RiRefImpl::path(self)
 	}
 
 	pub fn query(&self) -> Option<&Query> {
-		parse::find_query(self.as_bytes(), 0).map(|range| {
-			unsafe { Query::new_unchecked(&self.0[range]) }
-		})
+		RiRefImpl::query(self)
 	}
 
 	pub fn fragment(&self) -> Option<&Fragment> {
-		parse::find_fragment(self.as_bytes(), 0).map(|range| {
-			unsafe { Fragment::new_unchecked(&self.0[range]) }
-		})
+		RiRefImpl::fragment(self)
+	}
+}
+
+impl RiRefImpl for IriBuf {
+	type Authority = Authority;
+	type Path = Path;
+	type Query = Query;
+	type Fragment = Fragment;
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
+}
+
+impl RiImpl for IriBuf {}
+
+impl RiRefBufImpl for IriBuf {
+	type Ri = Iri;
+	type RiBuf = Self;
+
+	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
+		self.0.as_mut_vec()
+	}
+}
+
+impl RiBufImpl for IriBuf {
+	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
+		Self::new_unchecked(String::from_utf8_unchecked(bytes))
+	}
+}
+
+impl IriBuf {
+	pub fn from_scheme(scheme: SchemeBuf) -> Self {
+		RiBufImpl::from_scheme(scheme)
 	}
 }

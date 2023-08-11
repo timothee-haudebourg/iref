@@ -9,6 +9,8 @@ mod host;
 mod port;
 mod userinfo;
 
+use crate::common::AuthorityImpl;
+
 pub use super::{InvalidScheme, Scheme, SchemeBuf};
 pub use host::*;
 pub use port::*;
@@ -27,6 +29,19 @@ pub use userinfo::*;
 ))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Authority([u8]);
+
+impl AuthorityImpl for Authority {
+	type UserInfo = UserInfo;
+	type Host = Host;
+
+	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+		Self::new_unchecked(bytes)
+	}
+
+	fn as_bytes(&self) -> &[u8] {
+		&self.0
+	}
+}
 
 impl Authority {
 	pub fn user_info(&self) -> Option<&UserInfo> {

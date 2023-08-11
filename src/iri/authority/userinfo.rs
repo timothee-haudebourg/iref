@@ -7,6 +7,8 @@ use std::{
 
 use static_regular_grammar::RegularGrammar;
 
+use crate::common::authority::UserInofImpl;
+
 #[derive(RegularGrammar)]
 #[grammar(
 	file = "src/iri/grammar.abnf",
@@ -20,6 +22,16 @@ use static_regular_grammar::RegularGrammar;
 ))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct UserInfo(str);
+
+impl UserInofImpl for UserInfo {
+	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+	}
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
+}
 
 impl UserInfo {
 	/// Returns the host as a percent-encoded string slice.
