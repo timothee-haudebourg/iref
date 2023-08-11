@@ -213,6 +213,7 @@
 pub mod iri;
 pub mod uri;
 pub(crate) mod utils;
+pub(crate) mod parse;
 // pub mod parsing;
 // mod reference;
 

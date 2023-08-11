@@ -10,6 +10,8 @@ pub use fragment::*;
 pub use query::*;
 pub use scheme::*;
 
+use crate::parse;
+
 #[derive(RegularGrammar)]
 #[grammar(
 	file = "src/uri/grammar.abnf",
@@ -21,147 +23,65 @@ pub use scheme::*;
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Uri([u8]);
 
+pub struct UriParts<'a> {
+	pub scheme: &'a Scheme,
+	pub authority: Option<&'a Authority>,
+	// pub path: &'a Path,
+	pub query: Option<&'a Query>,
+	pub fragment: Option<&'a Fragment>,
+}
+
 impl Uri {
-	/// Returns the scheme of the URI.
-	///
-	/// Contrarily to [`UriRef`], the scheme of an URI is always defined.
+	pub fn parts(&self) -> UriParts {
+		let bytes = self.as_bytes();
+		let ranges = parse::parts(bytes, 0);
+
+		UriParts {
+			scheme: unsafe { Scheme::new_unchecked(&bytes[ranges.scheme]) },
+			authority: ranges.authority
+				.map(|r| unsafe { Authority::new_unchecked(&self.0[r]) }),
+			// path: unsafe { Path::new_unchecked(&self.0[ranges.path]) },
+			query: ranges.query
+				.map(|r| unsafe { Query::new_unchecked(&self.0[r]) }),
+			fragment: ranges.fragment
+				.map(|r| unsafe { Fragment::new_unchecked(&self.0[r]) }),
+		}
+	}
+
+	/// Returns the scheme of the IRI.
 	#[inline]
 	pub fn scheme(&self) -> &Scheme {
+		let bytes = self.as_bytes();
+		let range = parse::scheme(bytes, 0);
 		unsafe {
-			// SAFETY: URIs always have a scheme.
-			Scheme::new_unchecked(self.0.split(|b| *b == b':').next().unwrap())
+			Scheme::new_unchecked(&bytes[range])
 		}
 	}
 
-	/// Returns the authority part of the URI, if any.
+	/// Returns the authority part of the IRI reference, if any.
 	pub fn authority(&self) -> Option<&Authority> {
-		#[derive(Clone, Copy)]
-		pub enum State {
-			Scheme,
-			FirstSlash,
-			SecondSlash,
-			Capture(usize, usize),
-		}
-
-		let mut q = State::Scheme;
-		for (i, c) in self.0.iter().copied().enumerate() {
-			q = match q {
-				State::Scheme => match c {
-					b':' => State::FirstSlash,
-					_ => State::Scheme,
-				},
-				State::FirstSlash => match c {
-					b'/' => State::SecondSlash,
-					_ => break,
-				},
-				State::SecondSlash => match c {
-					b'/' => State::Capture(i + 1, i + 1),
-					_ => break,
-				},
-				State::Capture(start, _) => match c {
-					b'/' | b'?' | b'#' => break,
-					_ => State::Capture(start, i + 1),
-				},
-			}
-		}
-
-		match q {
-			State::Capture(start, end) => {
-				Some(unsafe { Authority::new_unchecked(&self.0[start..end]) })
-			}
-			_ => None,
-		}
+		parse::find_authority(self.as_bytes(), 0).map(|range| unsafe {
+			Authority::new_unchecked(&self.0[range])
+		})
 	}
 
-	// /// Returns the path of the URI.
+	// /// Returns the path of the IRI reference.
 	// pub fn path(&self) -> &Path {
-	// 	#[derive(Clone, Copy)]
-	// 	pub enum State {
-	// 		Scheme,
-	// 		FirstSlash(usize),
-	// 		SecondSlash(usize, usize),
-	// 		Authority(usize),
-	// 		Capture(usize, usize)
-	// 	}
-
-	// 	let mut q = State::Scheme;
-	// 	for (i, c) in &self.0 {
-	// 		q = match q {
-	// 			State::Scheme => match c {
-	// 				b':' => State::FirstSlash(i + 1),
-	// 				_ => State::Scheme
-	// 			}
-	// 			State::FirstSlash(_) => match c {
-	// 				b'/' => State::SecondSlash(i, i + 1),
-	// 				b'?' | b'#' => break,
-	// 				_ => State::Capture(i, i)
-	// 			}
-	// 			State::SecondSlash(start, end) => match c {
-	// 				b'/' => State::Authority(i + 1),
-	// 				b'?' | b'#' => break,
-	// 				_ => State::Capture(start, end)
-	// 			}
-	// 			State::Authority(_) => match c {
-	// 				b'/' => State::Capture(i, i + 1),
-	// 				b'?' | b'#' => break,
-	// 				c => State::Authority(c.len_utf8())
-	// 			}
-	// 			State::Capture(start, _) => match c {
-	// 				b'?' | b'#' => break,
-	// 				_ => State::Capture(start, i + 1)
-	// 			}
-	// 		}
-	// 	}
-
-	// 	let (start, end) = match q {
-	// 		State::Scheme => unreachable!(),
-	// 		State::FirstSlash(start) => (start, start),
-	// 		State::SecondSlash(start, end) => (start, end),
-	// 		State::Authority(start) => (start, start),
-	// 		State::Capture(start, end) => (start, end)
-	// 	};
-
+	// 	let range = parse::find_path(self.as_bytes(), 0);
 	// 	unsafe {
-	// 		Path::new_unchecked(&self.0[start..end])
+	// 		Path::new_unchecked(&self.0[range])
 	// 	}
 	// }
 
 	pub fn query(&self) -> Option<&Query> {
-		pub enum State {
-			Before,
-			Capture(usize, usize),
-		}
-
-		let mut q = State::Before;
-		for (i, c) in self.0.iter().copied().enumerate() {
-			q = match q {
-				State::Before => match c {
-					b'?' => State::Capture(i + 1, i + 1),
-					b'#' => break,
-					_ => State::Before,
-				},
-				State::Capture(start, _) => match c {
-					b'#' => break,
-					_ => State::Capture(start, i + 1),
-				},
-			}
-		}
-
-		match q {
-			State::Before => None,
-			State::Capture(start, end) => {
-				Some(unsafe { Query::new_unchecked(&self.0[start..end]) })
-			}
-		}
+		parse::find_query(self.as_bytes(), 0).map(|range| {
+			unsafe { Query::new_unchecked(&self.0[range]) }
+		})
 	}
 
 	pub fn fragment(&self) -> Option<&Fragment> {
-		for i in 0..self.0.len() {
-			if self.0[i] == b'#' {
-				return Some(unsafe { Fragment::new_unchecked(&self.0[i + 1..]) });
-			}
-		}
-
-		None
+		parse::find_fragment(self.as_bytes(), 0).map(|range| {
+			unsafe { Fragment::new_unchecked(&self.0[range]) }
+		})
 	}
 }
