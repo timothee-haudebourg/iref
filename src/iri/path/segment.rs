@@ -1,6 +1,6 @@
 use pct_str::PctStr;
 use std::{
-	cmp, fmt,
+	cmp,
 	hash::{self, Hash},
 	ops,
 };

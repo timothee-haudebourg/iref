@@ -1,5 +1,5 @@
 use std::{
-	cmp, fmt,
+	cmp,
 	hash::{self, Hash},
 };
 

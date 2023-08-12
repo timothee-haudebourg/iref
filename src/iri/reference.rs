@@ -1,4 +1,3 @@
-use core::fmt;
 use static_regular_grammar::RegularGrammar;
 
 use crate::{
@@ -84,7 +83,7 @@ impl IriRef {
 	/// See the [`IriRefBuf::resolve`] method for more information about the resolution process.
 	#[inline]
 	pub fn resolved(&self, base_iri: &impl AsRef<Iri>) -> IriBuf {
-		let mut iri_ref = self.to_owned();
+		let iri_ref = self.to_owned();
 		iri_ref.resolved(base_iri)
 	}
 }

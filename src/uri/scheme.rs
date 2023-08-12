@@ -1,5 +1,4 @@
 use static_regular_grammar::RegularGrammar;
-use std::fmt;
 
 #[derive(RegularGrammar, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[grammar(
