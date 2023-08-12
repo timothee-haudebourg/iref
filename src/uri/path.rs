@@ -5,7 +5,7 @@ mod segment;
 
 pub use segment::*;
 
-use crate::common::path::{SegmentsImpl, NormalizedSegmentsImpl, PathImpl, PathBufImpl};
+use crate::common::path::{NormalizedSegmentsImpl, PathBufImpl, PathImpl, SegmentsImpl};
 
 use super::PathMut;
 
@@ -40,9 +40,7 @@ impl PathImpl for Path {
 	}
 
 	fn to_path_buf(&self) -> Self::Owned {
-		unsafe {
-			PathBuf::new_unchecked(self.as_bytes().to_vec())
-		}
+		unsafe { PathBuf::new_unchecked(self.as_bytes().to_vec()) }
 	}
 }
 
@@ -181,20 +179,6 @@ impl Path {
 	#[inline]
 	pub fn suffix(&self, prefix: &Self) -> Option<PathBuf> {
 		PathImpl::suffix(self, prefix)
-	}
-}
-
-impl fmt::Display for Path {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Path {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
 	}
 }
 
@@ -478,7 +462,10 @@ mod tests {
 			(b"/foo/", &[b"foo", b""]),
 			(b"a/b/c/d", &[b"a", b"b", b"c", b"d"]),
 			(b"a/b//c/d", &[b"a", b"b", b"", b"c", b"d"]),
-			(b"//a/b/foo//bar/", &[b"", b"a", b"b", b"foo", b"", b"bar", b""]),
+			(
+				b"//a/b/foo//bar/",
+				&[b"", b"a", b"b", b"foo", b"", b"bar", b""],
+			),
 		];
 
 		for (input, expected) in vectors {
@@ -502,7 +489,10 @@ mod tests {
 			(b"/foo/", &[b"foo", b""]),
 			(b"a/b/c/d", &[b"a", b"b", b"c", b"d"]),
 			(b"a/b//c/d", &[b"a", b"b", b"", b"c", b"d"]),
-			(b"//a/b/foo//bar/", &[b"", b"a", b"b", b"foo", b"", b"bar", b""]),
+			(
+				b"//a/b/foo//bar/",
+				&[b"", b"a", b"b", b"foo", b"", b"bar", b""],
+			),
 		];
 
 		for (input, expected) in vectors {
@@ -577,7 +567,10 @@ mod tests {
 
 	#[test]
 	fn file_name() {
-		let vectors: [(&[u8], Option<&[u8]>); 2] = [(b"//a/b/foo//bar/", None), (b"//a/b/foo//bar", Some(b"bar"))];
+		let vectors: [(&[u8], Option<&[u8]>); 2] = [
+			(b"//a/b/foo//bar/", None),
+			(b"//a/b/foo//bar", Some(b"bar")),
+		];
 
 		for (input, expected) in vectors {
 			let input = Path::new(input).unwrap();

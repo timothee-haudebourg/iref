@@ -1,10 +1,10 @@
-use std::{ops::Deref, marker::PhantomData};
+use std::{marker::PhantomData, ops::Deref};
 
 use smallvec::SmallVec;
 
 use crate::utils::{allocate_range, replace};
 
-use super::path::{PathImpl, PathBufImpl, SegmentImpl, PARENT_SEGMENT, CURRENT_SEGMENT};
+use super::path::{PathBufImpl, PathImpl, SegmentImpl, CURRENT_SEGMENT, PARENT_SEGMENT};
 
 /// Stack size (in bytes) allocated for the `normalize` method to normalize a
 /// `Path`. If it needs more space, it will allocate memory on the heap.
@@ -21,30 +21,24 @@ pub struct PathMutImpl<'a, P: ?Sized> {
 	/// End offset (excluded).
 	end: usize,
 
-	p: PhantomData<P>
+	p: PhantomData<P>,
 }
 
 impl<'a, P: ?Sized + PathImpl> Deref for PathMutImpl<'a, P> {
 	type Target = P;
 
 	fn deref(&self) -> &Self::Target {
-		unsafe {
-			P::new_unchecked(&self.buffer[self.start..self.end])
-		}
+		unsafe { P::new_unchecked(&self.buffer[self.start..self.end]) }
 	}
 }
 
 impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
-	pub unsafe fn new(
-		buffer: &'a mut Vec<u8>,
-		start: usize,
-		end: usize,
-	) -> Self {
+	pub unsafe fn new(buffer: &'a mut Vec<u8>, start: usize, end: usize) -> Self {
 		Self {
 			buffer,
 			start,
 			end,
-			p: PhantomData
+			p: PhantomData,
 		}
 	}
 
@@ -59,7 +53,7 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 			buffer,
 			start: 0,
 			end,
-			p: PhantomData
+			p: PhantomData,
 		}
 	}
 

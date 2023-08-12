@@ -47,20 +47,6 @@ impl ops::Deref for Query {
 	}
 }
 
-impl fmt::Display for Query {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Query {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
 impl cmp::PartialEq for Query {
 	#[inline]
 	fn eq(&self, other: &Query) -> bool {

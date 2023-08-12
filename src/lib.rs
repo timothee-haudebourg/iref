@@ -210,18 +210,14 @@
 */
 
 // pub mod parsing;
+pub(crate) mod common;
 pub mod iri;
 pub mod uri;
 pub(crate) mod utils;
-pub(crate) mod common;
 // pub mod parsing;
 // mod reference;
 
-pub use common::{
-	RiParts,
-	RiRefParts,
-	RiRefPartsPresence
-};
+pub use common::{RiParts, RiRefParts, RiRefPartsPresence};
 
 pub use iri::{Iri, IriBuf, IriRef, IriRefBuf};
 pub use uri::{Uri, UriBuf};

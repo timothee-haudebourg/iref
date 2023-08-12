@@ -1,5 +1,5 @@
-use std::ops::Deref;
 use crate::common::path_mut::PathMutImpl;
+use std::ops::Deref;
 
 use super::{path::Segment, Path, PathBuf};
 
@@ -15,11 +15,7 @@ impl<'a> Deref for PathMut<'a> {
 }
 
 impl<'a> PathMut<'a> {
-	pub unsafe fn new(
-		buffer: &'a mut Vec<u8>,
-		start: usize,
-		end: usize,
-	) -> Self {
+	pub unsafe fn new(buffer: &'a mut Vec<u8>, start: usize, end: usize) -> Self {
 		Self(PathMutImpl::new(buffer, start, end))
 	}
 

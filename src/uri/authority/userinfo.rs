@@ -50,20 +50,6 @@ impl ops::Deref for UserInfo {
 	}
 }
 
-impl fmt::Display for UserInfo {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for UserInfo {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
 impl cmp::PartialEq for UserInfo {
 	#[inline]
 	fn eq(&self, other: &UserInfo) -> bool {

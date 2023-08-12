@@ -5,7 +5,7 @@ mod segment;
 
 pub use segment::*;
 
-use crate::common::path::{SegmentsImpl, NormalizedSegmentsImpl, PathImpl, PathBufImpl};
+use crate::common::path::{NormalizedSegmentsImpl, PathBufImpl, PathImpl, SegmentsImpl};
 
 use super::PathMut;
 
@@ -39,9 +39,7 @@ impl PathImpl for Path {
 	}
 
 	fn to_path_buf(&self) -> Self::Owned {
-		unsafe {
-			PathBuf::new_unchecked(self.to_string())
-		}
+		unsafe { PathBuf::new_unchecked(self.to_string()) }
 	}
 }
 
@@ -180,20 +178,6 @@ impl Path {
 	#[inline]
 	pub fn suffix(&self, prefix: &Self) -> Option<PathBuf> {
 		PathImpl::suffix(self, prefix)
-	}
-}
-
-impl fmt::Display for Path {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Path {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
 	}
 }
 

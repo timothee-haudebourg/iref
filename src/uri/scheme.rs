@@ -14,15 +14,3 @@ use std::fmt;
 ))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Scheme([u8]);
-
-impl fmt::Debug for Scheme {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Display for Scheme {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}

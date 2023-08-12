@@ -50,20 +50,6 @@ impl ops::Deref for Fragment {
 	}
 }
 
-impl fmt::Display for Fragment {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Fragment {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
 impl cmp::PartialEq for Fragment {
 	#[inline]
 	fn eq(&self, other: &Fragment) -> bool {

@@ -11,15 +11,3 @@ use std::fmt;
 #[grammar(sized(PortBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Port([u8]);
-
-impl fmt::Debug for Port {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Display for Port {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}

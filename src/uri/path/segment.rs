@@ -66,20 +66,6 @@ impl ops::Deref for Segment {
 	}
 }
 
-impl fmt::Display for Segment {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Segment {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
 impl PartialEq for Segment {
 	fn eq(&self, other: &Self) -> bool {
 		self.as_pct_str() == other.as_pct_str()

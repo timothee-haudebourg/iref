@@ -1,7 +1,10 @@
 use core::fmt;
 use static_regular_grammar::RegularGrammar;
 
-use crate::{common::{parse, RiRefImpl, RiRefBufImpl}, Iri, IriBuf, RiRefParts};
+use crate::{
+	common::{parse, RiRefBufImpl, RiRefImpl},
+	Iri, IriBuf, RiRefParts,
+};
 
 use super::{Authority, Fragment, Path, Query, Scheme};
 
@@ -12,7 +15,7 @@ use super::{Authority, Fragment, Path, Query, Scheme};
 	entry_point = "IRI-reference",
 	cache = "automata/iri/reference.aut.cbor"
 )]
-#[grammar(sized(IriRefBuf))]
+#[grammar(sized(IriRefBuf, derive(Debug, Display)))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct IriRef(str);
 
@@ -35,14 +38,18 @@ impl IriRef {
 		let ranges = parse::reference_parts(bytes, 0);
 
 		IriRefParts {
-			scheme: ranges.scheme
+			scheme: ranges
+				.scheme
 				.map(|r| unsafe { Scheme::new_unchecked(&bytes[r]) }),
-			authority: ranges.authority
+			authority: ranges
+				.authority
 				.map(|r| unsafe { Authority::new_unchecked(&self.0[r]) }),
 			path: unsafe { Path::new_unchecked(&self.0[ranges.path]) },
-			query: ranges.query
+			query: ranges
+				.query
 				.map(|r| unsafe { Query::new_unchecked(&self.0[r]) }),
-			fragment: ranges.fragment
+			fragment: ranges
+				.fragment
 				.map(|r| unsafe { Fragment::new_unchecked(&self.0[r]) }),
 		}
 	}
@@ -50,43 +57,35 @@ impl IriRef {
 	/// Returns the scheme of the IRI reference, if any.
 	#[inline]
 	pub fn scheme(&self) -> Option<&Scheme> {
-		let bytes = self.as_bytes();
-		parse::find_scheme(bytes, 0).map(|range| unsafe {
-			Scheme::new_unchecked(&bytes[range])
-		})
+		RiRefImpl::scheme_opt(self)
 	}
 
 	/// Returns the authority part of the IRI reference, if any.
 	pub fn authority(&self) -> Option<&Authority> {
-		parse::find_authority(self.as_bytes(), 0).ok().map(|range| unsafe {
-			Authority::new_unchecked(&self.0[range])
-		})
+		RiRefImpl::authority(self)
 	}
 
 	/// Returns the path of the IRI reference.
 	pub fn path(&self) -> &Path {
-		let range = parse::find_path(self.as_bytes(), 0);
-		unsafe {
-			Path::new_unchecked(&self.0[range])
-		}
+		RiRefImpl::path(self)
 	}
 
 	pub fn query(&self) -> Option<&Query> {
-		parse::find_query(self.as_bytes(), 0).ok().map(|range| {
-			unsafe { Query::new_unchecked(&self.0[range]) }
-		})
+		RiRefImpl::query(self)
 	}
 
 	pub fn fragment(&self) -> Option<&Fragment> {
-		parse::find_fragment(self.as_bytes(), 0).ok().map(|range| {
-			unsafe { Fragment::new_unchecked(&self.0[range]) }
-		})
+		RiRefImpl::fragment(self)
 	}
-}
 
-impl fmt::Display for IriRef {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		self.0.fmt(f)
+	/// Resolve the IRI reference against the given *base IRI*.
+	///
+	/// Return the resolved IRI.
+	/// See the [`IriRefBuf::resolve`] method for more information about the resolution process.
+	#[inline]
+	pub fn resolved(&self, base_iri: &impl AsRef<Iri>) -> IriBuf {
+		let mut iri_ref = self.to_owned();
+		iri_ref.resolved(base_iri)
 	}
 }
 
@@ -107,6 +106,10 @@ impl RiRefBufImpl for IriRefBuf {
 
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		self.0.as_mut_vec()
+	}
+
+	fn into_bytes(self) -> Vec<u8> {
+		self.0.into_bytes()
 	}
 }
 
@@ -131,6 +134,10 @@ impl IriRefBuf {
 	/// See <https://www.rfc-editor.org/errata/eid4547>
 	pub fn resolve(&mut self, base_iri: &impl AsRef<Iri>) {
 		RiRefBufImpl::resolve(self, base_iri.as_ref())
+	}
+
+	pub fn resolved(self, base_iri: &impl AsRef<Iri>) -> IriBuf {
+		RiRefBufImpl::resolved(self, base_iri.as_ref())
 	}
 }
 
@@ -319,6 +326,22 @@ mod tests {
 			let input = IriRef::new(input).unwrap();
 			eprintln!("{input}: {expected:?}");
 			assert_eq!(input.authority().map(Authority::as_str), expected.1)
+		}
+	}
+
+	#[test]
+	fn set_authority() {
+		let vectors = [
+			("scheme:path", Some("authority"), "scheme://authority/path"),
+			("scheme://authority//path", None, "scheme:/.//path"),
+		];
+
+		for (input, authority, expected) in vectors {
+			let mut buffer = IriRefBuf::new(input.to_string()).unwrap();
+			let authority = authority.map(Authority::new).transpose().unwrap();
+			buffer.set_authority(authority);
+			eprintln!("{input}, {authority:?} => {buffer}, {expected}");
+			assert_eq!(buffer.as_str(), expected)
 		}
 	}
 

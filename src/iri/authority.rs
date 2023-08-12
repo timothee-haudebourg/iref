@@ -1,5 +1,5 @@
 use std::{
-	cmp, fmt,
+	cmp,
 	hash::{self, Hash},
 };
 
@@ -64,26 +64,14 @@ impl Authority {
 		let ranges = AuthorityImpl::parts(self);
 
 		AuthorityParts {
-			user_info: ranges.user_info.map(|r| unsafe { UserInfo::new_unchecked(&self.0[r]) }),
-			host: unsafe {
-				Host::new_unchecked(&self.0[ranges.host])
-			},
-			port: ranges.port.map(|r| unsafe { Port::new_unchecked(&self.0.as_bytes()[r]) }),
+			user_info: ranges
+				.user_info
+				.map(|r| unsafe { UserInfo::new_unchecked(&self.0[r]) }),
+			host: unsafe { Host::new_unchecked(&self.0[ranges.host]) },
+			port: ranges
+				.port
+				.map(|r| unsafe { Port::new_unchecked(&self.0.as_bytes()[r]) }),
 		}
-	}
-}
-
-impl fmt::Display for Authority {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Authority {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
 	}
 }
 

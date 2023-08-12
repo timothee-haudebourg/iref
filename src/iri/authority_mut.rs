@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use crate::common::authority_mut::AuthorityMutImpl;
 
-use super::{Authority, UserInfo, Host, Port};
+use super::{Authority, Host, Port, UserInfo};
 
 pub struct AuthorityMut<'a>(AuthorityMutImpl<'a, Authority>);
 
@@ -15,11 +15,7 @@ impl<'a> Deref for AuthorityMut<'a> {
 }
 
 impl<'a> AuthorityMut<'a> {
-	pub unsafe fn new(
-		buffer: &'a mut Vec<u8>,
-		start: usize,
-		end: usize
-	) -> Self {
+	pub unsafe fn new(buffer: &'a mut Vec<u8>, start: usize, end: usize) -> Self {
 		Self(AuthorityMutImpl::new(buffer, start, end))
 	}
 

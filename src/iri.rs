@@ -16,7 +16,7 @@ pub use path_mut::*;
 pub use query::*;
 pub use reference::*;
 
-use crate::common::{parse, RiImpl, RiRefImpl, RiBufImpl, RiRefBufImpl};
+use crate::common::{parse, RiBufImpl, RiImpl, RiRefBufImpl, RiRefImpl};
 
 /// IRI.
 ///
@@ -79,12 +79,15 @@ impl Iri {
 
 		IriParts {
 			scheme: unsafe { Scheme::new_unchecked(&bytes[ranges.scheme]) },
-			authority: ranges.authority
+			authority: ranges
+				.authority
 				.map(|r| unsafe { Authority::new_unchecked(&self.0[r]) }),
 			path: unsafe { Path::new_unchecked(&self.0[ranges.path]) },
-			query: ranges.query
+			query: ranges
+				.query
 				.map(|r| unsafe { Query::new_unchecked(&self.0[r]) }),
-			fragment: ranges.fragment
+			fragment: ranges
+				.fragment
 				.map(|r| unsafe { Fragment::new_unchecked(&self.0[r]) }),
 		}
 	}
@@ -133,6 +136,10 @@ impl RiRefBufImpl for IriBuf {
 
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		self.0.as_mut_vec()
+	}
+
+	fn into_bytes(self) -> Vec<u8> {
+		self.0.into_bytes()
 	}
 }
 

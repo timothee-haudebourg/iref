@@ -61,20 +61,6 @@ impl Authority {
 	}
 }
 
-impl fmt::Display for Authority {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Authority {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
 impl cmp::PartialEq for Authority {
 	#[inline]
 	fn eq(&self, other: &Authority) -> bool {

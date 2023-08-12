@@ -1,5 +1,5 @@
-use std::ops::Deref;
 use crate::common::path_mut::PathMutImpl;
+use std::ops::Deref;
 
 use super::{path::Segment, Path, PathBuf};
 

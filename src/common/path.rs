@@ -25,9 +25,7 @@ pub trait SegmentImpl: 'static {
 	fn as_bytes(&self) -> &[u8];
 
 	fn as_pct_str(&self) -> &PctStr {
-		unsafe {
-			PctStr::new_unchecked(self.as_bytes())
-		}
+		unsafe { PctStr::new_unchecked(self.as_bytes()) }
 	}
 
 	fn len(&self) -> usize {
@@ -49,7 +47,7 @@ pub trait SegmentImpl: 'static {
 		let mut i = 0;
 		while i < bytes.len() {
 			if bytes[i] == b':' {
-				return crate::uri::Scheme::new(&bytes[0..i]).is_ok()
+				return crate::uri::Scheme::new(&bytes[0..i]).is_ok();
 			} else {
 				i += 1
 			}
@@ -65,7 +63,7 @@ pub trait PathImpl: 'static {
 	const EMPTY_ABSOLUTE: &'static Self;
 
 	type Segment: ?Sized + SegmentImpl;
-	
+
 	type Owned: PathBufImpl<Borrowed = Self>;
 
 	fn as_bytes(&self) -> &[u8];
@@ -145,7 +143,10 @@ pub trait PathImpl: 'static {
 			i += 1
 		}
 
-		(<Self::Segment as SegmentImpl>::new_unchecked(&bytes[offset..i]), i + 1)
+		(
+			<Self::Segment as SegmentImpl>::new_unchecked(&bytes[offset..i]),
+			i + 1,
+		)
 	}
 
 	/// Returns the segment following a previous segment ending at the given
@@ -319,9 +320,7 @@ pub trait PathImpl: 'static {
 				// Instead we return `/./`.
 				unsafe { Some(Self::new_unchecked(b"/./")) }
 			} else {
-				unsafe {
-					Some(Self::new_unchecked(&bytes[..end]))
-				}
+				unsafe { Some(Self::new_unchecked(&bytes[..end])) }
 			}
 		}
 	}
@@ -435,7 +434,9 @@ impl<'a, P: ?Sized + PathImpl> DoubleEndedIterator for SegmentsImpl<'a, P> {
 /// heap.
 const NORMALIZE_STACK_SIZE: usize = 16;
 
-pub struct NormalizedSegmentsImpl<'a, P: ?Sized + PathImpl>(smallvec::IntoIter<[&'a P::Segment; NORMALIZE_STACK_SIZE]>);
+pub struct NormalizedSegmentsImpl<'a, P: ?Sized + PathImpl>(
+	smallvec::IntoIter<[&'a P::Segment; NORMALIZE_STACK_SIZE]>,
+);
 
 impl<'a, P: ?Sized + PathImpl> NormalizedSegmentsImpl<'a, P> {
 	fn new(path: &'a P) -> NormalizedSegmentsImpl<P> {
@@ -445,13 +446,17 @@ impl<'a, P: ?Sized + PathImpl> NormalizedSegmentsImpl<'a, P> {
 			match segment.as_bytes() {
 				CURRENT_SEGMENT => (),
 				PARENT_SEGMENT => {
-					if stack.last().map(|s| s.as_bytes() == PARENT_SEGMENT).unwrap_or(true) {
+					if stack
+						.last()
+						.map(|s| s.as_bytes() == PARENT_SEGMENT)
+						.unwrap_or(true)
+					{
 						stack.push(segment)
 					} else {
 						stack.pop();
 					}
 				}
-				_ => stack.push(segment)
+				_ => stack.push(segment),
 			}
 		}
 

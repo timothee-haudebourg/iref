@@ -47,20 +47,6 @@ impl ops::Deref for Host {
 	}
 }
 
-impl fmt::Display for Host {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl fmt::Debug for Host {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
 impl cmp::PartialEq for Host {
 	#[inline]
 	fn eq(&self, other: &Host) -> bool {

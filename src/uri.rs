@@ -2,17 +2,17 @@ use static_regular_grammar::RegularGrammar;
 
 mod authority;
 mod fragment;
-mod query;
-mod scheme;
 mod path;
 mod path_mut;
+mod query;
+mod scheme;
 
 pub use authority::*;
 pub use fragment::*;
-pub use query::*;
-pub use scheme::*;
 pub use path::*;
 pub use path_mut::*;
+pub use query::*;
+pub use scheme::*;
 
 use crate::common::{parse, RiImpl, RiRefImpl};
 
@@ -55,12 +55,15 @@ impl Uri {
 
 		UriParts {
 			scheme: unsafe { Scheme::new_unchecked(&bytes[ranges.scheme]) },
-			authority: ranges.authority
+			authority: ranges
+				.authority
 				.map(|r| unsafe { Authority::new_unchecked(&self.0[r]) }),
 			path: unsafe { Path::new_unchecked(&self.0[ranges.path]) },
-			query: ranges.query
+			query: ranges
+				.query
 				.map(|r| unsafe { Query::new_unchecked(&self.0[r]) }),
-			fragment: ranges.fragment
+			fragment: ranges
+				.fragment
 				.map(|r| unsafe { Fragment::new_unchecked(&self.0[r]) }),
 		}
 	}
