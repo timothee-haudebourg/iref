@@ -1,5 +1,37 @@
 use std::ops::Range;
 
+fn is_scheme_char(b: u8) -> bool {
+	// ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+	b.is_ascii_alphanumeric() | matches!(b, b'+' | b'-' | b'.')
+}
+
+/// Checks if the input byte string looks like a scheme.
+///
+/// Returns `true` if it is of the form `prefix:suffix` where `prefix` is a
+/// valid scheme, of `false` otherwise.
+#[inline]
+pub fn looks_like_scheme(bytes: &[u8]) -> bool {
+	let mut i = 0;
+	while i < bytes.len() {
+		if i == 0 {
+			if !bytes[i].is_ascii_alphabetic() {
+				break
+			}
+		} else {
+			let b = bytes[i];
+			if b == b':' {
+				return true
+			} else if !is_scheme_char(b) {
+				break
+			}
+		}
+
+		i += 1
+	}
+
+	false
+}
+
 pub enum SchemeAuthorityOrPath {
 	Scheme,
 	Authority,

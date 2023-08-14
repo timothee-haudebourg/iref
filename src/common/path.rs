@@ -1,7 +1,7 @@
 use pct_str::PctStr;
 use smallvec::SmallVec;
 
-use super::path_mut::PathMutImpl;
+use super::{path_mut::PathMutImpl, parse};
 
 pub const CURRENT_SEGMENT: &'static [u8] = b".";
 
@@ -36,24 +36,12 @@ pub trait SegmentImpl: 'static {
 		self.as_bytes().is_empty()
 	}
 
-	/// Checks if this segments looks like a scheme part.
+	/// Checks if this segment looks like a scheme.
 	///
-	/// Returns `true` is of the form `prefix:suffix` where `prefix` is a valid
-	/// scheme, of `false` otherwise.
-	#[inline]
+	/// Returns `true` if it is of the form `prefix:suffix` where `prefix` is a
+	/// valid scheme, of `false` otherwise.
 	fn looks_like_scheme(&self) -> bool {
-		let bytes = self.as_bytes();
-
-		let mut i = 0;
-		while i < bytes.len() {
-			if bytes[i] == b':' {
-				return crate::uri::Scheme::new(&bytes[0..i]).is_ok();
-			} else {
-				i += 1
-			}
-		}
-
-		false
+		parse::looks_like_scheme(self.as_bytes())
 	}
 }
 
@@ -243,33 +231,6 @@ pub trait PathImpl: 'static {
 		result
 	}
 
-	/// Return the path directory part.
-	///
-	/// This correspond to the path without everything after the right most `/`.
-	#[inline]
-	fn directory(&self) -> &Self {
-		if self.is_empty() {
-			Self::EMPTY
-		} else {
-			let bytes = self.as_bytes();
-			let mut last = bytes.len() - 1;
-
-			loop {
-				if bytes[last] == b'/' {
-					break;
-				}
-
-				if last == 0 {
-					return Self::EMPTY;
-				}
-
-				last -= 1;
-			}
-
-			unsafe { Self::new_unchecked(&bytes[..=last]) }
-		}
-	}
-
 	/// Returns the last segment of the path, if there is one, unless it is
 	/// empty.
 	///
@@ -284,12 +245,6 @@ pub trait PathImpl: 'static {
 	}
 
 	/// Returns the path without its final segment, if there is one.
-	///
-	/// ```
-	/// # use iref::iri::Path;
-	/// assert_eq!(Path::new("//foo").unwrap().parent().unwrap().as_str(), "/./");
-	/// assert_eq!(Path::new("/foo").unwrap().parent().unwrap().as_str(), "/")
-	/// ```
 	#[inline]
 	fn parent(&self) -> Option<&Self> {
 		if self.is_empty() {
@@ -323,6 +278,18 @@ pub trait PathImpl: 'static {
 				unsafe { Some(Self::new_unchecked(&bytes[..end])) }
 			}
 		}
+	}
+
+	/// Returns the path without its final segment, if there is one.
+	#[inline]
+	fn parent_or_empty(&self) -> &Self {
+		self.parent().unwrap_or_else(|| {
+			if self.is_absolute() {
+				Self::EMPTY_ABSOLUTE
+			} else {
+				Self::EMPTY
+			}
+		})
 	}
 
 	/// Get the suffix part of this path, if any, with regard to the given prefix path.
@@ -365,6 +332,14 @@ pub trait PathImpl: 'static {
 		}
 
 		Some(buf)
+	}
+
+	/// Checks if this path looks like a scheme.
+	///
+	/// Returns `true` if it is of the form `prefix:suffix` where `prefix` is a
+	/// valid scheme, of `false` otherwise.
+	fn looks_like_scheme(&self) -> bool {
+		parse::looks_like_scheme(self.as_bytes())
 	}
 }
 

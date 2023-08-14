@@ -53,15 +53,18 @@ impl<'a, A: ?Sized + AuthorityImpl> AuthorityMutImpl<'a, A> {
 			Some(new_userinfo) => match parse::find_user_info(bytes, self.start) {
 				Some(userinfo_range) => self.replace(userinfo_range, new_userinfo.as_bytes()),
 				None => {
-					self.allocate(self.start..self.start, new_userinfo.len() + 1);
+					let added_len = new_userinfo.len() + 1;
+					self.allocate(self.start..self.start, added_len);
 					self.data[self.start..(self.start + new_userinfo.len())]
 						.copy_from_slice(new_userinfo.as_bytes());
-					self.data[self.start + new_userinfo.len()] = b'@'
+					self.data[self.start + new_userinfo.len()] = b'@';
+					self.end += added_len
 				}
 			},
 			None => {
 				if let Some(userinfo_range) = parse::find_user_info(bytes, self.start) {
 					self.replace(userinfo_range.start..(userinfo_range.end + 1), b"");
+					self.end -= userinfo_range.end - userinfo_range.start;
 				}
 			}
 		}
@@ -71,7 +74,15 @@ impl<'a, A: ?Sized + AuthorityImpl> AuthorityMutImpl<'a, A> {
 	pub fn set_host(&mut self, host: &A::Host) {
 		let bytes = &self.data[..self.end];
 		let range = parse::find_host(bytes, self.start);
-		self.replace(range, host.as_bytes())
+		let host_len = range.end - range.start;
+
+		if host_len > host.len() {
+			self.end -= host_len - host.len()
+		} else {
+			self.end -= host.len() - host_len
+		}
+
+		self.replace(range, host.as_bytes());
 	}
 
 	#[inline]
@@ -81,15 +92,18 @@ impl<'a, A: ?Sized + AuthorityImpl> AuthorityMutImpl<'a, A> {
 			Some(new_port) => match parse::find_port(bytes, self.start) {
 				Some(range) => self.replace(range, new_port.as_bytes()),
 				None => {
-					self.allocate(self.start..self.start, new_port.len() + 1);
-					self.data[self.start] = b':';
-					self.data[(self.start + 1)..(self.start + 1 + new_port.len())]
+					let added_len = new_port.len() + 1;
+					self.allocate(self.end..self.end, added_len);
+					self.data[self.end] = b':';
+					self.data[(self.end + 1)..(self.end + added_len)]
 						.copy_from_slice(new_port.as_bytes());
+					self.end += added_len;
 				}
 			},
 			None => {
-				if let Some(userinfo_range) = parse::find_port(bytes, self.start) {
-					self.replace((userinfo_range.start - 1)..userinfo_range.end, b"");
+				if let Some(port_range) = parse::find_port(bytes, self.start) {
+					self.replace((port_range.start - 1)..port_range.end, b"");
+					self.end -= port_range.end - port_range.start;
 				}
 			}
 		}

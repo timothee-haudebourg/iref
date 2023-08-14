@@ -125,14 +125,6 @@ impl Path {
 		PathImpl::normalized(self)
 	}
 
-	/// Return the path directory part.
-	///
-	/// This correspond to the path without everything after the right most `/`.
-	#[inline]
-	pub fn directory(&self) -> &Self {
-		PathImpl::directory(self)
-	}
-
 	/// Returns the last segment of the path, if there is one, unless it is
 	/// empty.
 	///
@@ -147,12 +139,29 @@ impl Path {
 	///
 	/// ```
 	/// # use iref::iri::Path;
-	/// assert_eq!(Path::new("//foo").unwrap().parent().unwrap().as_str(), "/./");
-	/// assert_eq!(Path::new("/foo").unwrap().parent().unwrap().as_str(), "/")
+	/// assert_eq!(Path::new("/foo/bar").unwrap().parent().unwrap(), "/foo");
+	/// assert_eq!(Path::new("/foo").unwrap().parent().unwrap(), "/");
+	/// assert_eq!(Path::new("//foo").unwrap().parent().unwrap(), "/./");
+	/// assert_eq!(Path::new("/").unwrap().parent(), None);
 	/// ```
 	#[inline]
 	pub fn parent(&self) -> Option<&Self> {
 		PathImpl::parent(self)
+	}
+
+	/// Returns the path without its final segment, if there is one.
+	///
+	/// ```
+	/// # use iref::iri::Path;
+	/// assert_eq!(Path::new("/foo/bar").unwrap().parent_or_empty(), "/foo");
+	/// assert_eq!(Path::new("/foo").unwrap().parent_or_empty(), "/");
+	/// assert_eq!(Path::new("//foo").unwrap().parent_or_empty(), "/./");
+	/// assert_eq!(Path::new("/").unwrap().parent_or_empty(), "/");
+	/// assert_eq!(Path::new("").unwrap().parent_or_empty(), "");
+	/// ```
+	#[inline]
+	pub fn parent_or_empty(&self) -> &Self {
+		PathImpl::parent_or_empty(self)
 	}
 
 	/// Get the suffix part of this path, if any, with regard to the given prefix path.
@@ -201,6 +210,24 @@ impl PartialEq for Path {
 		} else {
 			false
 		}
+	}
+}
+
+impl PartialEq<str> for Path {
+	fn eq(&self, other: &str) -> bool {
+		self.as_str() == other
+	}
+}
+
+impl<'a> PartialEq<&'a str> for Path {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_str() == *other
+	}
+}
+
+impl PartialEq<String> for Path {
+	fn eq(&self, other: &String) -> bool {
+		self.as_str() == other.as_str()
 	}
 }
 
@@ -342,6 +369,24 @@ impl PathBuf {
 	#[inline]
 	pub fn normalize(&mut self) {
 		self.as_path_mut().normalize()
+	}
+}
+
+impl PartialEq<str> for PathBuf {
+	fn eq(&self, other: &str) -> bool {
+		self.as_str() == other
+	}
+}
+
+impl<'a> PartialEq<&'a str> for PathBuf {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_str() == *other
+	}
+}
+
+impl PartialEq<String> for PathBuf {
+	fn eq(&self, other: &String) -> bool {
+		self.as_str() == other.as_str()
 	}
 }
 

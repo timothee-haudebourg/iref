@@ -17,14 +17,6 @@ pub use path_mut::*;
 pub use query::*;
 pub use reference::*;
 
-pub struct RiParts<'a, T: RiImpl> {
-	pub scheme: &'a Scheme,
-	pub authority: Option<&'a T::Authority>,
-	pub path: &'a T::Path,
-	pub query: Option<&'a T::Query>,
-	pub fragment: Option<&'a T::Fragment>,
-}
-
 pub trait RiImpl: RiRefImpl {
 	/// Returns the scheme of the IRI.
 	#[inline]
@@ -38,9 +30,18 @@ pub trait RiImpl: RiRefImpl {
 pub trait RiBufImpl: Sized + RiRefBufImpl {
 	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self;
 
+	#[inline]
 	fn from_scheme(scheme: SchemeBuf) -> Self {
 		let mut bytes = scheme.into_bytes();
 		bytes.push(b':');
 		unsafe { Self::new_unchecked(bytes) }
+	}
+
+	#[inline]
+	fn set_scheme(&mut self, new_scheme: &Scheme) {
+		let range = parse::scheme(self.as_bytes(), 0);
+		unsafe {
+			self.replace(range, new_scheme.as_bytes())
+		}
 	}
 }

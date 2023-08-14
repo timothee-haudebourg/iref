@@ -126,14 +126,6 @@ impl Path {
 		PathImpl::normalized(self)
 	}
 
-	/// Return the path directory part.
-	///
-	/// This correspond to the path without everything after the right most `/`.
-	#[inline]
-	pub fn directory(&self) -> &Self {
-		PathImpl::directory(self)
-	}
-
 	/// Returns the last segment of the path, if there is one, unless it is
 	/// empty.
 	///
@@ -147,13 +139,30 @@ impl Path {
 	/// Returns the path without its final segment, if there is one.
 	///
 	/// ```
-	/// # use iref::iri::Path;
-	/// assert_eq!(Path::new("//foo").unwrap().parent().unwrap().as_str(), "/./");
-	/// assert_eq!(Path::new("/foo").unwrap().parent().unwrap().as_str(), "/")
+	/// # use iref::uri::Path;
+	/// assert_eq!(Path::new(b"/foo/bar").unwrap().parent().unwrap(), b"/foo");
+	/// assert_eq!(Path::new(b"/foo").unwrap().parent().unwrap(), b"/");
+	/// assert_eq!(Path::new(b"//foo").unwrap().parent().unwrap(), b"/./");
+	/// assert_eq!(Path::new(b"/").unwrap().parent(), None);
 	/// ```
 	#[inline]
 	pub fn parent(&self) -> Option<&Self> {
 		PathImpl::parent(self)
+	}
+
+	/// Returns the path without its final segment, if there is one.
+	///
+	/// ```
+	/// # use iref::uri::Path;
+	/// assert_eq!(Path::new(b"/foo/bar").unwrap().parent_or_empty(), b"/foo");
+	/// assert_eq!(Path::new(b"/foo").unwrap().parent_or_empty(), b"/");
+	/// assert_eq!(Path::new(b"//foo").unwrap().parent_or_empty(), b"/./");
+	/// assert_eq!(Path::new(b"/").unwrap().parent_or_empty(), b"/");
+	/// assert_eq!(Path::new(b"").unwrap().parent_or_empty(), b"");
+	/// ```
+	#[inline]
+	pub fn parent_or_empty(&self) -> &Self {
+		PathImpl::parent_or_empty(self)
 	}
 
 	/// Get the suffix part of this path, if any, with regard to the given prefix path.
@@ -202,6 +211,48 @@ impl PartialEq for Path {
 		} else {
 			false
 		}
+	}
+}
+
+impl PartialEq<[u8]> for Path {
+	fn eq(&self, other: &[u8]) -> bool {
+		self.as_bytes() == other
+	}
+}
+
+impl<'a> PartialEq<&'a [u8]> for Path {
+	fn eq(&self, other: &&'a [u8]) -> bool {
+		self.as_bytes() == *other
+	}
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for Path {
+	fn eq(&self, other: &[u8; N]) -> bool {
+		self.as_bytes() == other
+	}
+}
+
+impl<'a, const N: usize> PartialEq<&'a [u8; N]> for Path {
+	fn eq(&self, other: &&'a [u8; N]) -> bool {
+		self.as_bytes() == *other
+	}
+}
+
+impl PartialEq<str> for Path {
+	fn eq(&self, other: &str) -> bool {
+		self.as_str() == other
+	}
+}
+
+impl<'a> PartialEq<&'a str> for Path {
+	fn eq(&self, other: &&'a str) -> bool {
+		self.as_str() == *other
+	}
+}
+
+impl PartialEq<String> for Path {
+	fn eq(&self, other: &String) -> bool {
+		self.as_str() == other.as_str()
 	}
 }
 

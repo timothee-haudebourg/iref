@@ -6,32 +6,6 @@ use super::{
 };
 use crate::uri::Scheme;
 
-pub struct RiRefParts<'a, T: ?Sized + RiRefImpl> {
-	pub scheme: Option<&'a Scheme>,
-	pub authority: Option<&'a T::Authority>,
-	pub path: &'a T::Path,
-	pub query: Option<&'a T::Query>,
-	pub fragment: Option<&'a T::Fragment>,
-}
-
-impl<'a, T: ?Sized + RiRefBufImpl> RiRefParts<'a, T> {
-	pub fn into_presence(self) -> RiRefPartsPresence {
-		RiRefPartsPresence {
-			scheme: self.scheme.is_some(),
-			authority: self.authority.is_some(),
-			query: self.query.is_some(),
-			fragment: self.fragment.is_some(),
-		}
-	}
-}
-
-pub struct RiRefPartsPresence {
-	pub scheme: bool,
-	pub authority: bool,
-	pub query: bool,
-	pub fragment: bool,
-}
-
 pub trait RiRefImpl {
 	type Authority: ?Sized + AuthorityImpl;
 	type Path: ?Sized + PathImpl;
@@ -39,27 +13,6 @@ pub trait RiRefImpl {
 	type Fragment: ?Sized + FragmentImpl;
 
 	fn as_bytes(&self) -> &[u8];
-
-	fn parts(&self) -> RiRefParts<Self> {
-		let bytes = self.as_bytes();
-		let ranges = parse::reference_parts(bytes, 0);
-
-		RiRefParts {
-			scheme: ranges
-				.scheme
-				.map(|r| unsafe { Scheme::new_unchecked(&bytes[r]) }),
-			authority: ranges
-				.authority
-				.map(|r| unsafe { Self::Authority::new_unchecked(&bytes[r]) }),
-			path: unsafe { Self::Path::new_unchecked(&bytes[ranges.path]) },
-			query: ranges
-				.query
-				.map(|r| unsafe { Self::Query::new_unchecked(&bytes[r]) }),
-			fragment: ranges
-				.fragment
-				.map(|r| unsafe { Self::Fragment::new_unchecked(&bytes[r]) }),
-		}
-	}
 
 	/// Returns the scheme of the IRI reference, if any.
 	#[inline]
@@ -147,7 +100,16 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 			},
 			None => {
 				if let Some(scheme_range) = parse::find_scheme(self.as_bytes(), 0) {
-					unsafe { self.replace(scheme_range.start..(scheme_range.end + 1), b"") }
+					let value: &[u8] = if self.authority().is_none() && self.path().looks_like_scheme() {
+						// AMBIGUITY: The URI `http:foo:bar` would become
+						//            `foo:bar`, but `foo` is not the scheme.
+						// SOLUTION:  We change `foo:bar` to `./foo:bar`.
+						b"./"
+					} else {
+						b""
+					};
+
+					unsafe { self.replace(scheme_range.start..(scheme_range.end + 1), value) }
 				}
 			}
 		}
@@ -162,23 +124,35 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 			})
 	}
 
-	/// Set the authority of the IRI.
-	///
-	/// It must be a syntactically correct authority. If not,
-	/// this method returns an error, and the IRI is unchanged.
 	#[inline]
 	fn set_authority(&mut self, authority: Option<&Self::Authority>) {
 		let bytes = self.as_bytes();
 		match authority {
 			Some(new_authority) => match parse::find_authority(bytes, 0) {
 				Ok(range) => unsafe { self.replace(range, new_authority.as_bytes()) },
-				Err(start) => unsafe {
-					self.allocate(start..start, new_authority.len() + 2);
-					let bytes = self.as_mut_vec();
-					let delim_end = start + 2;
-					bytes[start..delim_end].copy_from_slice(b"//");
-					bytes[delim_end..(delim_end + new_authority.len())]
-						.copy_from_slice(new_authority.as_bytes())
+				Err(start) => {
+					if !bytes[start..].starts_with(b"/") {
+						// VALIDITY: When an authority is present, the path must
+						//           be absolute.
+						unsafe {
+							self.allocate(start..start, new_authority.len() + 3);
+							let bytes = self.as_mut_vec();
+							let delim_end = start + 2;
+							bytes[start..delim_end].copy_from_slice(b"//");
+							bytes[delim_end..(delim_end + new_authority.len())]
+								.copy_from_slice(new_authority.as_bytes());
+							bytes[delim_end+new_authority.len()] = b'/';
+						}
+					} else {
+						unsafe {
+							self.allocate(start..start, new_authority.len() + 2);
+							let bytes = self.as_mut_vec();
+							let delim_end = start + 2;
+							bytes[start..delim_end].copy_from_slice(b"//");
+							bytes[delim_end..(delim_end + new_authority.len())]
+								.copy_from_slice(new_authority.as_bytes())
+						}
+					}
 				},
 			},
 			None => {
@@ -211,7 +185,8 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 	fn set_path(&mut self, path: &Self::Path) {
 		let range = parse::find_path(self.as_bytes(), 0);
 
-		if path.as_bytes().starts_with(b"//") && self.authority().is_none() {
+		let has_authority = self.authority().is_some();
+		if !has_authority && path.as_bytes().starts_with(b"//") {
 			// AMBIGUITY: The URI `http:old/path` would become
 			//            `http://new_path`, but `//new_path` is not the
 			//            authority.
@@ -222,6 +197,29 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 				self.allocate(range, path.len() + 2);
 				let bytes = self.as_mut_vec();
 				bytes[start..actual_start].copy_from_slice(b"/.");
+				bytes[actual_start..(actual_start + path.len())].copy_from_slice(path.as_bytes())
+			}
+		} else if has_authority && path.is_relative() {
+			// VALIDITY: When an authority is present, the path must be
+			//           absolute.
+			unsafe {
+				let start = range.start;
+				let actual_start = start + 1;
+				self.allocate(range, path.len() + 1);
+				let bytes = self.as_mut_vec();
+				bytes[start] = b'/';
+				bytes[actual_start..(actual_start + path.len())].copy_from_slice(path.as_bytes())
+			}
+		} else if range.start == 0 && path.looks_like_scheme() {
+			// AMBIGUITY: The URI `old/path` would become `new:path`, but `new`
+			//            is not the scheme.
+			// SOLUTION:  We change `new:path` to `./new:path`.
+			unsafe {
+				let start = range.start;
+				let actual_start = start + 2;
+				self.allocate(range, path.len() + 2);
+				let bytes = self.as_mut_vec();
+				bytes[start..actual_start].copy_from_slice(b"./");
 				bytes[actual_start..(actual_start + path.len())].copy_from_slice(path.as_bytes())
 			}
 		} else {
@@ -285,13 +283,13 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 	///
 	/// See <https://www.rfc-editor.org/errata/eid4547>
 	fn resolve(&mut self, base_iri: &Self::Ri) {
-		let has = self.parts().into_presence();
+		let parts = parse::reference_parts(self.as_bytes(), 0);
 
-		if has.scheme {
+		if parts.scheme.is_some() {
 			self.path_mut().normalize();
 		} else {
 			self.set_scheme(Some(base_iri.scheme()));
-			if self.authority().is_some() {
+			if parts.authority.is_some() {
 				self.path_mut().normalize();
 			} else {
 				if self.path().is_relative() && self.path().is_empty() {
@@ -304,15 +302,17 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 				} else {
 					let mut path_buffer = Self::RiBuf::from_scheme(base_iri.scheme().to_owned()); // we set the scheme to avoid path disambiguation.
 					path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
+					
 					if base_iri.authority().is_some() && base_iri.path().is_empty() {
 						path_buffer.set_path(Self::Path::EMPTY_ABSOLUTE);
 					} else {
-						path_buffer.set_path(base_iri.path().directory());
+						path_buffer.set_path(base_iri.path().parent_or_empty());
 						path_buffer.path_mut().normalize();
 					}
 					path_buffer
 						.path_mut()
 						.symbolic_append(self.path().segments());
+					
 					self.set_path(path_buffer.path());
 				}
 				self.set_authority(base_iri.authority());
@@ -320,7 +320,7 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 		}
 	}
 
-	fn resolved(mut self, base_iri: &Self::Ri) -> Self::RiBuf {
+	fn into_resolved(mut self, base_iri: &Self::Ri) -> Self::RiBuf {
 		self.resolve(base_iri);
 		unsafe { Self::RiBuf::new_unchecked(self.into_bytes()) }
 	}

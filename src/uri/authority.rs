@@ -43,30 +43,45 @@ impl AuthorityImpl for Authority {
 	}
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AuthorityParts<'a> {
+	pub user_info: Option<&'a UserInfo>,
+	pub host: &'a Host,
+	pub port: Option<&'a Port>,
+}
+
 impl Authority {
 	pub fn user_info(&self) -> Option<&UserInfo> {
-		todo!()
+		AuthorityImpl::user_info(self)
 	}
 
 	pub fn host(&self) -> &Host {
-		todo!()
+		AuthorityImpl::host(self)
 	}
 
 	pub fn port(&self) -> Option<&Port> {
-		todo!()
+		AuthorityImpl::port(self)
 	}
 
-	pub fn parts(&self) -> (Option<&UserInfo>, &Host, Option<&Port>) {
-		todo!()
+	pub fn parts(&self) -> AuthorityParts {
+		let ranges = AuthorityImpl::parts(self);
+
+		AuthorityParts {
+			user_info: ranges
+				.user_info
+				.map(|r| unsafe { UserInfo::new_unchecked(&self.0[r]) }),
+			host: unsafe { Host::new_unchecked(&self.0[ranges.host]) },
+			port: ranges
+				.port
+				.map(|r| unsafe { Port::new_unchecked(&self.0[r]) }),
+		}
 	}
 }
 
 impl cmp::PartialEq for Authority {
 	#[inline]
 	fn eq(&self, other: &Authority) -> bool {
-		let (u1, h1, p1) = self.parts();
-		let (u2, h2, p2) = other.parts();
-		u1 == u2 && h1 == h2 && p1 == p2
+		self.parts() == other.parts()
 	}
 }
 
@@ -89,20 +104,13 @@ impl PartialOrd for Authority {
 impl Ord for Authority {
 	#[inline]
 	fn cmp(&self, other: &Authority) -> cmp::Ordering {
-		let (u1, h1, p1) = self.parts();
-		let (u2, h2, p2) = other.parts();
-		u1.cmp(&u2)
-			.then_with(|| h1.cmp(h2))
-			.then_with(|| p1.cmp(&p2))
+		self.parts().cmp(&other.parts())
 	}
 }
 
 impl Hash for Authority {
 	#[inline]
 	fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
-		let (u, h, p) = self.parts();
-		u.hash(hasher);
-		h.hash(hasher);
-		p.hash(hasher)
+		self.parts().hash(hasher)
 	}
 }

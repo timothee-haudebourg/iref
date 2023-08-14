@@ -19,6 +19,10 @@ impl<'a> PathMut<'a> {
 		Self(PathMutImpl::new(buffer, start, end))
 	}
 
+	pub(crate) fn from_impl(i: PathMutImpl<'a, Path>) -> Self {
+		Self(i)
+	}
+
 	pub fn from_path(path: &'a mut PathBuf) -> Self {
 		Self(PathMutImpl::from_path(path))
 	}
