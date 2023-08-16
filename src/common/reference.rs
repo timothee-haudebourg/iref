@@ -100,14 +100,15 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 			},
 			None => {
 				if let Some(scheme_range) = parse::find_scheme(self.as_bytes(), 0) {
-					let value: &[u8] = if self.authority().is_none() && self.path().looks_like_scheme() {
-						// AMBIGUITY: The URI `http:foo:bar` would become
-						//            `foo:bar`, but `foo` is not the scheme.
-						// SOLUTION:  We change `foo:bar` to `./foo:bar`.
-						b"./"
-					} else {
-						b""
-					};
+					let value: &[u8] =
+						if self.authority().is_none() && self.path().looks_like_scheme() {
+							// AMBIGUITY: The URI `http:foo:bar` would become
+							//            `foo:bar`, but `foo` is not the scheme.
+							// SOLUTION:  We change `foo:bar` to `./foo:bar`.
+							b"./"
+						} else {
+							b""
+						};
 
 					unsafe { self.replace(scheme_range.start..(scheme_range.end + 1), value) }
 				}
@@ -141,7 +142,7 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 							bytes[start..delim_end].copy_from_slice(b"//");
 							bytes[delim_end..(delim_end + new_authority.len())]
 								.copy_from_slice(new_authority.as_bytes());
-							bytes[delim_end+new_authority.len()] = b'/';
+							bytes[delim_end + new_authority.len()] = b'/';
 						}
 					} else {
 						unsafe {
@@ -153,7 +154,7 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 								.copy_from_slice(new_authority.as_bytes())
 						}
 					}
-				},
+				}
 			},
 			None => {
 				if let Ok(range) = parse::find_authority(bytes, 0) {
@@ -302,7 +303,7 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 				} else {
 					let mut path_buffer = Self::RiBuf::from_scheme(base_iri.scheme().to_owned()); // we set the scheme to avoid path disambiguation.
 					path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
-					
+
 					if base_iri.authority().is_some() && base_iri.path().is_empty() {
 						path_buffer.set_path(Self::Path::EMPTY_ABSOLUTE);
 					} else {
@@ -312,7 +313,7 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 					path_buffer
 						.path_mut()
 						.symbolic_append(self.path().segments());
-					
+
 					self.set_path(path_buffer.path());
 				}
 				self.set_authority(base_iri.authority());

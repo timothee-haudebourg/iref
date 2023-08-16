@@ -37,7 +37,5 @@ pub fn replace(buffer: &mut Vec<u8>, range: Range<usize>, content: &[u8]) {
 	allocate_range(buffer, range, content.len());
 
 	// actually replace the content.
-	for i in 0..content.len() {
-		buffer[start + i] = content[i]
-	}
+	buffer[start..(start + content.len())].copy_from_slice(content)
 }

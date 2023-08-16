@@ -15,6 +15,12 @@ impl<'a> Deref for AuthorityMut<'a> {
 }
 
 impl<'a> AuthorityMut<'a> {
+	/// Creates a new mutable authority part.
+	///
+	/// # Safety
+	///
+	/// The buffer content between the range `start..end` must be a valid
+	/// authority.
 	pub unsafe fn new(buffer: &'a mut Vec<u8>, start: usize, end: usize) -> Self {
 		Self(AuthorityMutImpl::new(buffer, start, end))
 	}

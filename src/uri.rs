@@ -1,5 +1,8 @@
 use static_regular_grammar::RegularGrammar;
-use std::{borrow::Cow, hash::{Hash, self}};
+use std::{
+	borrow::Cow,
+	hash::{self, Hash},
+};
 
 mod authority;
 mod authority_mut;
@@ -7,8 +10,8 @@ mod fragment;
 mod path;
 mod path_mut;
 mod query;
-mod scheme;
 mod reference;
+mod scheme;
 
 pub use authority::*;
 pub use authority_mut::*;
@@ -16,10 +19,10 @@ pub use fragment::*;
 pub use path::*;
 pub use path_mut::*;
 pub use query::*;
-pub use scheme::*;
 pub use reference::*;
+pub use scheme::*;
 
-use crate::common::{parse, RiImpl, RiRefImpl, RiBufImpl, RiRefBufImpl};
+use crate::common::{parse, RiBufImpl, RiImpl, RiRefBufImpl, RiRefImpl};
 
 macro_rules! uri_error {
 	($($(#[$meta:meta])* $variant:ident : $ident:ident),*) => {
@@ -37,7 +40,7 @@ macro_rules! uri_error {
 					Self::$variant($ident(Cow::Owned(value)))
 				}
 			}
-			
+
 			impl<'a> From<$ident<&'a str>> for UriError<Cow<'a, str>> {
 				fn from($ident(value): $ident<&'a str>) -> Self {
 					Self::$variant($ident(Cow::Borrowed(value)))
@@ -49,7 +52,7 @@ macro_rules! uri_error {
 					Self::$variant($ident(Cow::Owned(value)))
 				}
 			}
-			
+
 			impl<'a> From<$ident<&'a [u8]>> for UriError<Cow<'a, [u8]>> {
 				fn from($ident(value): $ident<&'a [u8]>) -> Self {
 					Self::$variant($ident(Cow::Borrowed(value)))
@@ -68,7 +71,7 @@ uri_error! {
 
 	#[error("invalid URI scheme: {0}")]
 	Scheme: InvalidScheme,
-	
+
 	#[error("invalid URI authority: {0}")]
 	Authority: InvalidAuthority,
 
@@ -179,7 +182,7 @@ macro_rules! bytestr_eq {
 				self.as_bytes() == other
 			}
 		}
-		
+
 		impl<'a, const N: usize> PartialEq<&'a [u8; N]> for $ident {
 			fn eq(&self, other: &&'a [u8; N]) -> bool {
 				self.as_bytes() == *other
@@ -191,7 +194,7 @@ macro_rules! bytestr_eq {
 				self.as_bytes() == other
 			}
 		}
-		
+
 		impl<'a> PartialEq<&'a [u8]> for $ident {
 			fn eq(&self, other: &&'a [u8]) -> bool {
 				self.as_bytes() == *other
@@ -203,13 +206,13 @@ macro_rules! bytestr_eq {
 				self.as_str() == other
 			}
 		}
-		
+
 		impl<'a> PartialEq<&'a str> for $ident {
 			fn eq(&self, other: &&'a str) -> bool {
 				self.as_str() == *other
 			}
 		}
-		
+
 		impl PartialEq<String> for $ident {
 			fn eq(&self, other: &String) -> bool {
 				self.as_str() == other.as_str()
@@ -286,11 +289,16 @@ impl UriBuf {
 	}
 
 	pub fn into_uri_ref(self) -> UriRefBuf {
-		unsafe {
-			UriRefBuf::new_unchecked(self.0)
-		}
+		unsafe { UriRefBuf::new_unchecked(self.0) }
 	}
 
+	/// Returns a mutable reference to the underlying `Vec<u8>` buffer
+	/// representing the URI.
+	///
+	/// # Safety
+	///
+	/// The caller must ensure that once the mutable reference is dropped, its
+	/// content is still a valid URI.
 	pub unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		&mut self.0
 	}
@@ -304,12 +312,12 @@ impl UriBuf {
 	}
 
 	/// Sets the scheme part.
-	/// 
+	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{UriBuf, uri::Scheme};
-	/// 
+	///
 	/// let mut a = UriBuf::new(b"http://example.org/path".to_vec()).unwrap();
 	/// a.set_scheme(Scheme::new(b"https").unwrap());
 	/// assert_eq!(a, b"https://example.org/path");
@@ -319,29 +327,29 @@ impl UriBuf {
 	}
 
 	/// Sets the authority part.
-	/// 
+	///
 	/// If the path is relative, this also turns it into an absolute path,
 	/// since an authority cannot be followed by a relative path.
-	/// 
+	///
 	/// To avoid any ambiguity, if `authority` is `None` and the path starts
 	/// with `//`, it will be changed into `/.//` as to not be interpreted as
 	/// an authority part.
-	/// 
+	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{UriBuf, uri::Authority};
-	/// 
+	///
 	/// let mut a = UriBuf::new(b"scheme:/path".to_vec()).unwrap();
 	/// a.set_authority(Some(Authority::new(b"example.org").unwrap()));
 	/// assert_eq!(a, b"scheme://example.org/path");
-	/// 
+	///
 	/// // When an authority is added before a relative path,
 	/// // the path becomes absolute.
 	/// let mut b = UriBuf::new(b"scheme:path".to_vec()).unwrap();
 	/// b.set_authority(Some(Authority::new(b"example.org").unwrap()));
 	/// assert_eq!(b, b"scheme://example.org/path");
-	/// 
+	///
 	/// // When an authority is removed and the path starts with `//`,
 	/// // a `/.` prefix is added to the path to avoid any ambiguity.
 	/// let mut c = UriBuf::new(b"scheme://example.org//path".to_vec()).unwrap();
@@ -353,11 +361,11 @@ impl UriBuf {
 	}
 
 	/// Sets the path part.
-	/// 
+	///
 	/// If there is an authority and the path is relative, this also turns it
 	/// into an absolute path, since an authority cannot be followed by a
 	/// relative path.
-	/// 
+	///
 	/// To avoid any ambiguity, if there is no authority and the path starts
 	/// with `//`, it will be changed into `/.//` as to not be interpreted as
 	/// an authority part. Similarly if there is no scheme nor authority and the
@@ -365,20 +373,20 @@ impl UriBuf {
 	/// to not be confused with a scheme.
 	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{UriBuf, uri::Path};
-	/// 
+	///
 	/// let mut a = UriBuf::new(b"http://example.org/old/path".to_vec()).unwrap();
 	/// a.set_path(Path::new(b"/foo/bar").unwrap());
 	/// assert_eq!(a, b"http://example.org/foo/bar");
-	/// 
+	///
 	/// // If there is an authority and the new path is relative,
 	/// // it is turned into an absolute path.
 	/// let mut b = UriBuf::new(b"http://example.org/old/path".to_vec()).unwrap();
 	/// b.set_path(Path::new(b"relative/path").unwrap());
 	/// assert_eq!(b, b"http://example.org/relative/path");
-	/// 
+	///
 	/// // If there is no authority and the path starts with `//`,
 	/// // it is prefixed with `/.` to avoid being confused with an authority.
 	/// let mut c = UriBuf::new(b"http:old/path".to_vec()).unwrap();

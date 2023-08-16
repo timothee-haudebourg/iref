@@ -15,14 +15,14 @@ pub fn looks_like_scheme(bytes: &[u8]) -> bool {
 	while i < bytes.len() {
 		if i == 0 {
 			if !bytes[i].is_ascii_alphabetic() {
-				break
+				break;
 			}
 		} else {
 			let b = bytes[i];
 			if b == b':' {
-				return true
+				return true;
 			} else if !is_scheme_char(b) {
-				break
+				break;
 			}
 		}
 

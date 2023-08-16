@@ -1,11 +1,11 @@
 use pct_str::PctStr;
 use smallvec::SmallVec;
 
-use super::{path_mut::PathMutImpl, parse};
+use super::{parse, path_mut::PathMutImpl};
 
-pub const CURRENT_SEGMENT: &'static [u8] = b".";
+pub const CURRENT_SEGMENT: &[u8] = b".";
 
-pub const PARENT_SEGMENT: &'static [u8] = b"..";
+pub const PARENT_SEGMENT: &[u8] = b"..";
 
 pub trait PathBufImpl: 'static + Default {
 	type Borrowed: ?Sized + PathImpl<Owned = Self>;
@@ -238,10 +238,7 @@ pub trait PathImpl: 'static {
 	/// are preserved.
 	#[inline]
 	fn file_name(&self) -> Option<&Self::Segment> {
-		self.segments()
-			.next_back()
-			.map(|s| s)
-			.filter(|s| !s.is_empty())
+		self.segments().next_back().filter(|s| !s.is_empty())
 	}
 
 	/// Returns the path without its final segment, if there is one.

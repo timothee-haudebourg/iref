@@ -1,4 +1,4 @@
-use std::hash::{Hash, self};
+use std::hash::{self, Hash};
 
 use static_regular_grammar::RegularGrammar;
 
@@ -7,7 +7,7 @@ use crate::{
 	Uri, UriBuf,
 };
 
-use super::{Authority, Fragment, Path, Query, Scheme, PathMut, AuthorityMut, bytestr_eq};
+use super::{bytestr_eq, Authority, AuthorityMut, Fragment, Path, PathMut, Query, Scheme};
 
 /// URI reference.
 #[derive(RegularGrammar)]
@@ -17,7 +17,10 @@ use super::{Authority, Fragment, Path, Query, Scheme, PathMut, AuthorityMut, byt
 	cache = "automata/uri/reference.aut.cbor",
 	ascii
 )]
-#[grammar(sized(UriRefBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[grammar(sized(
+	UriRefBuf,
+	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
+))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct UriRef([u8]);
 
@@ -38,7 +41,7 @@ pub struct UriRefParts<'a> {
 	pub authority: Option<&'a Authority>,
 	pub path: &'a Path,
 	pub query: Option<&'a Query>,
-	pub fragment: Option<&'a Fragment>
+	pub fragment: Option<&'a Fragment>,
 }
 
 impl UriRef {
@@ -160,6 +163,13 @@ impl UriRefBuf {
 		}
 	}
 
+	/// Returns a mutable reference to the underlying `Vec<u8>` buffer
+	/// representing the URI reference.
+	///
+	/// # Safety
+	///
+	/// The caller must ensure that once the mutable reference is dropped, its
+	/// content is still a valid URI reference.
 	pub unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		&mut self.0
 	}
@@ -173,24 +183,24 @@ impl UriRefBuf {
 	}
 
 	/// Sets the scheme part.
-	/// 
+	///
 	/// If there is no authority and the start of the path looks like a scheme
 	/// (e.g. `foo:`) then the path is prefixed with `./` to avoid being
 	/// confused with a scheme.
-	/// 
+	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{UriRefBuf, uri::Scheme};
-	/// 
+	///
 	/// let mut a = UriRefBuf::new(b"foo/bar".to_vec()).unwrap();
 	/// a.set_scheme(Some(Scheme::new(b"http").unwrap()));
 	/// assert_eq!(a, "http:foo/bar");
-	/// 
+	///
 	/// let mut b = UriRefBuf::new(b"scheme://example.org/foo/bar".to_vec()).unwrap();
 	/// b.set_scheme(None);
 	/// assert_eq!(b, "//example.org/foo/bar");
-	/// 
+	///
 	/// let mut c = UriRefBuf::new(b"scheme:foo:bar".to_vec()).unwrap();
 	/// c.set_scheme(None);
 	/// assert_eq!(c, "./foo:bar");
@@ -200,29 +210,29 @@ impl UriRefBuf {
 	}
 
 	/// Sets the authority part.
-	/// 
+	///
 	/// If the path is relative, this also turns it into an absolute path,
 	/// since an authority cannot be followed by a relative path.
-	/// 
+	///
 	/// To avoid any ambiguity, if `authority` is `None` and the path starts
 	/// with `//`, it will be changed into `/.//` as to not be interpreted as
 	/// an authority part.
-	/// 
+	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{UriRefBuf, uri::Authority};
-	/// 
+	///
 	/// let mut a = UriRefBuf::new(b"scheme:/path".to_vec()).unwrap();
 	/// a.set_authority(Some(Authority::new(b"example.org").unwrap()));
 	/// assert_eq!(a, b"scheme://example.org/path");
-	/// 
+	///
 	/// // When an authority is added before a relative path,
 	/// // the path becomes absolute.
 	/// let mut b = UriRefBuf::new(b"scheme:path".to_vec()).unwrap();
 	/// b.set_authority(Some(Authority::new(b"example.org").unwrap()));
 	/// assert_eq!(b, b"scheme://example.org/path");
-	/// 
+	///
 	/// // When an authority is removed and the path starts with `//`,
 	/// // a `/.` prefix is added to the path to avoid any ambiguity.
 	/// let mut c = UriRefBuf::new(b"scheme://example.org//path".to_vec()).unwrap();
@@ -234,11 +244,11 @@ impl UriRefBuf {
 	}
 
 	/// Sets the path part.
-	/// 
+	///
 	/// If there is an authority and the path is relative, this also turns it
 	/// into an absolute path, since an authority cannot be followed by a
 	/// relative path.
-	/// 
+	///
 	/// To avoid any ambiguity, if there is no authority and the path starts
 	/// with `//`, it will be changed into `/.//` as to not be interpreted as
 	/// an authority part. Similarly if there is no scheme nor authority and the
@@ -246,26 +256,26 @@ impl UriRefBuf {
 	/// to not be confused with a scheme.
 	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{UriRefBuf, uri::Path};
-	/// 
+	///
 	/// let mut a = UriRefBuf::new(b"http://example.org/old/path".to_vec()).unwrap();
 	/// a.set_path(Path::new(b"/foo/bar").unwrap());
 	/// assert_eq!(a, b"http://example.org/foo/bar");
-	/// 
+	///
 	/// // If there is an authority and the new path is relative,
 	/// // it is turned into an absolute path.
 	/// let mut b = UriRefBuf::new(b"http://example.org/old/path".to_vec()).unwrap();
 	/// b.set_path(Path::new(b"relative/path").unwrap());
 	/// assert_eq!(b, b"http://example.org/relative/path");
-	/// 
+	///
 	/// // If there is no authority and the path starts with `//`,
 	/// // it is prefixed with `/.` to avoid being confused with an authority.
 	/// let mut c = UriRefBuf::new(b"http:old/path".to_vec()).unwrap();
 	/// c.set_path(Path::new(b"//foo/bar").unwrap());
 	/// assert_eq!(c, b"http:/.//foo/bar");
-	/// 
+	///
 	/// // If there is no authority nor scheme, and the path beginning looks
 	/// // like a scheme, it is prefixed with `./` to avoid being confused with
 	/// // a scheme.
@@ -309,7 +319,13 @@ mod tests {
 
 	const PARTS: [(
 		&[u8],
-		(Option<&[u8]>, Option<&[u8]>, &[u8], Option<&[u8]>, Option<&[u8]>),
+		(
+			Option<&[u8]>,
+			Option<&[u8]>,
+			&[u8],
+			Option<&[u8]>,
+			Option<&[u8]>,
+		),
 	); 36] = [
 		// 0 components.
 		(b"", (None, None, b"", None, None)),
@@ -332,7 +348,10 @@ mod tests {
 			(Some(b"scheme"), Some(b"authority"), b"", None, None),
 		),
 		(b"scheme:path", (Some(b"scheme"), None, b"path", None, None)),
-		(b"scheme:/path", (Some(b"scheme"), None, b"/path", None, None)),
+		(
+			b"scheme:/path",
+			(Some(b"scheme"), None, b"/path", None, None),
+		),
 		(
 			b"scheme:?query",
 			(Some(b"scheme"), None, b"", Some(b"query"), None),
@@ -370,7 +389,13 @@ mod tests {
 		),
 		(
 			b"scheme://authority?query",
-			(Some(b"scheme"), Some(b"authority"), b"", Some(b"query"), None),
+			(
+				Some(b"scheme"),
+				Some(b"authority"),
+				b"",
+				Some(b"query"),
+				None,
+			),
 		),
 		(
 			b"scheme://authority#fragment",
@@ -400,7 +425,13 @@ mod tests {
 		),
 		(
 			b"//authority?query#fragment",
-			(None, Some(b"authority"), b"", Some(b"query"), Some(b"fragment")),
+			(
+				None,
+				Some(b"authority"),
+				b"",
+				Some(b"query"),
+				Some(b"fragment"),
+			),
 		),
 		(
 			b"path?query#fragment",
@@ -494,8 +525,16 @@ mod tests {
 	#[test]
 	fn set_authority() {
 		let vectors: [(&[u8], Option<&[u8]>, &[u8]); 3] = [
-			(b"scheme:/path", Some(b"authority"), b"scheme://authority/path"),
-			(b"scheme:path", Some(b"authority"), b"scheme://authority/path"),
+			(
+				b"scheme:/path",
+				Some(b"authority"),
+				b"scheme://authority/path",
+			),
+			(
+				b"scheme:path",
+				Some(b"authority"),
+				b"scheme://authority/path",
+			),
 			(b"scheme://authority//path", None, b"scheme:/.//path"),
 		];
 

@@ -15,6 +15,12 @@ impl<'a> Deref for PathMut<'a> {
 }
 
 impl<'a> PathMut<'a> {
+	/// Creates a new mutable path reference.
+	///
+	/// # Safety
+	///
+	/// The buffer content between in the range `start..end` must be a valid
+	/// IRI path.
 	pub unsafe fn new(buffer: &'a mut Vec<u8>, start: usize, end: usize) -> Self {
 		Self(PathMutImpl::new(buffer, start, end))
 	}

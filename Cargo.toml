@@ -21,8 +21,7 @@ smallvec = "1.2"
 serde = { version = "1.0", optional = true }
 hashbrown = { version = "0.14.0", optional = true }
 thiserror = "1.0.40"
-# static-regular-grammar = { git = "https://github.com/timothee-haudebourg/static-regular-grammar.git" }
-static-regular-grammar = { path = "/home/timothee/Projets/utils/parsing/static-regular-grammar" }
+static-regular-grammar = { git = "https://github.com/timothee-haudebourg/static-regular-grammar.git" }
 
 [dev-dependencies]
 serde_json = "1.0"

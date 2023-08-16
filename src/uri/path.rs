@@ -278,7 +278,7 @@ impl Ord for Path {
 					(None, None) => return Ordering::Equal,
 					(Some(_), None) => return Ordering::Greater,
 					(None, Some(_)) => return Ordering::Less,
-					(Some(a), Some(b)) => match a.cmp(&b) {
+					(Some(a), Some(b)) => match a.cmp(b) {
 						Ordering::Greater => return Ordering::Greater,
 						Ordering::Less => return Ordering::Less,
 						Ordering::Equal => (),

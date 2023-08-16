@@ -40,8 +40,6 @@ pub trait RiBufImpl: Sized + RiRefBufImpl {
 	#[inline]
 	fn set_scheme(&mut self, new_scheme: &Scheme) {
 		let range = parse::scheme(self.as_bytes(), 0);
-		unsafe {
-			self.replace(range, new_scheme.as_bytes())
-		}
+		unsafe { self.replace(range, new_scheme.as_bytes()) }
 	}
 }

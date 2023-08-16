@@ -73,17 +73,17 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 			let start = self.first_segment_offset();
 
 			let len = 2 + segment.len();
-			allocate_range(&mut self.buffer, start..start, len);
+			allocate_range(self.buffer, start..start, len);
 			self.end += len;
 			let offset = start + 2;
 			self.buffer[start..offset].copy_from_slice(b"./");
 			self.buffer[offset..self.end].copy_from_slice(segment.as_bytes());
 		} else if self.is_empty() {
-			replace(&mut self.buffer, self.end..self.end, segment.as_bytes());
+			replace(self.buffer, self.end..self.end, segment.as_bytes());
 			self.end += segment.len();
 		} else {
 			let len = 1 + segment.len();
-			allocate_range(&mut self.buffer, self.end..self.end, len);
+			allocate_range(self.buffer, self.end..self.end, len);
 			let offset = self.end + 1;
 			self.buffer[self.end..offset].copy_from_slice(b"/");
 			self.end += len;
@@ -108,14 +108,14 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 				i -= 1
 			}
 
-			replace(&mut self.buffer, i..self.end, &[]);
+			replace(self.buffer, i..self.end, &[]);
 			self.end = i;
 		}
 	}
 
 	pub fn clear(&mut self) {
 		let start = self.first_segment_offset();
-		replace(&mut self.buffer, start..self.end, b"");
+		replace(self.buffer, start..self.end, b"");
 		self.end = start
 	}
 
@@ -153,7 +153,7 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 		}
 
 		let start = self.first_segment_offset();
-		replace(&mut self.buffer, start..self.end, &buffer);
+		replace(self.buffer, start..self.end, &buffer);
 		self.end = start + buffer.len();
 	}
 }

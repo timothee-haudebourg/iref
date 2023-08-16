@@ -1,4 +1,4 @@
-use std::hash::{Hash, self};
+use std::hash::{self, Hash};
 
 use static_regular_grammar::RegularGrammar;
 
@@ -7,7 +7,7 @@ use crate::{
 	Iri, IriBuf,
 };
 
-use super::{Authority, Fragment, Path, Query, Scheme, PathMut, AuthorityMut};
+use super::{Authority, AuthorityMut, Fragment, Path, PathMut, Query, Scheme};
 
 /// IRI reference.
 #[derive(RegularGrammar)]
@@ -16,7 +16,10 @@ use super::{Authority, Fragment, Path, Query, Scheme, PathMut, AuthorityMut};
 	entry_point = "IRI-reference",
 	cache = "automata/iri/reference.aut.cbor"
 )]
-#[grammar(sized(IriRefBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[grammar(sized(
+	IriRefBuf,
+	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
+))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct IriRef(str);
 
@@ -37,7 +40,7 @@ pub struct IriRefParts<'a> {
 	pub authority: Option<&'a Authority>,
 	pub path: &'a Path,
 	pub query: Option<&'a Query>,
-	pub fragment: Option<&'a Fragment>
+	pub fragment: Option<&'a Fragment>,
 }
 
 impl IriRef {
@@ -175,6 +178,13 @@ impl IriRefBuf {
 		}
 	}
 
+	/// Returns the underlying bytes representing the IRI reference as a mutable
+	/// `Vec<u8>`.
+	///
+	/// # Safety
+	///
+	/// The caller must ensure that once the mutable reference is dropped, its
+	/// content is still a valid IRI reference.
 	pub unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		self.0.as_mut_vec()
 	}
@@ -188,24 +198,24 @@ impl IriRefBuf {
 	}
 
 	/// Sets the scheme part.
-	/// 
+	///
 	/// If there is no authority and the start of the path looks like a scheme
 	/// (e.g. `foo:`) then the path is prefixed with `./` to avoid being
 	/// confused with a scheme.
-	/// 
+	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{IriRefBuf, iri::Scheme};
-	/// 
+	///
 	/// let mut a = IriRefBuf::new("foo/bar".to_string()).unwrap();
 	/// a.set_scheme(Some(Scheme::new(b"http").unwrap()));
 	/// assert_eq!(a, "http:foo/bar");
-	/// 
+	///
 	/// let mut b = IriRefBuf::new("scheme://example.org/foo/bar".to_string()).unwrap();
 	/// b.set_scheme(None);
 	/// assert_eq!(b, "//example.org/foo/bar");
-	/// 
+	///
 	/// let mut c = IriRefBuf::new("scheme:foo:bar".to_string()).unwrap();
 	/// c.set_scheme(None);
 	/// assert_eq!(c, "./foo:bar");
@@ -215,29 +225,29 @@ impl IriRefBuf {
 	}
 
 	/// Sets the authority part.
-	/// 
+	///
 	/// If the path is relative, this also turns it into an absolute path,
 	/// since an authority cannot be followed by a relative path.
-	/// 
+	///
 	/// To avoid any ambiguity, if `authority` is `None` and the path starts
 	/// with `//`, it will be changed into `/.//` as to not be interpreted as
 	/// an authority part.
-	/// 
+	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{IriRefBuf, iri::Authority};
-	/// 
+	///
 	/// let mut a = IriRefBuf::new("scheme:/path".to_string()).unwrap();
 	/// a.set_authority(Some(Authority::new("example.org").unwrap()));
 	/// assert_eq!(a, "scheme://example.org/path");
-	/// 
+	///
 	/// // When an authority is added before a relative path,
 	/// // the path becomes absolute.
 	/// let mut b = IriRefBuf::new("scheme:path".to_string()).unwrap();
 	/// b.set_authority(Some(Authority::new("example.org").unwrap()));
 	/// assert_eq!(b, "scheme://example.org/path");
-	/// 
+	///
 	/// // When an authority is removed and the path starts with `//`,
 	/// // a `/.` prefix is added to the path to avoid any ambiguity.
 	/// let mut c = IriRefBuf::new("scheme://example.org//path".to_string()).unwrap();
@@ -249,11 +259,11 @@ impl IriRefBuf {
 	}
 
 	/// Sets the path part.
-	/// 
+	///
 	/// If there is an authority and the path is relative, this also turns it
 	/// into an absolute path, since an authority cannot be followed by a
 	/// relative path.
-	/// 
+	///
 	/// To avoid any ambiguity, if there is no authority and the path starts
 	/// with `//`, it will be changed into `/.//` as to not be interpreted as
 	/// an authority part. Similarly if there is no scheme nor authority and the
@@ -261,26 +271,26 @@ impl IriRefBuf {
 	/// to not be confused with a scheme.
 	///
 	/// # Example
-	/// 
+	///
 	/// ```
 	/// use iref::{IriRefBuf, iri::Path};
-	/// 
+	///
 	/// let mut a = IriRefBuf::new("http://example.org/old/path".to_string()).unwrap();
 	/// a.set_path(Path::new("/foo/bar").unwrap());
 	/// assert_eq!(a, "http://example.org/foo/bar");
-	/// 
+	///
 	/// // If there is an authority and the new path is relative,
 	/// // it is turned into an absolute path.
 	/// let mut b = IriRefBuf::new("http://example.org/old/path".to_string()).unwrap();
 	/// b.set_path(Path::new("relative/path").unwrap());
 	/// assert_eq!(b, "http://example.org/relative/path");
-	/// 
+	///
 	/// // If there is no authority and the path starts with `//`,
 	/// // it is prefixed with `/.` to avoid being confused with an authority.
 	/// let mut c = IriRefBuf::new("http:old/path".to_string()).unwrap();
 	/// c.set_path(Path::new("//foo/bar").unwrap());
 	/// assert_eq!(c, "http:/.//foo/bar");
-	/// 
+	///
 	/// // If there is no authority nor scheme, and the path beginning looks
 	/// // like a scheme, it is prefixed with `./` to avoid being confused with
 	/// // a scheme.

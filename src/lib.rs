@@ -89,7 +89,7 @@
 //! # fn main() -> Result<(), iref::IriError<&'static str>> {
 //! # let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
 //! for segment in iri.path().segments() {
-//! 	println!("{}", segment);
+//!   println!("{}", segment);
 //! }
 //! # Ok(())
 //! # }
@@ -200,5 +200,5 @@ pub mod iri;
 pub mod uri;
 pub(crate) mod utils;
 
-pub use iri::{Iri, IriBuf, IriRef, IriRefBuf, InvalidIri, IriError};
-pub use uri::{Uri, UriBuf, UriRef, UriRefBuf, InvalidUri, UriError};
+pub use iri::{InvalidIri, Iri, IriBuf, IriError, IriRef, IriRefBuf};
+pub use uri::{InvalidUri, Uri, UriBuf, UriError, UriRef, UriRefBuf};
