@@ -1,14 +1,20 @@
-//! This crates gives an implementation of
-//! [Internationalized Resource Identifiers (IRIs)](https://en.wikipedia.org/wiki/Internationalized_resource_identifier) and IRI references following
-//! [RFC 3987](https://tools.ietf.org/html/rfc3987) and
-//! [RFC 3986](https://tools.ietf.org/html/rfc3986) defined by the
-//! [Internet Engineering Task Force (IETF)](ietf.org).
-//! IRIs are a superclass of
-//! [Uniform Resource Identifier (URIs)](https://en.wikipedia.org/wiki/Uniform_resource_identifier) and
-//! [Uniform Resource Locator (URLs)](https://en.wikipedia.org/wiki/Uniform_Resource_Locator)
-//! used to uniquely identify objects across the web.
-//! An IRI is defined as a sequence of characters with distinguishable components:
-//! a scheme, an authority, a path, a query and a fragment.
+//! This crates provides an implementation of
+//! [Uniform Resource Identifiers (URIs, aka URLs)][uri] and [Internationalized
+//! Resource Identifiers (IRIs)][iri] following [RFC 3987][uri-rfc] and [RFC
+//! 3986][iri-rfc] defined by the [Internet Engineering Task Force
+//! (IETF)][ietf] to uniquely identify objects across the web. IRIs are a
+//! superclass of URIs accepting international characters defined in the
+//! [Unicode][unicode] table.
+//!
+//! [uri]: <https://en.wikipedia.org/wiki/Uniform_Resource_Identifier>
+//! [uri-rfc]: <https://tools.ietf.org/html/rfc3986>
+//! [iri]: <https://en.wikipedia.org/wiki/Internationalized_resource_identifier>
+//! [iri-rfc]: <https://tools.ietf.org/html/rfc3987>
+//! [ietf]: <ietf.org>
+//! [unicode]: <https://en.wikipedia.org/wiki/Unicode>
+//!
+//! URI/IRIs are defined as a sequence of characters with distinguishable
+//! components: a scheme, an authority, a path, a query and a fragment.
 //!
 //! ```text
 //!     foo://example.com:8042/over/there?name=ferret#nose
@@ -17,16 +23,19 @@
 //!   scheme     authority       path        query   fragment
 //! ```
 //!
-//! This crate provides the four types `Iri`, `IriBuf`, `IriRef` and `IriRefBuf`
-//! to manipulate byte/string slices and buffers as IRIs and IRI references.
-//! Theses allows the easy access and manipulation of every components.
+//! This crate provides types to represent borrowed and owned URIs and IRIs
+//! (`Uri`, `Iri`, `UriBuf`, `IriBuf`), borrowed and owned URIs and IRIs
+//! references (`UriRef`, `IriRef`, `UriRefBuf`, `IriRefBuf`) and similar
+//! types for every part of an URI/IRI. Theses allows the easy access and
+//! manipulation of every components.
 //! It features:
-//!   - borrowed and owned IRIs and IRI-reference;
-//!   - mutable IRI buffers (in-place);
+//!   - borrowed and owned URI/IRIs and URI/IRI-reference;
+//!   - mutable URI/IRI buffers (in-place);
 //!   - path normalization;
 //!   - comparison modulo normalization;
-//!   - IRI-reference resolution;
-//!   - static IRI parsing with the [`static-iref`] crate and its `iri` macro; and
+//!   - URI/IRI-reference resolution;
+//!   - static URI/IRI parsing with the [`static-iref`] crate and its `iri`
+//!     macro; and
 //!   - `serde` support (by enabling the `serde` feature).
 //!
 //! [`static-iref`]: https://crates.io/crates/static-iref

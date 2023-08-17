@@ -22,6 +22,7 @@ use crate::common::FragmentImpl;
 	FragmentBuf,
 	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
 ))]
+#[cfg_attr(feature = "serde", grammar(serde))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Fragment([u8]);
 

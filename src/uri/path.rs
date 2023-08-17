@@ -17,6 +17,7 @@ use super::PathMut;
 	cache = "automata/uri/path.aut.cbor"
 )]
 #[grammar(sized(PathBuf, derive(Debug, Display)))]
+#[cfg_attr(feature = "serde", grammar(serde))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Path([u8]);
 

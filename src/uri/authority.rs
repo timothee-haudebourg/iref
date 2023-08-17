@@ -27,6 +27,7 @@ pub use userinfo::*;
 	AuthorityBuf,
 	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
 ))]
+#[cfg_attr(feature = "serde", grammar(serde))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Authority([u8]);
 
