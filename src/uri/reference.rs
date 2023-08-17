@@ -162,11 +162,11 @@ impl UriRef {
 	///
 	/// # Example
 	/// ```
-	/// # use iref::IriRef;
-	/// let a = IriRef::new("https://crates.io/crates/iref?query#fragment").unwrap();
-	/// let b = IriRef::new("https://crates.io/crates/iref/?query#fragment").unwrap();
-	/// assert_eq!(a.base(), "https://crates.io/crates/");
-	/// assert_eq!(b.base(), "https://crates.io/crates/iref/")
+	/// # use iref::UriRef;
+	/// let a = UriRef::new(b"https://crates.io/crates/iref?query#fragment").unwrap();
+	/// let b = UriRef::new(b"https://crates.io/crates/iref/?query#fragment").unwrap();
+	/// assert_eq!(a.base(), b"https://crates.io/crates/");
+	/// assert_eq!(b.base(), b"https://crates.io/crates/iref/")
 	/// ```
 	#[inline]
 	pub fn base(&self) -> &Self {
