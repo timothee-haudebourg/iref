@@ -1,23 +1,29 @@
 # Internationalized Resource Identifiers and References
 
-[![CI](https://github.com/timothee-haudebourg/iref/workflows/Continuous%20Integration/badge.svg)](https://github.com/timothee-haudebourg/iref/actions)
+[![CI](https://github.com/timothee-haudebourg/iref/workflows/CI/badge.svg)](https://github.com/timothee-haudebourg/iref/actions)
 [![Crate informations](https://img.shields.io/crates/v/iref.svg?style=flat-square)](https://crates.io/crates/iref)
 [![License](https://img.shields.io/crates/l/iref.svg?style=flat-square)](https://github.com/timothee-haudebourg/iref#license)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/iref)
 
 <!-- cargo-rdme start -->
 
-This crates gives an implementation of
-[Internationalized Resource Identifiers (IRIs)](https://en.wikipedia.org/wiki/Internationalized_resource_identifier) and IRI references following
-[RFC 3987](https://tools.ietf.org/html/rfc3987) and
-[RFC 3986](https://tools.ietf.org/html/rfc3986) defined by the
-[Internet Engineering Task Force (IETF)](ietf.org).
-IRIs are a superclass of
-[Uniform Resource Identifier (URIs)](https://en.wikipedia.org/wiki/Uniform_resource_identifier) and
-[Uniform Resource Locator (URLs)](https://en.wikipedia.org/wiki/Uniform_Resource_Locator)
-used to uniquely identify objects across the web.
-An IRI is defined as a sequence of characters with distinguishable components:
-a scheme, an authority, a path, a query and a fragment.
+This crates provides an implementation of
+[Uniform Resource Identifiers (URIs, aka URLs)][uri] and [Internationalized
+Resource Identifiers (IRIs)][iri] following [RFC 3987][uri-rfc] and [RFC
+3986][iri-rfc] defined by the [Internet Engineering Task Force
+(IETF)][ietf] to uniquely identify objects across the web. IRIs are a
+superclass of URIs accepting international characters defined in the
+[Unicode][unicode] table.
+
+[uri]: <https://en.wikipedia.org/wiki/Uniform_Resource_Identifier>
+[uri-rfc]: <https://tools.ietf.org/html/rfc3986>
+[iri]: <https://en.wikipedia.org/wiki/Internationalized_resource_identifier>
+[iri-rfc]: <https://tools.ietf.org/html/rfc3987>
+[ietf]: <ietf.org>
+[unicode]: <https://en.wikipedia.org/wiki/Unicode>
+
+URI/IRIs are defined as a sequence of characters with distinguishable
+components: a scheme, an authority, a path, a query and a fragment.
 
 ```text
     foo://example.com:8042/over/there?name=ferret#nose
@@ -26,16 +32,19 @@ a scheme, an authority, a path, a query and a fragment.
   scheme     authority       path        query   fragment
 ```
 
-This crate provides the four types `Iri`, `IriBuf`, `IriRef` and `IriRefBuf`
-to manipulate byte/string slices and buffers as IRIs and IRI references.
-Theses allows the easy access and manipulation of every components.
+This crate provides types to represent borrowed and owned URIs and IRIs
+(`Uri`, `Iri`, `UriBuf`, `IriBuf`), borrowed and owned URIs and IRIs
+references (`UriRef`, `IriRef`, `UriRefBuf`, `IriRefBuf`) and similar
+types for every part of an URI/IRI. Theses allows the easy access and
+manipulation of every components.
 It features:
-  - borrowed and owned IRIs and IRI-reference;
-  - mutable IRI buffers (in-place);
+  - borrowed and owned URI/IRIs and URI/IRI-reference;
+  - mutable URI/IRI buffers (in-place);
   - path normalization;
   - comparison modulo normalization;
-  - IRI-reference resolution;
-  - static IRI parsing with the [`static-iref`] crate and its `iri` macro; and
+  - URI/IRI-reference resolution;
+  - static URI/IRI parsing with the [`static-iref`] crate and its `iri`
+    macro; and
   - `serde` support (by enabling the `serde` feature).
 
 [`static-iref`]: https://crates.io/crates/static-iref
@@ -47,8 +56,6 @@ Note that no memory allocation occurs using `Iri`, it only borrows the input dat
 Access to each component is done in constant time.
 
 ```rust
-extern crate iref;
-
 use iref::Iri;
 
 let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
@@ -66,12 +73,9 @@ modified in-place to reduce memory allocation and optimize memory accesses.
 This also allows the conversion from `IriBuf` into `Iri`.
 
 ```rust
-extern crate iref;
-
-use std::convert::TryInto;
 use iref::IriBuf;
 
-let mut iri = IriBuf::new("https://www.rust-lang.org")?;
+let mut iri = IriBuf::new("https://www.rust-lang.org".to_string())?;
 
 iri.authority_mut().unwrap().set_port(Some("40".try_into()?));
 iri.set_path("/foo".try_into()?);
@@ -93,7 +97,7 @@ It is possible to access the segments of a path using the iterator returned by t
 
 ```rust
 for segment in iri.path().segments() {
-	println!("{}", segment);
+  println!("{}", segment);
 }
 ```
 
@@ -102,12 +106,13 @@ version of the path where dot segments (`.` and `..`) are removed.
 In addition, it is possible to push or pop segments to a path using the
 corresponding methods:
 ```rust
-let mut iri = IriBuf::new("https://rust-lang.org/a/c")?;
+let mut iri = IriBuf::new("https://rust-lang.org/a/c".to_string())?;
 let mut path = iri.path_mut();
 
 path.pop();
 path.push("b".try_into()?);
-path.push("c/".try_into()?); // a `/` character is allowed at the end of a segment.
+path.push("c".try_into()?);
+path.push("".try_into()?); // the empty segment is valid.
 
 assert_eq!(iri.path(), "/a/b/c/");
 ```
@@ -123,10 +128,10 @@ let mut iri_ref = IriRefBuf::default(); // an IRI reference can be empty.
 
 // An IRI reference with a scheme is a valid IRI.
 iri_ref.set_scheme(Some("https".try_into()?));
-let iri: Iri = iri_ref.as_iri()?;
+let iri: &Iri = iri_ref.as_iri().unwrap();
 
 // An IRI can be safely converted into an IRI reference.
-let iri_ref: IriRef = iri.into();
+let iri_ref: &IriRef = iri.into();
 ```
 
 Given a base IRI, references can be resolved into a regular IRI using the
@@ -136,7 +141,7 @@ This crate provides a *strict* implementation of this algorithm.
 
 ```rust
 let base_iri = Iri::new("http://a/b/c/d;p?q")?;
-let mut iri_ref = IriRefBuf::new("g;x=1/../y")?;
+let mut iri_ref = IriRefBuf::new("g;x=1/../y".to_string())?;
 
 // non mutating resolution.
 assert_eq!(iri_ref.resolved(base_iri), "http://a/b/c/y");

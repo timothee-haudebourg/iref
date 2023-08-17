@@ -1,133 +1,92 @@
-use super::Error;
-use crate::parsing;
-use pct_str::PctStr;
-use std::borrow::Borrow;
-use std::cmp::{Ord, Ordering, PartialOrd};
-use std::convert::TryFrom;
-use std::hash::{Hash, Hasher};
-use std::{cmp, fmt};
+use pct_str::{PctStr, PctString};
+use std::{
+	cmp,
+	hash::{self, Hash},
+	ops,
+};
 
-#[derive(Clone, Copy)]
-pub struct Query<'a> {
-	/// The Query slice.
-	pub(crate) data: &'a [u8],
+use static_regular_grammar::RegularGrammar;
+
+use crate::common::QueryImpl;
+
+/// IRI query.
+#[derive(RegularGrammar)]
+#[grammar(
+	file = "src/iri/grammar.abnf",
+	entry_point = "iquery",
+	no_deref,
+	cache = "automata/iri/query.aut.cbor"
+)]
+#[grammar(sized(QueryBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[cfg_attr(feature = "serde", grammar(serde))]
+#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
+pub struct Query(str);
+
+impl QueryImpl for Query {
+	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+	}
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
 }
 
-impl<'a> Query<'a> {
-	/// Returns a reference to the byte representation of the query.
-	#[inline]
-	pub fn as_bytes(&self) -> &[u8] {
-		self.data
-	}
-
-	/// Get the underlying query slice as a string slice.
-	#[inline]
-	pub fn as_str(&self) -> &str {
-		unsafe { std::str::from_utf8_unchecked(self.data) }
-	}
-
-	/// Get the underlying query slice as a percent-encoded string slice.
+impl Query {
+	/// Returns the query as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
+}
 
-	/// Checks if the query is empty.
-	#[inline]
-	pub fn is_empty(&self) -> bool {
-		self.data.is_empty()
+impl ops::Deref for Query {
+	type Target = PctStr;
+
+	fn deref(&self) -> &Self::Target {
+		self.as_pct_str()
 	}
 }
 
-impl<'a> AsRef<str> for Query<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> AsRef<[u8]> for Query<'a> {
-	#[inline(always)]
-	fn as_ref(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> Borrow<str> for Query<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &str {
-		self.as_str()
-	}
-}
-
-impl<'a> Borrow<[u8]> for Query<'a> {
-	#[inline(always)]
-	fn borrow(&self) -> &[u8] {
-		self.as_bytes()
-	}
-}
-
-impl<'a> TryFrom<&'a str> for Query<'a> {
-	type Error = Error;
-
-	#[inline]
-	fn try_from(str: &'a str) -> Result<Query<'a>, Error> {
-		let query_len = parsing::parse_query(str.as_ref(), 0)?;
-		if query_len < str.len() {
-			Err(Error::InvalidQuery)
-		} else {
-			Ok(Query { data: str.as_ref() })
-		}
-	}
-}
-
-impl<'a> fmt::Display for Query<'a> {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl<'a> fmt::Debug for Query<'a> {
-	#[inline]
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-
-impl<'a> cmp::PartialEq for Query<'a> {
+impl cmp::PartialEq for Query {
 	#[inline]
 	fn eq(&self, other: &Query) -> bool {
 		self.as_pct_str() == other.as_pct_str()
 	}
 }
 
-impl<'a> Eq for Query<'a> {}
+impl Eq for Query {}
 
-impl<'a> cmp::PartialEq<&'a str> for Query<'a> {
+impl<'a> PartialEq<&'a str> for Query {
 	#[inline]
 	fn eq(&self, other: &&'a str) -> bool {
 		self.as_str() == *other
 	}
 }
 
-impl<'a> PartialOrd for Query<'a> {
+impl PartialOrd for Query {
 	#[inline]
-	fn partial_cmp(&self, other: &Query<'a>) -> Option<Ordering> {
+	fn partial_cmp(&self, other: &Query) -> Option<cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl<'a> Ord for Query<'a> {
+impl Ord for Query {
 	#[inline]
-	fn cmp(&self, other: &Query<'a>) -> Ordering {
+	fn cmp(&self, other: &Query) -> cmp::Ordering {
 		self.as_pct_str().cmp(other.as_pct_str())
 	}
 }
 
-impl<'a> Hash for Query<'a> {
+impl Hash for Query {
 	#[inline]
-	fn hash<H: Hasher>(&self, hasher: &mut H) {
+	fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
 		self.as_pct_str().hash(hasher)
+	}
+}
+
+impl QueryBuf {
+	pub fn into_pct_string(self) -> PctString {
+		unsafe { PctString::new_unchecked(self.0) }
 	}
 }

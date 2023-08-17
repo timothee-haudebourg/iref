@@ -1,10 +1,9 @@
-extern crate iref;
+use std::borrow::Cow;
 
-use iref::IriBuf;
-use std::convert::TryInto;
+use iref::{IriBuf, IriError};
 
-fn main() -> Result<(), iref::Error> {
-	let mut iri = IriBuf::new("https://www.rust-lang.org")?;
+fn main() -> Result<(), IriError<Cow<'static, str>>> {
+	let mut iri = IriBuf::new("https://www.rust-lang.org".to_string())?;
 
 	iri.authority_mut()
 		.unwrap()

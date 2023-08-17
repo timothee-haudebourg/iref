@@ -1,14 +1,20 @@
-//! This crates gives an implementation of
-//! [Internationalized Resource Identifiers (IRIs)](https://en.wikipedia.org/wiki/Internationalized_resource_identifier) and IRI references following
-//! [RFC 3987](https://tools.ietf.org/html/rfc3987) and
-//! [RFC 3986](https://tools.ietf.org/html/rfc3986) defined by the
-//! [Internet Engineering Task Force (IETF)](ietf.org).
-//! IRIs are a superclass of
-//! [Uniform Resource Identifier (URIs)](https://en.wikipedia.org/wiki/Uniform_resource_identifier) and
-//! [Uniform Resource Locator (URLs)](https://en.wikipedia.org/wiki/Uniform_Resource_Locator)
-//! used to uniquely identify objects across the web.
-//! An IRI is defined as a sequence of characters with distinguishable components:
-//! a scheme, an authority, a path, a query and a fragment.
+//! This crates provides an implementation of
+//! [Uniform Resource Identifiers (URIs, aka URLs)][uri] and [Internationalized
+//! Resource Identifiers (IRIs)][iri] following [RFC 3987][uri-rfc] and [RFC
+//! 3986][iri-rfc] defined by the [Internet Engineering Task Force
+//! (IETF)][ietf] to uniquely identify objects across the web. IRIs are a
+//! superclass of URIs accepting international characters defined in the
+//! [Unicode][unicode] table.
+//!
+//! [uri]: <https://en.wikipedia.org/wiki/Uniform_Resource_Identifier>
+//! [uri-rfc]: <https://tools.ietf.org/html/rfc3986>
+//! [iri]: <https://en.wikipedia.org/wiki/Internationalized_resource_identifier>
+//! [iri-rfc]: <https://tools.ietf.org/html/rfc3987>
+//! [ietf]: <ietf.org>
+//! [unicode]: <https://en.wikipedia.org/wiki/Unicode>
+//!
+//! URI/IRIs are defined as a sequence of characters with distinguishable
+//! components: a scheme, an authority, a path, a query and a fragment.
 //!
 //! ```text
 //!     foo://example.com:8042/over/there?name=ferret#nose
@@ -17,16 +23,19 @@
 //!   scheme     authority       path        query   fragment
 //! ```
 //!
-//! This crate provides the four types `Iri`, `IriBuf`, `IriRef` and `IriRefBuf`
-//! to manipulate byte/string slices and buffers as IRIs and IRI references.
-//! Theses allows the easy access and manipulation of every components.
+//! This crate provides types to represent borrowed and owned URIs and IRIs
+//! (`Uri`, `Iri`, `UriBuf`, `IriBuf`), borrowed and owned URIs and IRIs
+//! references (`UriRef`, `IriRef`, `UriRefBuf`, `IriRefBuf`) and similar
+//! types for every part of an URI/IRI. Theses allows the easy access and
+//! manipulation of every components.
 //! It features:
-//!   - borrowed and owned IRIs and IRI-reference;
-//!   - mutable IRI buffers (in-place);
+//!   - borrowed and owned URI/IRIs and URI/IRI-reference;
+//!   - mutable URI/IRI buffers (in-place);
 //!   - path normalization;
 //!   - comparison modulo normalization;
-//!   - IRI-reference resolution;
-//!   - static IRI parsing with the [`static-iref`] crate and its `iri` macro; and
+//!   - URI/IRI-reference resolution;
+//!   - static URI/IRI parsing with the [`static-iref`] crate and its `iri`
+//!     macro; and
 //!   - `serde` support (by enabling the `serde` feature).
 //!
 //! [`static-iref`]: https://crates.io/crates/static-iref
@@ -38,11 +47,9 @@
 //! Access to each component is done in constant time.
 //!
 //! ```rust
-//! extern crate iref;
-//!
 //! use iref::Iri;
 //!
-//! # fn main() -> Result<(), iref::Error> {
+//! # fn main() -> Result<(), iref::IriError<&'static str>> {
 //! let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
 //!
 //! println!("scheme: {}", iri.scheme());
@@ -61,13 +68,10 @@
 //! This also allows the conversion from `IriBuf` into `Iri`.
 //!
 //! ```rust
-//! extern crate iref;
-//!
-//! use std::convert::TryInto;
 //! use iref::IriBuf;
 //!
-//! # fn main() -> Result<(), iref::Error> {
-//! let mut iri = IriBuf::new("https://www.rust-lang.org")?;
+//! # fn main() -> Result<(), iref::IriError<std::borrow::Cow<'static, str>>> {
+//! let mut iri = IriBuf::new("https://www.rust-lang.org".to_string())?;
 //!
 //! iri.authority_mut().unwrap().set_port(Some("40".try_into()?));
 //! iri.set_path("/foo".try_into()?);
@@ -90,12 +94,11 @@
 //! It is possible to access the segments of a path using the iterator returned by the `segments` method.
 //!
 //! ```rust
-//! # extern crate iref;
 //! # use iref::Iri;
-//! # fn main() -> Result<(), iref::Error> {
+//! # fn main() -> Result<(), iref::IriError<&'static str>> {
 //! # let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
 //! for segment in iri.path().segments() {
-//! 	println!("{}", segment);
+//!   println!("{}", segment);
 //! }
 //! # Ok(())
 //! # }
@@ -106,16 +109,15 @@
 //! In addition, it is possible to push or pop segments to a path using the
 //! corresponding methods:
 //! ```rust
-//! # extern crate iref;
-//! # use std::convert::TryInto;
 //! # use iref::IriBuf;
-//! # fn main() -> Result<(), iref::Error> {
-//! let mut iri = IriBuf::new("https://rust-lang.org/a/c")?;
+//! # fn main() -> Result<(), iref::IriError<std::borrow::Cow<'static, str>>> {
+//! let mut iri = IriBuf::new("https://rust-lang.org/a/c".to_string())?;
 //! let mut path = iri.path_mut();
 //!
 //! path.pop();
 //! path.push("b".try_into()?);
-//! path.push("c/".try_into()?); // a `/` character is allowed at the end of a segment.
+//! path.push("c".try_into()?);
+//! path.push("".try_into()?); // the empty segment is valid.
 //!
 //! assert_eq!(iri.path(), "/a/b/c/");
 //! # Ok(())
@@ -129,18 +131,16 @@
 //! Contrarily to regular IRIs, relative IRI references may have no scheme.
 //!
 //! ```rust
-//! # extern crate iref;
-//! # use std::convert::TryInto;
 //! # use iref::{Iri, IriRef, IriRefBuf};
-//! # fn main() -> Result<(), iref::Error> {
+//! # fn main() -> Result<(), iref::IriError<&'static str>> {
 //! let mut iri_ref = IriRefBuf::default(); // an IRI reference can be empty.
 //!
 //! // An IRI reference with a scheme is a valid IRI.
 //! iri_ref.set_scheme(Some("https".try_into()?));
-//! let iri: Iri = iri_ref.as_iri()?;
+//! let iri: &Iri = iri_ref.as_iri().unwrap();
 //!
 //! // An IRI can be safely converted into an IRI reference.
-//! let iri_ref: IriRef = iri.into();
+//! let iri_ref: &IriRef = iri.into();
 //! # Ok(())
 //! # }
 //! ```
@@ -151,12 +151,10 @@
 //! This crate provides a *strict* implementation of this algorithm.
 //!
 //! ```rust
-//! # extern crate iref;
-//! # use std::convert::TryInto;
 //! # use iref::{Iri, IriRef, IriRefBuf};
-//! # fn main() -> Result<(), iref::Error> {
+//! # fn main() -> Result<(), iref::IriError<::std::borrow::Cow<'static, str>>> {
 //! let base_iri = Iri::new("http://a/b/c/d;p?q")?;
-//! let mut iri_ref = IriRefBuf::new("g;x=1/../y")?;
+//! let mut iri_ref = IriRefBuf::new("g;x=1/../y".to_string())?;
 //!
 //! // non mutating resolution.
 //! assert_eq!(iri_ref.resolved(base_iri), "http://a/b/c/y");
@@ -206,93 +204,10 @@
 //! Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 //! percent encoded characters are correctly handled.
 //! The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
-#![allow(clippy::tabs_in_doc_comments)]
+pub(crate) mod common;
+pub mod iri;
+pub mod uri;
+pub(crate) mod utils;
 
-mod iri;
-pub mod parsing;
-mod reference;
-
-pub use crate::iri::*;
-pub use crate::reference::*;
-use std::ops::Range;
-
-/// Replacement function in IRI-reference buffers.
-///
-/// Replace the given `range` of the input `buffer` with the given `content`.
-/// This function is used in many places to replace parts of an IRI-reference buffer data.
-pub(crate) fn replace(buffer: &mut Vec<u8>, range: Range<usize>, content: &[u8]) {
-	let range_len = range.end - range.start;
-
-	// move the content around.
-	if range_len != content.len() {
-		let tail_len = buffer.len() - range.end; // the length of the content in the buffer after [range].
-		let new_end = range.start + content.len();
-
-		if range_len > content.len() {
-			// shrink
-			for i in 0..tail_len {
-				buffer[new_end + i] = buffer[range.end + i];
-			}
-
-			buffer.resize(new_end + tail_len, 0);
-		} else {
-			// grow
-			let tail_len = buffer.len() - range.end;
-
-			buffer.resize(new_end + tail_len, 0);
-
-			for i in 0..tail_len {
-				buffer[new_end + tail_len - i - 1] = buffer[range.end + tail_len - i - 1];
-			}
-		}
-	}
-
-	// actually replace the content.
-	for i in 0..content.len() {
-		buffer[range.start + i] = content[i]
-	}
-}
-
-#[cfg(feature = "serde")]
-impl<'de: 'a, 'a> serde::Deserialize<'de> for Iri<'a> {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where
-		D: serde::Deserializer<'de>,
-	{
-		struct Visitor;
-
-		impl<'de> serde::de::Visitor<'de> for Visitor {
-			type Value = Iri<'de>;
-
-			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-				write!(formatter, "an IRI")
-			}
-
-			fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
-			where
-				E: serde::de::Error,
-			{
-				Iri::new(v).map_err(|_| E::invalid_value(serde::de::Unexpected::Str(v), &self))
-			}
-
-			fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
-			where
-				E: serde::de::Error,
-			{
-				Iri::new(v).map_err(|_| E::invalid_value(serde::de::Unexpected::Bytes(v), &self))
-			}
-		}
-
-		deserializer.deserialize_str(Visitor)
-	}
-}
-
-#[cfg(feature = "serde")]
-impl<'a> serde::Serialize for Iri<'a> {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: serde::Serializer,
-	{
-		serializer.serialize_str(self.as_str())
-	}
-}
+pub use iri::{InvalidIri, Iri, IriBuf, IriError, IriRef, IriRefBuf};
+pub use uri::{InvalidUri, Uri, UriBuf, UriError, UriRef, UriRefBuf};

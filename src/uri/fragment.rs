@@ -9,13 +9,14 @@ use static_regular_grammar::RegularGrammar;
 
 use crate::common::FragmentImpl;
 
-/// IRI fragment.
+/// URI fragment.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "src/iri/grammar.abnf",
-	entry_point = "ifragment",
+	file = "src/uri/grammar.abnf",
+	entry_point = "fragment",
+	ascii,
 	no_deref,
-	cache = "automata/iri/fragment.aut.cbor"
+	cache = "automata/uri/fragment.aut.cbor"
 )]
 #[grammar(sized(
 	FragmentBuf,
@@ -23,15 +24,15 @@ use crate::common::FragmentImpl;
 ))]
 #[cfg_attr(feature = "serde", grammar(serde))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
-pub struct Fragment(str);
+pub struct Fragment([u8]);
 
 impl FragmentImpl for Fragment {
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
-		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+		Self::new_unchecked(bytes)
 	}
 
 	fn as_bytes(&self) -> &[u8] {
-		self.0.as_bytes()
+		&self.0
 	}
 }
 

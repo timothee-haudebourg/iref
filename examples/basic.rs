@@ -1,8 +1,6 @@
-extern crate iref;
+use iref::{Iri, IriError};
 
-use iref::Iri;
-
-fn main() -> Result<(), iref::Error> {
+fn main() -> Result<(), IriError<&'static str>> {
 	let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
 
 	println!("scheme: {}", iri.scheme());

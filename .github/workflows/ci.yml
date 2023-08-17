@@ -1,34 +1,47 @@
-on: [push, pull_request]
-name: Continuous Integration
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+env:
+  CARGO_TERM_COLORS: always
 
 jobs:
-
-  test:
-    name: Test Suite
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.71.0"
           profile: minimal
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-
+      - name: Build
+        run: cargo build --features="serde" --verbose
+      - name: Run tests
+        run: cargo test --features="serde" --verbose
   rustfmt:
-    name: Rustfmt
+    name: Formatting
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.71.0"
           profile: minimal
           override: true
           components: rustfmt
@@ -37,17 +50,17 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-
   clippy:
-    name: Clippy
+    name: Warnings
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: "1.71.0"
           profile: minimal
           override: true
           components: clippy
@@ -55,4 +68,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --features="serde" -- -D warnings

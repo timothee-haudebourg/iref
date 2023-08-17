@@ -6,19 +6,22 @@ use std::{
 use static_regular_grammar::RegularGrammar;
 
 mod host;
+mod port;
 mod userinfo;
 
-use crate::common::authority::AuthorityImpl;
-pub use crate::uri::{InvalidPort, Port, PortBuf};
-pub use crate::uri::{InvalidScheme, Scheme, SchemeBuf};
+use crate::common::AuthorityImpl;
+
+pub use super::{InvalidScheme, Scheme, SchemeBuf};
 pub use host::*;
+pub use port::*;
 pub use userinfo::*;
 
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "src/iri/grammar.abnf",
-	entry_point = "iauthority",
-	cache = "automata/iri/authority.aut.cbor"
+	file = "src/uri/grammar.abnf",
+	entry_point = "authority",
+	ascii,
+	cache = "automata/uri/authority.aut.cbor"
 )]
 #[grammar(sized(
 	AuthorityBuf,
@@ -26,18 +29,18 @@ pub use userinfo::*;
 ))]
 #[cfg_attr(feature = "serde", grammar(serde))]
 #[cfg_attr(feature = "ignore-grammars", grammar(disable))]
-pub struct Authority(str);
+pub struct Authority([u8]);
 
 impl AuthorityImpl for Authority {
 	type UserInfo = UserInfo;
 	type Host = Host;
 
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
-		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+		Self::new_unchecked(bytes)
 	}
 
 	fn as_bytes(&self) -> &[u8] {
-		self.0.as_bytes()
+		&self.0
 	}
 }
 
@@ -71,7 +74,7 @@ impl Authority {
 			host: unsafe { Host::new_unchecked(&self.0[ranges.host]) },
 			port: ranges
 				.port
-				.map(|r| unsafe { Port::new_unchecked(&self.0.as_bytes()[r]) }),
+				.map(|r| unsafe { Port::new_unchecked(&self.0[r]) }),
 		}
 	}
 }
@@ -110,32 +113,5 @@ impl Hash for Authority {
 	#[inline]
 	fn hash<H: hash::Hasher>(&self, hasher: &mut H) {
 		self.parts().hash(hasher)
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn parts() {
-		let vectors = [
-			("host", (None, "host", None)),
-			("user@host", (Some("user"), "host", None)),
-			("host:123", (None, "host", Some("123"))),
-			("user@host:123", (Some("user"), "host", Some("123"))),
-			("a:b@host", (Some("a:b"), "host", None)),
-			("a:b@host:123", (Some("a:b"), "host", Some("123"))),
-		];
-
-		for (input, expected) in vectors {
-			// eprintln!("{input} => {expected:?}");
-			let input = Authority::new(input).unwrap();
-			let parts = input.parts();
-
-			assert_eq!(parts.user_info.map(UserInfo::as_str), expected.0);
-			assert_eq!(parts.host.as_str(), expected.1);
-			assert_eq!(parts.port.map(Port::as_str), expected.2)
-		}
 	}
 }
