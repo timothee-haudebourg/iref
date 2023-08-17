@@ -1,11 +1,11 @@
 [package]
 name = "iref"
-version = "2.2.3"
-authors = ["Timothée Haudebourg <author@haudebourg.net>"]
+version = "3.0.0"
 edition = "2021"
+authors = ["Timothée Haudebourg <author@haudebourg.net>"]
 categories = ["web-programming", "internationalization"]
-keywords = ["iri", "uri", "resource", "identifier", "slice"]
-description = "Internationalized Resource Identifiers (IRIs) and References, borrowed and owned."
+keywords = ["iri", "uri", "url", "resource", "identifier"]
+description = "Uniform & Internationalized Resource Identifiers (URIs/IRIs), borrowed and owned."
 repository = "https://github.com/timothee-haudebourg/iref"
 documentation = "https://docs.rs/iref"
 license = "MIT/Apache-2.0"
@@ -20,9 +20,9 @@ ignore-grammars = []
 pct-str = "2.0"
 smallvec = "1.2"
 thiserror = "1.0.40"
+static-regular-grammar = "1.0"
 serde = { version = "1.0", optional = true }
 hashbrown = { version = "0.14.0", optional = true }
-static-regular-grammar = { git = "https://github.com/timothee-haudebourg/static-regular-grammar.git" }
 
 [dev-dependencies]
 serde_json = "1.0"
