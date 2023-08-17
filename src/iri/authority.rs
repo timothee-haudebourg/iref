@@ -128,7 +128,7 @@ mod tests {
 		];
 
 		for (input, expected) in vectors {
-			eprintln!("{input} => {expected:?}");
+			// eprintln!("{input} => {expected:?}");
 			let input = Authority::new(input).unwrap();
 			let parts = input.parts();
 

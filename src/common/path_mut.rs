@@ -4,7 +4,10 @@ use smallvec::SmallVec;
 
 use crate::utils::{allocate_range, replace};
 
-use super::path::{PathBufImpl, PathImpl, SegmentImpl, CURRENT_SEGMENT, PARENT_SEGMENT};
+use super::{
+	parse,
+	path::{PathBufImpl, PathImpl, SegmentImpl, CURRENT_SEGMENT, PARENT_SEGMENT},
+};
 
 /// Stack size (in bytes) allocated for the `normalize` method to normalize a
 /// `Path`. If it needs more space, it will allocate memory on the heap.
@@ -21,6 +24,10 @@ pub struct PathMutImpl<'a, P: ?Sized> {
 	/// End offset (excluded).
 	end: usize,
 
+	/// Determines if the path follows an authority part,
+	/// in which case some disambiguation rules applies.
+	follows_authority: bool,
+
 	p: PhantomData<P>,
 }
 
@@ -34,10 +41,13 @@ impl<'a, P: ?Sized + PathImpl> Deref for PathMutImpl<'a, P> {
 
 impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 	pub unsafe fn new(buffer: &'a mut Vec<u8>, start: usize, end: usize) -> Self {
+		let follows_authority = parse::find_authority(&buffer[..start], 0).is_ok();
+
 		Self {
 			buffer,
 			start,
 			end,
+			follows_authority,
 			p: PhantomData,
 		}
 	}
@@ -53,6 +63,7 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 			buffer,
 			start: 0,
 			end,
+			follows_authority: true,
 			p: PhantomData,
 		}
 	}
@@ -66,12 +77,15 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 	}
 
 	pub fn push(&mut self, segment: &P::Segment) {
+		// Disambiguate if the path is empty and one of the following is true:
+		// - `segment` looks like a scheme and path is a the start.
+		// - `segment` is empty, path is absolute and following an authority.
+		// - `segment` is empty, path is relative.
 		let disambiguate = self.is_empty()
-			&& (segment.is_empty() || (self.start == 0 && segment.looks_like_scheme()));
+			&& ((self.start == 0 && segment.looks_like_scheme()) || segment.is_empty());
 
 		if disambiguate {
 			let start = self.first_segment_offset();
-
 			let len = 2 + segment.len();
 			allocate_range(self.buffer, start..start, len);
 			self.end += len;
@@ -82,12 +96,21 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 			replace(self.buffer, self.end..self.end, segment.as_bytes());
 			self.end += segment.len();
 		} else {
+			let bytes = self.as_bytes();
+			let mut start_offset = 0usize;
+			if (self.follows_authority || bytes.len() > 3) && bytes.ends_with(b"/./") {
+				// we can remove the `./` here.
+				start_offset = 2;
+			};
+
+			let start = self.end - start_offset;
 			let len = 1 + segment.len();
-			allocate_range(self.buffer, self.end..self.end, len);
-			let offset = self.end + 1;
-			self.buffer[self.end..offset].copy_from_slice(b"/");
-			self.end += len;
-			self.buffer[offset..self.end].copy_from_slice(segment.as_bytes());
+			allocate_range(self.buffer, start..self.end, len);
+
+			self.buffer[start] = b'/';
+			self.end += len - start_offset;
+			let segment_offset = start + 1;
+			self.buffer[segment_offset..self.end].copy_from_slice(segment.as_bytes());
 		}
 	}
 
@@ -119,13 +142,26 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 		self.end = start
 	}
 
-	/// Push the given segment to this path using the `.` and `..` segments semantics.
+	/// Push the given segment to this path using the `.` and `..` segments
+	/// semantics.
+	///
+	/// Returns wether or not a special segment has been push and should be
+	/// followed by an empty segment when doing reference resolution.
 	#[inline]
-	pub fn symbolic_push(&mut self, segment: &P::Segment) {
+	pub fn symbolic_push(&mut self, segment: &P::Segment, is_open: bool) -> bool {
 		match segment.as_bytes() {
-			CURRENT_SEGMENT => (),
-			PARENT_SEGMENT => self.pop(),
-			_ => self.push(segment),
+			CURRENT_SEGMENT => true,
+			PARENT_SEGMENT => {
+				self.pop();
+				true
+			}
+			_ => {
+				if !segment.is_empty() || !is_open || !self.is_empty() {
+					self.push(segment);
+				}
+
+				false
+			}
 		}
 	}
 
@@ -136,16 +172,21 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
 	#[inline]
 	pub fn symbolic_append<'s, S: IntoIterator<Item = &'s P::Segment>>(&mut self, path: S) {
+		let mut open = false;
 		for segment in path {
-			self.symbolic_push(segment)
+			open = self.symbolic_push(segment, open);
+		}
+
+		if open && !self.is_empty() {
+			self.push(<P::Segment as SegmentImpl>::EMPTY)
 		}
 	}
 
 	#[inline]
 	pub fn normalize(&mut self) {
 		let mut buffer: SmallVec<[u8; NORMALIZE_IN_PLACE_BUFFER_LEN]> = SmallVec::new();
-		for segment in self.normalized_segments() {
-			if !buffer.is_empty() {
+		for (i, segment) in self.normalized_segments().enumerate() {
+			if i > 0 {
 				buffer.push(b'/')
 			}
 

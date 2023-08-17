@@ -81,7 +81,9 @@ impl<'a> PathMut<'a> {
 	/// Push the given segment to this path using the `.` and `..` segments semantics.
 	#[inline]
 	pub fn symbolic_push(&mut self, segment: &Segment) {
-		self.0.symbolic_push(segment)
+		if self.0.symbolic_push(segment, false) && !self.0.is_empty() {
+			self.0.push(Segment::EMPTY)
+		}
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.

@@ -49,6 +49,10 @@ impl PathBufImpl for PathBuf {
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		&mut self.0
 	}
+
+	fn as_bytes(&self) -> &[u8] {
+		&self.0
+	}
 }
 
 impl Path {
@@ -134,6 +138,21 @@ impl Path {
 	#[inline]
 	pub fn file_name(&self) -> Option<&Segment> {
 		PathImpl::file_name(self)
+	}
+
+	/// Returns the directory path, which is the path without the file name.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use iref::uri::Path;
+	/// assert_eq!(Path::new(b"/foo/bar").unwrap().directory(), b"/foo/");
+	/// assert_eq!(Path::new(b"/foo").unwrap().directory(), b"/");
+	/// assert_eq!(Path::new(b"//foo").unwrap().directory(), b"//");
+	/// assert_eq!(Path::new(b"/").unwrap().directory(), b"/");
+	/// ```
+	pub fn directory(&self) -> &Self {
+		PathImpl::directory(self)
 	}
 
 	/// Returns the path without its final segment, if there is one.
@@ -562,12 +581,12 @@ mod tests {
 			(b"", b""),
 			(b"a/b/c", b"a/b/c"),
 			(b"a/..", b""),
-			(b"a/b/..", b"a"),
+			(b"a/b/..", b"a/"),
 			(b"a/b/../", b"a/"),
-			(b"a/b/c/..", b"a/b"),
-			(b"a/b/c/.", b"a/b/c"),
-			(b"a/../..", b".."),
-			(b"/a/../..", b"/.."),
+			(b"a/b/c/..", b"a/b/"),
+			(b"a/b/c/.", b"a/b/c/"),
+			(b"a/../..", b"../"),
+			(b"/a/../..", b"/../"),
 		];
 
 		for (input, expected) in vectors {

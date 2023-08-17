@@ -10,7 +10,7 @@ pub struct AuthorityPartsImpl {
 	pub port: Option<Range<usize>>,
 }
 
-pub trait AuthorityImpl {
+pub trait AuthorityImpl: PartialEq {
 	type UserInfo: ?Sized + UserInofImpl;
 	type Host: ?Sized + HostImpl;
 

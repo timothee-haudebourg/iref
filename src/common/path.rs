@@ -12,13 +12,21 @@ pub trait PathBufImpl: 'static + Default {
 
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8>;
 
+	fn as_bytes(&self) -> &[u8];
+
 	fn as_path_mut(&mut self) -> PathMutImpl<Self::Borrowed> {
 		PathMutImpl::from_path(self)
+	}
+
+	fn is_empty(&self) -> bool {
+		self.as_bytes().is_empty() || self.as_bytes() == *b"/"
 	}
 }
 
 pub trait SegmentImpl: 'static {
 	const PARENT: &'static Self;
+
+	const EMPTY: &'static Self;
 
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self;
 
@@ -224,8 +232,13 @@ pub trait PathImpl: 'static {
 			Self::EMPTY.to_path_buf()
 		};
 
+		let mut open = false;
 		for segment in self.segments() {
-			result.as_path_mut().symbolic_push(segment)
+			open = result.as_path_mut().symbolic_push(segment, open)
+		}
+
+		if open && !result.is_empty() {
+			result.as_path_mut().push(Self::Segment::EMPTY)
 		}
 
 		result
@@ -239,6 +252,26 @@ pub trait PathImpl: 'static {
 	#[inline]
 	fn file_name(&self) -> Option<&Self::Segment> {
 		self.segments().next_back().filter(|s| !s.is_empty())
+	}
+
+	/// Returns the directory path, which is the path without the file name.
+	fn directory(&self) -> &Self {
+		let bytes = self.as_bytes();
+		if bytes.is_empty() {
+			self
+		} else {
+			let mut i = bytes.len() - 1;
+
+			while i > 0 && bytes[i] != b'/' {
+				i -= 1
+			}
+
+			if i == 0 && bytes[i] != b'/' {
+				Self::EMPTY
+			} else {
+				unsafe { Self::new_unchecked(&bytes[..=i]) }
+			}
+		}
 	}
 
 	/// Returns the path without its final segment, if there is one.

@@ -2,15 +2,29 @@ use std::ops::Range;
 
 use super::{
 	parse, AuthorityImpl, AuthorityMutImpl, FragmentImpl, PathImpl, PathMutImpl, QueryImpl,
-	RiBufImpl, RiImpl,
+	RiBufImpl, RiImpl, SegmentImpl,
 };
 use crate::uri::Scheme;
+
+pub type Suffix<'a, R> = (
+	<<R as RiRefImpl>::Path as PathImpl>::Owned,
+	Option<&'a <R as RiRefImpl>::Query>,
+	Option<&'a <R as RiRefImpl>::Fragment>,
+);
 
 pub trait RiRefImpl {
 	type Authority: ?Sized + AuthorityImpl;
 	type Path: ?Sized + PathImpl;
 	type Query: ?Sized + QueryImpl;
 	type Fragment: ?Sized + FragmentImpl;
+
+	type RiRefBuf: Default
+		+ RiRefBufImpl<
+			Authority = Self::Authority,
+			Path = Self::Path,
+			Query = Self::Query,
+			Fragment = Self::Fragment,
+		>;
 
 	fn as_bytes(&self) -> &[u8];
 
@@ -49,6 +63,99 @@ pub trait RiRefImpl {
 			.ok()
 			.map(|range| unsafe { Self::Fragment::new_unchecked(&bytes[range]) })
 	}
+
+	/// Get this IRI reference relatively to the given one.
+	#[inline]
+	fn relative_to(&self, other: &Self) -> Self::RiRefBuf {
+		let mut result = Self::RiRefBuf::default();
+
+		match (self.scheme_opt(), other.scheme_opt()) {
+			(Some(a), Some(b)) if a == b => (),
+			(Some(_), None) => (),
+			(None, Some(_)) => (),
+			(None, None) => (),
+			_ => {
+				return unsafe {
+					<Self::RiRefBuf as RiRefBufImpl>::new_unchecked(self.as_bytes().to_vec())
+				}
+			}
+		}
+
+		match (self.authority(), other.authority()) {
+			(Some(a), Some(b)) if a == b => (),
+			(Some(_), None) => (),
+			(None, Some(_)) => (),
+			(None, None) => (),
+			_ => {
+				return unsafe {
+					<Self::RiRefBuf as RiRefBufImpl>::new_unchecked(self.as_bytes().to_vec())
+				}
+			}
+		}
+
+		let mut self_segments = self.path().normalized_segments().peekable();
+		let mut base_segments = other
+			.path()
+			.parent_or_empty()
+			.normalized_segments()
+			.peekable();
+
+		if self.path().is_absolute() == other.path().is_absolute() {
+			loop {
+				match (self_segments.peek(), base_segments.peek()) {
+					(Some(a), Some(b)) if a.as_pct_str() == b.as_pct_str() => {
+						base_segments.next();
+						self_segments.next();
+					}
+					_ => break,
+				}
+			}
+		}
+
+		for _segment in base_segments {
+			result
+				.path_mut()
+				.push(<<Self::Path as PathImpl>::Segment as SegmentImpl>::PARENT);
+		}
+
+		for segment in self_segments {
+			result.path_mut().push(segment)
+		}
+
+		if (self.query().is_some() || self.fragment().is_some())
+			&& Some(result.path().as_bytes()) == other.path().last().map(|s| s.as_bytes())
+		{
+			result.path_mut().clear()
+		}
+
+		result.set_query(self.query());
+		result.set_fragment(self.fragment());
+
+		result
+	}
+
+	#[inline]
+	fn suffix(&self, prefix: &Self) -> Option<Suffix<Self>> {
+		if self.scheme_opt() == prefix.scheme_opt() && self.authority() == prefix.authority() {
+			self.path()
+				.suffix(prefix.path())
+				.map(|suffix_path| (suffix_path, self.query(), self.fragment()))
+		} else {
+			None
+		}
+	}
+
+	#[inline]
+	fn base(&self) -> &[u8] {
+		let bytes = self.as_bytes();
+		let path_range = parse::find_path(bytes, 0);
+		let path_start = path_range.start;
+		let path = unsafe { Self::Path::new_unchecked(&bytes[path_range]) };
+
+		let directory_path = path.directory();
+		let end = path_start + directory_path.len();
+		&bytes[..end]
+	}
 }
 
 pub trait RiRefBufImpl: Sized + RiRefImpl {
@@ -68,6 +175,8 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 			Query = Self::Query,
 			Fragment = Self::Fragment,
 		>;
+
+	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self;
 
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8>;
 
@@ -292,31 +401,32 @@ pub trait RiRefBufImpl: Sized + RiRefImpl {
 			self.set_scheme(Some(base_iri.scheme()));
 			if parts.authority.is_some() {
 				self.path_mut().normalize();
-			} else {
-				if self.path().is_relative() && self.path().is_empty() {
-					self.set_path(base_iri.path());
-					if self.query().is_none() {
-						self.set_query(base_iri.query());
-					}
-				} else if self.path().is_absolute() {
-					self.path_mut().normalize();
-				} else {
-					let mut path_buffer = Self::RiBuf::from_scheme(base_iri.scheme().to_owned()); // we set the scheme to avoid path disambiguation.
-					path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
-
-					if base_iri.authority().is_some() && base_iri.path().is_empty() {
-						path_buffer.set_path(Self::Path::EMPTY_ABSOLUTE);
-					} else {
-						path_buffer.set_path(base_iri.path().parent_or_empty());
-						path_buffer.path_mut().normalize();
-					}
-					path_buffer
-						.path_mut()
-						.symbolic_append(self.path().segments());
-
-					self.set_path(path_buffer.path());
-				}
+			} else if self.path().is_relative() && self.path().is_empty() {
 				self.set_authority(base_iri.authority());
+				self.set_path(base_iri.path());
+				if self.query().is_none() {
+					self.set_query(base_iri.query());
+				}
+			} else if self.path().is_absolute() {
+				self.set_authority(base_iri.authority());
+				self.path_mut().normalize();
+			} else {
+				self.set_authority(base_iri.authority());
+				let mut path_buffer = Self::RiBuf::from_scheme(base_iri.scheme().to_owned()); // we set the scheme to avoid path disambiguation.
+				path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
+
+				if base_iri.authority().is_some() && base_iri.path().is_empty() {
+					path_buffer.set_path(Self::Path::EMPTY_ABSOLUTE);
+				} else {
+					path_buffer.set_path(base_iri.path().parent_or_empty());
+					path_buffer.path_mut().normalize();
+				}
+
+				path_buffer
+					.path_mut()
+					.symbolic_append(self.path().segments());
+
+				self.set_path(path_buffer.path());
 			}
 		}
 	}

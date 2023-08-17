@@ -3,11 +3,12 @@ use std::hash::{self, Hash};
 use static_regular_grammar::RegularGrammar;
 
 use crate::{
-	common::{parse, RiRefBufImpl, RiRefImpl},
-	Iri, IriBuf,
+	common::{parse, str_eq, RiRefBufImpl, RiRefImpl},
+	uri::InvalidUriRef,
+	InvalidIri, InvalidUri, Iri, IriBuf, Uri, UriBuf, UriRef, UriRefBuf,
 };
 
-use super::{Authority, AuthorityMut, Fragment, Path, PathMut, Query, Scheme};
+use super::{Authority, AuthorityMut, Fragment, Path, PathBuf, PathMut, Query, Scheme};
 
 /// IRI reference.
 #[derive(RegularGrammar)]
@@ -28,6 +29,8 @@ impl RiRefImpl for IriRef {
 	type Path = Path;
 	type Query = Query;
 	type Fragment = Fragment;
+
+	type RiRefBuf = IriRefBuf;
 
 	fn as_bytes(&self) -> &[u8] {
 		self.0.as_bytes()
@@ -65,6 +68,26 @@ impl IriRef {
 		}
 	}
 
+	/// Converts this IRI reference into an IRI, if possible.
+	#[inline]
+	pub fn as_iri(&self) -> Option<&Iri> {
+		if self.scheme().is_some() {
+			Some(unsafe { Iri::new_unchecked(&self.0) })
+		} else {
+			None
+		}
+	}
+
+	/// Converts this IRI reference into an URI, if possible.
+	pub fn as_uri(&self) -> Option<&Uri> {
+		Uri::new(self.as_bytes()).ok()
+	}
+
+	/// Converts this IRI reference into an URI reference, if possible.
+	pub fn as_uri_ref(&self) -> Option<&UriRef> {
+		UriRef::new(self.as_bytes()).ok()
+	}
+
 	/// Returns the scheme of the IRI reference, if any.
 	#[inline]
 	pub fn scheme(&self) -> Option<&Scheme> {
@@ -98,29 +121,115 @@ impl IriRef {
 		let iri_ref = self.to_owned();
 		iri_ref.into_resolved(base_iri)
 	}
-}
 
-impl PartialEq<str> for IriRef {
-	fn eq(&self, other: &str) -> bool {
-		self.as_str() == other
+	/// Get this IRI reference relatively to the given one.
+	///
+	/// # Example
+	/// ```
+	/// # use iref::IriRef;
+	/// let a = IriRef::new("https://crates.io/").unwrap();
+	/// let b = IriRef::new("https://crates.io/crates/iref").unwrap();
+	/// let c = IriRef::new("https://crates.io/crates/json-ld").unwrap();
+	/// assert_eq!(b.relative_to(a), "crates/iref");
+	/// assert_eq!(a.relative_to(b), "..");
+	/// assert_eq!(b.relative_to(c), "iref");
+	/// assert_eq!(c.relative_to(b), "json-ld");
+	/// ```
+	pub fn relative_to(&self, other: &(impl ?Sized + AsRef<IriRef>)) -> IriRefBuf {
+		RiRefImpl::relative_to(self, other.as_ref())
+	}
+
+	/// Get the suffix of this IRI reference, if any, with regard to the given prefix IRI reference..
+	///
+	/// Returns `Some((suffix, query, fragment))` if this IRI reference is of the form
+	/// `prefix/suffix?query#fragment` where `prefix` is given as parameter.
+	/// Returns `None` otherwise.
+	/// If the `suffix` scheme or authority is different from this path, it will return `None`.
+	///
+	/// See [`Path::suffix`] for more details.
+	#[inline]
+	pub fn suffix(
+		&self,
+		prefix: &(impl ?Sized + AsRef<IriRef>),
+	) -> Option<(PathBuf, Option<&Query>, Option<&Fragment>)> {
+		RiRefImpl::suffix(self, prefix.as_ref())
+	}
+
+	/// The IRI reference without the file name, query and fragment.
+	///
+	/// # Example
+	/// ```
+	/// # use iref::IriRef;
+	/// let a = IriRef::new("https://crates.io/crates/iref?query#fragment").unwrap();
+	/// let b = IriRef::new("https://crates.io/crates/iref/?query#fragment").unwrap();
+	/// assert_eq!(a.base(), "https://crates.io/crates/");
+	/// assert_eq!(b.base(), "https://crates.io/crates/iref/")
+	/// ```
+	#[inline]
+	pub fn base(&self) -> &Self {
+		unsafe { Self::new_unchecked(std::str::from_utf8_unchecked(RiRefImpl::base(self))) }
 	}
 }
 
-impl<'a> PartialEq<&'a str> for IriRef {
-	fn eq(&self, other: &&'a str) -> bool {
-		self.as_str() == *other
+impl<'a> TryFrom<&'a IriRef> for &'a Iri {
+	type Error = InvalidIri<&'a IriRef>;
+
+	fn try_from(value: &'a IriRef) -> Result<Self, Self::Error> {
+		value.as_iri().ok_or(InvalidIri(value))
 	}
 }
 
-impl PartialEq<String> for IriRef {
-	fn eq(&self, other: &String) -> bool {
-		self.as_str() == other.as_str()
+impl<'a> TryFrom<&'a IriRef> for &'a Uri {
+	type Error = InvalidUri<&'a IriRef>;
+
+	fn try_from(value: &'a IriRef) -> Result<Self, Self::Error> {
+		value.as_uri().ok_or(InvalidUri(value))
 	}
 }
+
+impl<'a> TryFrom<&'a IriRef> for &'a UriRef {
+	type Error = InvalidUriRef<&'a IriRef>;
+
+	fn try_from(value: &'a IriRef) -> Result<Self, Self::Error> {
+		value.as_uri_ref().ok_or(InvalidUriRef(value))
+	}
+}
+
+str_eq!(IriRef);
 
 impl PartialEq for IriRef {
 	fn eq(&self, other: &Self) -> bool {
 		self.parts() == other.parts()
+	}
+}
+
+impl<'a> PartialEq<&'a IriRef> for IriRef {
+	fn eq(&self, other: &&'a Self) -> bool {
+		*self == **other
+	}
+}
+
+impl PartialEq<IriRefBuf> for IriRef {
+	fn eq(&self, other: &IriRefBuf) -> bool {
+		*self == *other.as_iri_ref()
+	}
+}
+
+impl PartialEq<Iri> for IriRef {
+	fn eq(&self, other: &Iri) -> bool {
+		*self == *other.as_iri_ref()
+	}
+}
+
+impl<'a> PartialEq<&'a Iri> for IriRef {
+	fn eq(&self, other: &&'a Iri) -> bool {
+		*self == *other.as_iri_ref()
+	}
+}
+
+impl PartialEq<IriBuf> for IriRef {
+	fn eq(&self, other: &IriBuf) -> bool {
+		*self == *other.as_iri_ref()
 	}
 }
 
@@ -129,6 +238,36 @@ impl Eq for IriRef {}
 impl PartialOrd for IriRef {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
+	}
+}
+
+impl<'a> PartialOrd<&'a IriRef> for IriRef {
+	fn partial_cmp(&self, other: &&'a Self) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(*other)
+	}
+}
+
+impl PartialOrd<IriRefBuf> for IriRef {
+	fn partial_cmp(&self, other: &IriRefBuf) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_iri_ref())
+	}
+}
+
+impl PartialOrd<Iri> for IriRef {
+	fn partial_cmp(&self, other: &Iri) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<&'a Iri> for IriRef {
+	fn partial_cmp(&self, other: &&'a Iri) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_iri_ref())
+	}
+}
+
+impl PartialOrd<IriBuf> for IriRef {
+	fn partial_cmp(&self, other: &IriBuf) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_iri_ref())
 	}
 }
 
@@ -150,6 +289,8 @@ impl RiRefImpl for IriRefBuf {
 	type Query = Query;
 	type Fragment = Fragment;
 
+	type RiRefBuf = Self;
+
 	fn as_bytes(&self) -> &[u8] {
 		self.0.as_bytes()
 	}
@@ -158,6 +299,10 @@ impl RiRefImpl for IriRefBuf {
 impl RiRefBufImpl for IriRefBuf {
 	type Ri = Iri;
 	type RiBuf = IriBuf;
+
+	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
+		Self::new_unchecked(String::from_utf8_unchecked(bytes))
+	}
 
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		self.0.as_mut_vec()
@@ -169,13 +314,48 @@ impl RiRefBufImpl for IriRefBuf {
 }
 
 impl IriRefBuf {
+	/// Creates a new IRI reference from a byte string.
 	#[inline]
-	pub fn as_iri(&self) -> Option<&Iri> {
-		if self.scheme().is_some() {
-			Some(unsafe { Iri::new_unchecked(&self.0) })
-		} else {
-			None
+	pub fn from_vec(buffer: Vec<u8>) -> Result<Self, InvalidIriRef<Vec<u8>>> {
+		match String::from_utf8(buffer) {
+			Ok(string) => {
+				Self::new(string).map_err(|InvalidIriRef(s)| InvalidIriRef(s.into_bytes()))
+			}
+			Err(e) => Err(InvalidIriRef(e.into_bytes())),
 		}
+	}
+
+	/// Creates a new IRI reference from a byte string without varidation.
+	///
+	/// # Safety
+	///
+	/// The input bytes must be a valid IRI reference.
+	#[inline]
+	pub unsafe fn from_vec_unchecked(buffer: Vec<u8>) -> Self {
+		Self::new_unchecked(String::from_utf8_unchecked(buffer))
+	}
+
+	/// Converts this IRI reference into an IRI, if possible.
+	pub fn try_into_iri(self) -> Result<IriBuf, InvalidIri<Self>> {
+		if self.scheme().is_some() {
+			unsafe { Ok(IriBuf::new_unchecked(self.0)) }
+		} else {
+			Err(InvalidIri(self))
+		}
+	}
+
+	/// Converts this IRI reference into an URI, if possible.
+	pub fn try_into_uri(self) -> Result<UriBuf, InvalidUri<Self>> {
+		UriBuf::new(self.into_bytes()).map_err(|InvalidUri(bytes)| unsafe {
+			InvalidUri(Self::new_unchecked(String::from_utf8_unchecked(bytes)))
+		})
+	}
+
+	/// Converts this IRI reference into an URI reference, if possible.
+	pub fn try_into_uri_ref(self) -> Result<UriRefBuf, InvalidUriRef<Self>> {
+		UriRefBuf::new(self.into_bytes()).map_err(|InvalidUriRef(bytes)| unsafe {
+			InvalidUriRef(Self::new_unchecked(String::from_utf8_unchecked(bytes)))
+		})
 	}
 
 	/// Returns the underlying bytes representing the IRI reference as a mutable
@@ -326,21 +506,65 @@ impl IriRefBuf {
 	}
 }
 
-impl PartialEq<str> for IriRefBuf {
-	fn eq(&self, other: &str) -> bool {
-		self.as_str() == other
+impl TryFrom<IriRefBuf> for IriBuf {
+	type Error = InvalidIri<IriRefBuf>;
+
+	fn try_from(value: IriRefBuf) -> Result<Self, Self::Error> {
+		value.try_into_iri()
 	}
 }
 
-impl<'a> PartialEq<&'a str> for IriRefBuf {
-	fn eq(&self, other: &&'a str) -> bool {
-		self.as_str() == *other
+impl TryFrom<IriRefBuf> for UriBuf {
+	type Error = InvalidUri<IriRefBuf>;
+
+	fn try_from(value: IriRefBuf) -> Result<Self, Self::Error> {
+		value.try_into_uri()
 	}
 }
 
-impl PartialEq<String> for IriRefBuf {
-	fn eq(&self, other: &String) -> bool {
-		self.as_str() == other.as_str()
+impl TryFrom<IriRefBuf> for UriRefBuf {
+	type Error = InvalidUriRef<IriRefBuf>;
+
+	fn try_from(value: IriRefBuf) -> Result<Self, Self::Error> {
+		value.try_into_uri_ref()
+	}
+}
+
+str_eq!(IriRefBuf);
+
+impl PartialEq<Iri> for IriRefBuf {
+	fn eq(&self, other: &Iri) -> bool {
+		*self.as_iri_ref() == *other.as_iri_ref()
+	}
+}
+
+impl<'a> PartialEq<&'a Iri> for IriRefBuf {
+	fn eq(&self, other: &&'a Iri) -> bool {
+		*self.as_iri_ref() == *other.as_iri_ref()
+	}
+}
+
+impl PartialEq<IriBuf> for IriRefBuf {
+	fn eq(&self, other: &IriBuf) -> bool {
+		*self.as_iri_ref() == *other.as_iri_ref()
+	}
+}
+
+impl PartialOrd<Iri> for IriRefBuf {
+	fn partial_cmp(&self, other: &Iri) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(other.as_iri_ref())
+	}
+}
+
+impl<'a> PartialOrd<&'a Iri> for IriRefBuf {
+	fn partial_cmp(&self, other: &&'a Iri) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(other.as_iri_ref())
+	}
+}
+
+impl PartialOrd<IriBuf> for IriRefBuf {
+	fn partial_cmp(&self, other: &IriBuf) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(other.as_iri_ref())
 	}
 }
 
@@ -527,7 +751,7 @@ mod tests {
 	fn authority() {
 		for (input, expected) in PARTS {
 			let input = IriRef::new(input).unwrap();
-			eprintln!("{input}: {expected:?}");
+			// eprintln!("{input}: {expected:?}");
 			assert_eq!(input.authority().map(Authority::as_str), expected.1)
 		}
 	}
@@ -544,7 +768,7 @@ mod tests {
 			let mut buffer = IriRefBuf::new(input.to_string()).unwrap();
 			let authority = authority.map(Authority::new).transpose().unwrap();
 			buffer.set_authority(authority);
-			eprintln!("{input}, {authority:?} => {buffer}, {expected}");
+			// eprintln!("{input}, {authority:?} => {buffer}, {expected}");
 			assert_eq!(buffer.as_str(), expected)
 		}
 	}
@@ -553,7 +777,7 @@ mod tests {
 	fn path() {
 		for (input, expected) in PARTS {
 			let input = IriRef::new(input).unwrap();
-			eprintln!("{input}: {expected:?}");
+			// eprintln!("{input}: {expected:?}");
 			assert_eq!(input.path().as_str(), expected.2)
 		}
 	}
@@ -562,7 +786,7 @@ mod tests {
 	fn query() {
 		for (input, expected) in PARTS {
 			let input = IriRef::new(input).unwrap();
-			eprintln!("{input}: {expected:?}");
+			// eprintln!("{input}: {expected:?}");
 			assert_eq!(input.query().map(Query::as_str), expected.3)
 		}
 	}
@@ -571,8 +795,212 @@ mod tests {
 	fn fragment() {
 		for (input, expected) in PARTS {
 			let input = IriRef::new(input).unwrap();
-			eprintln!("{input}: {expected:?}");
+			// eprintln!("{input}: {expected:?}");
 			assert_eq!(input.fragment().map(Fragment::as_str), expected.4)
+		}
+	}
+
+	#[test]
+	fn disambiguate_scheme() {
+		let mut iri_ref = IriRefBuf::new("scheme:a:b/c".to_string()).unwrap();
+		iri_ref.set_scheme(None);
+		assert_eq!(iri_ref.as_str(), "./a:b/c")
+	}
+
+	#[test]
+	fn disambiguate_authority() {
+		let mut iri_ref = IriRefBuf::new("//host//path".to_string()).unwrap();
+		iri_ref.set_authority(None);
+		assert_eq!(iri_ref.as_str(), "/.//path")
+	}
+
+	#[test]
+	fn unambiguous_resolution() {
+		let base_iri = Iri::new("http:/a/b").unwrap();
+
+		let tests = [("../..//", "http:/..//")];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
+			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+		}
+	}
+
+	#[test]
+	fn resolution_normal() {
+		// https://www.w3.org/2004/04/uri-rel-test.html
+		let base_iri = Iri::new("http://a/b/c/d;p?q").unwrap();
+
+		let tests = [
+			("g:h", "g:h"),
+			("g", "http://a/b/c/g"),
+			("./g", "http://a/b/c/g"),
+			("g/", "http://a/b/c/g/"),
+			("/g", "http://a/g"),
+			("//g", "http://g"),
+			("?y", "http://a/b/c/d;p?y"),
+			("g?y", "http://a/b/c/g?y"),
+			("#s", "http://a/b/c/d;p?q#s"),
+			("g#s", "http://a/b/c/g#s"),
+			("g?y#s", "http://a/b/c/g?y#s"),
+			(";x", "http://a/b/c/;x"),
+			("g;x", "http://a/b/c/g;x"),
+			("g;x?y#s", "http://a/b/c/g;x?y#s"),
+			("", "http://a/b/c/d;p?q"),
+			(".", "http://a/b/c/"),
+			("./", "http://a/b/c/"),
+			("..", "http://a/b/"),
+			("../", "http://a/b/"),
+			("../g", "http://a/b/g"),
+			("../..", "http://a/"),
+			("../../", "http://a/"),
+			("../../g", "http://a/g"),
+		];
+
+		for (relative, absolute) in &tests {
+			println!("{} => {}", relative, absolute);
+			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+		}
+	}
+
+	#[test]
+	fn resolution_abnormal() {
+		// https://www.w3.org/2004/04/uri-rel-test.html
+		// NOTE we implement [Errata 4547](https://www.rfc-editor.org/errata/eid4547)
+		let base_iri = Iri::new("http://a/b/c/d;p?q").unwrap();
+
+		let tests = [
+			("../../../g", "http://a/../g"), // NOTE without Errata 4547: "http://a/g"
+			("../../../../g", "http://a/../../g"), // NOTE without Errata 4547: "http://a/g"
+			("/./g", "http://a/g"),
+			("/../g", "http://a/../g"), // NOTE without Errata 4547: "http://a/g"
+			("g.", "http://a/b/c/g."),
+			(".g", "http://a/b/c/.g"),
+			("g..", "http://a/b/c/g.."),
+			("..g", "http://a/b/c/..g"),
+			("./../g", "http://a/b/g"),
+			("./g/.", "http://a/b/c/g/"),
+			("g/./h", "http://a/b/c/g/h"),
+			("g/../h", "http://a/b/c/h"),
+			("g;x=1/./y", "http://a/b/c/g;x=1/y"),
+			("g;x=1/../y", "http://a/b/c/y"),
+			("g?y/./x", "http://a/b/c/g?y/./x"),
+			("g?y/../x", "http://a/b/c/g?y/../x"),
+			("g#s/./x", "http://a/b/c/g#s/./x"),
+			("g#s/../x", "http://a/b/c/g#s/../x"),
+			("http:g", "http:g"),
+		];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
+			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+		}
+	}
+
+	#[test]
+	fn more_resolutions1() {
+		let base_iri = Iri::new("http://a/bb/ccc/d;p?q").unwrap();
+
+		let tests = [
+			("#s", "http://a/bb/ccc/d;p?q#s"),
+			("", "http://a/bb/ccc/d;p?q"),
+		];
+
+		for (relative, absolute) in &tests {
+			println!("{} => {}", relative, absolute);
+			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
+			assert_eq!(buffer.as_str(), *absolute);
+		}
+	}
+
+	#[test]
+	fn more_resolutions2() {
+		let base_iri = Iri::new("http://a/bb/ccc/./d;p?q").unwrap();
+
+		let tests = [
+			("..", "http://a/bb/"),
+			("../", "http://a/bb/"),
+			("../g", "http://a/bb/g"),
+			("../..", "http://a/"),
+			("../../", "http://a/"),
+			("../../g", "http://a/g"),
+		];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
+			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
+			assert_eq!(buffer.as_str(), *absolute);
+		}
+	}
+
+	#[test]
+	fn more_resolutions3() {
+		let base_iri = Iri::new("http://ab//de//ghi").unwrap();
+
+		let tests = [
+			("xyz", "http://ab//de//xyz"),
+			("./xyz", "http://ab//de//xyz"),
+			("../xyz", "http://ab//de/xyz"),
+		];
+
+		for (relative, absolute) in &tests {
+			println!("{} => {}", relative, absolute);
+			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
+			assert_eq!(buffer.as_str(), *absolute);
+		}
+	}
+
+	// https://github.com/timothee-haudebourg/iref/issues/14
+	#[test]
+	fn reference_resolution_with_scheme_no_disambiguation() {
+		let base = Iri::new("scheme:a:b/").unwrap();
+		let mut iri = IriRefBuf::new("Foo".to_string()).unwrap();
+		iri.resolve(base);
+
+		assert_eq!(iri.to_string(), "scheme:a:b/Foo")
+	}
+
+	#[test]
+	fn relative_to() {
+		let base =
+			IriRef::new("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld").unwrap();
+		let vectors = [
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/link",
+				"link",
+			),
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld#fragment-works",
+				"#fragment-works",
+			),
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld?query=works",
+				"?query=works",
+			),
+			("https://w3c.github.io/json-ld-api/tests/", "../"),
+			("https://w3c.github.io/json-ld-api/", "../../"),
+			("https://w3c.github.io/json-ld-api/parent", "../../parent"),
+			(
+				"https://w3c.github.io/json-ld-api/parent#fragment",
+				"../../parent#fragment",
+			),
+			(
+				"https://w3c.github.io/parent-parent-eq-root",
+				"../../../parent-parent-eq-root",
+			),
+			(
+				"http://example.org/scheme-relative",
+				"http://example.org/scheme-relative",
+			),
+			(
+				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld",
+				"0066-in.jsonld",
+			),
+		];
+
+		for (input, expected) in &vectors {
+			let input = IriRef::new(input).unwrap();
+			assert_eq!(input.relative_to(base), *expected)
 		}
 	}
 }

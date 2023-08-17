@@ -1,5 +1,5 @@
 use std::{
-	borrow::Cow,
+	borrow::{Borrow, Cow},
 	hash::{self, Hash},
 };
 
@@ -21,7 +21,11 @@ pub use path_mut::*;
 pub use query::*;
 pub use reference::*;
 
-use crate::common::{parse, RiBufImpl, RiImpl, RiRefBufImpl, RiRefImpl};
+use crate::{
+	common::{parse, str_eq, RiBufImpl, RiImpl, RiRefBufImpl, RiRefImpl},
+	uri::InvalidUriRef,
+	InvalidUri, Uri, UriBuf, UriRef, UriRefBuf,
+};
 
 macro_rules! iri_error {
 	($($(#[$meta:meta])* $variant:ident : $ident:ident),*) => {
@@ -96,12 +100,7 @@ iri_error! {
 	Fragment: InvalidFragment
 }
 
-/// IRI.
-///
-/// Wrapper around a borrowed bytes slice representing an IRI.
-/// An IRI can be seen as an IRI-reference with a defined [`Scheme`].
-/// All methods of [`IriRef`] are available from this type, however the [`scheme`](Iri::scheme) method
-/// is redefined to always return some scheme.
+/// Internationalized Resource Identifier (IRI).
 ///
 /// # Example
 ///
@@ -144,6 +143,8 @@ impl RiRefImpl for Iri {
 	type Query = Query;
 	type Fragment = Fragment;
 
+	type RiRefBuf = IriRefBuf;
+
 	fn as_bytes(&self) -> &[u8] {
 		self.0.as_bytes()
 	}
@@ -171,8 +172,21 @@ impl Iri {
 		}
 	}
 
+	/// Converts this IRI into an IRI reference.
+	///
+	/// All IRI are valid IRI references.
 	pub fn as_iri_ref(&self) -> &IriRef {
 		unsafe { IriRef::new_unchecked(&self.0) }
+	}
+
+	/// Converts this IRI into an URI, if possible.
+	pub fn as_uri(&self) -> Option<&Uri> {
+		Uri::new(self.as_bytes()).ok()
+	}
+
+	/// Converts this IRI into an URI reference, if possible.
+	pub fn as_uri_ref(&self) -> Option<&UriRef> {
+		UriRef::new(self.as_bytes()).ok()
 	}
 
 	/// Returns the scheme of the IRI.
@@ -200,33 +214,75 @@ impl Iri {
 	}
 }
 
+impl AsRef<IriRef> for Iri {
+	fn as_ref(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
+
+impl Borrow<IriRef> for Iri {
+	fn borrow(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
+
 impl<'a> From<&'a Iri> for &'a IriRef {
 	fn from(value: &'a Iri) -> Self {
 		value.as_iri_ref()
 	}
 }
 
-impl PartialEq<str> for Iri {
-	fn eq(&self, other: &str) -> bool {
-		self.as_str() == other
+impl<'a> TryFrom<&'a Iri> for &'a Uri {
+	type Error = InvalidUri<&'a Iri>;
+
+	fn try_from(value: &'a Iri) -> Result<Self, Self::Error> {
+		value.as_uri().ok_or(InvalidUri(value))
 	}
 }
 
-impl<'a> PartialEq<&'a str> for Iri {
-	fn eq(&self, other: &&'a str) -> bool {
-		self.as_str() == *other
+impl<'a> TryFrom<&'a Iri> for &'a UriRef {
+	type Error = InvalidUriRef<&'a Iri>;
+
+	fn try_from(value: &'a Iri) -> Result<Self, Self::Error> {
+		value.as_uri_ref().ok_or(InvalidUriRef(value))
 	}
 }
 
-impl PartialEq<String> for Iri {
-	fn eq(&self, other: &String) -> bool {
-		self.as_str() == other.as_str()
-	}
-}
+str_eq!(Iri);
 
 impl PartialEq for Iri {
 	fn eq(&self, other: &Self) -> bool {
 		self.parts() == other.parts()
+	}
+}
+
+impl<'a> PartialEq<&'a Iri> for Iri {
+	fn eq(&self, other: &&'a Self) -> bool {
+		*self == **other
+	}
+}
+
+impl PartialEq<IriBuf> for Iri {
+	fn eq(&self, other: &IriBuf) -> bool {
+		*self == *other.as_iri()
+	}
+}
+
+impl PartialEq<IriRef> for Iri {
+	fn eq(&self, other: &IriRef) -> bool {
+		*self.as_iri_ref() == *other
+	}
+}
+
+impl<'a> PartialEq<&'a IriRef> for Iri {
+	fn eq(&self, other: &&'a IriRef) -> bool {
+		*self.as_iri_ref() == **other
+	}
+}
+
+impl PartialEq<IriRefBuf> for Iri {
+	fn eq(&self, other: &IriRefBuf) -> bool {
+		*self.as_iri_ref() == *other.as_iri_ref()
 	}
 }
 
@@ -235,6 +291,36 @@ impl Eq for Iri {}
 impl PartialOrd for Iri {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
+	}
+}
+
+impl<'a> PartialOrd<&'a Iri> for Iri {
+	fn partial_cmp(&self, other: &&'a Self) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(*other)
+	}
+}
+
+impl PartialOrd<IriBuf> for Iri {
+	fn partial_cmp(&self, other: &IriBuf) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_iri())
+	}
+}
+
+impl PartialOrd<IriRef> for Iri {
+	fn partial_cmp(&self, other: &IriRef) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(other)
+	}
+}
+
+impl<'a> PartialOrd<&'a IriRef> for Iri {
+	fn partial_cmp(&self, other: &&'a IriRef) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(*other)
+	}
+}
+
+impl PartialOrd<IriRefBuf> for Iri {
+	fn partial_cmp(&self, other: &IriRefBuf) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_iri_ref())
 	}
 }
 
@@ -256,6 +342,8 @@ impl RiRefImpl for IriBuf {
 	type Query = Query;
 	type Fragment = Fragment;
 
+	type RiRefBuf = IriRefBuf;
+
 	fn as_bytes(&self) -> &[u8] {
 		self.0.as_bytes()
 	}
@@ -267,6 +355,10 @@ impl RiRefBufImpl for IriBuf {
 	type Ri = Iri;
 	type RiBuf = Self;
 
+	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
+		Self::new_unchecked(String::from_utf8_unchecked(bytes))
+	}
+
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		self.0.as_mut_vec()
 	}
@@ -276,19 +368,40 @@ impl RiRefBufImpl for IriBuf {
 	}
 }
 
-impl RiBufImpl for IriBuf {
-	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
-		Self::new_unchecked(String::from_utf8_unchecked(bytes))
-	}
-}
+impl RiBufImpl for IriBuf {}
 
 impl IriBuf {
+	/// Creates a new IRI from a byte string.
+	#[inline]
+	pub fn from_vec(buffer: Vec<u8>) -> Result<Self, InvalidIri<Vec<u8>>> {
+		match String::from_utf8(buffer) {
+			Ok(string) => Self::new(string).map_err(|InvalidIri(s)| InvalidIri(s.into_bytes())),
+			Err(e) => Err(InvalidIri(e.into_bytes())),
+		}
+	}
+
+	/// Creates a new IRI from its scheme.
 	pub fn from_scheme(scheme: SchemeBuf) -> Self {
 		RiBufImpl::from_scheme(scheme)
 	}
 
+	/// Converts this IRI into an IRI reference.
 	pub fn into_iri_ref(self) -> IriRefBuf {
 		unsafe { IriRefBuf::new_unchecked(self.0) }
+	}
+
+	/// Converts this IRI into an URI, if possible.
+	pub fn try_into_uri(self) -> Result<UriBuf, InvalidUri<IriBuf>> {
+		UriBuf::new(self.into_bytes()).map_err(|InvalidUri(bytes)| unsafe {
+			InvalidUri(Self::new_unchecked(String::from_utf8_unchecked(bytes)))
+		})
+	}
+
+	/// Converts this IRI into an URI reference, if possible.
+	pub fn try_into_uri_ref(self) -> Result<UriRefBuf, InvalidUriRef<IriBuf>> {
+		UriRefBuf::new(self.into_bytes()).map_err(|InvalidUriRef(bytes)| unsafe {
+			InvalidUriRef(Self::new_unchecked(String::from_utf8_unchecked(bytes)))
+		})
 	}
 
 	/// Returns a mutable reference to the underlying `Vec<u8>` buffer
@@ -407,26 +520,74 @@ impl IriBuf {
 	}
 }
 
+impl AsRef<IriRef> for IriBuf {
+	fn as_ref(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
+
+impl Borrow<IriRef> for IriBuf {
+	fn borrow(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
+
 impl From<IriBuf> for IriRefBuf {
 	fn from(value: IriBuf) -> Self {
 		value.into_iri_ref()
 	}
 }
 
-impl PartialEq<str> for IriBuf {
-	fn eq(&self, other: &str) -> bool {
-		self.as_str() == other
+impl TryFrom<IriBuf> for UriBuf {
+	type Error = InvalidUri<IriBuf>;
+
+	fn try_from(value: IriBuf) -> Result<Self, Self::Error> {
+		value.try_into_uri()
 	}
 }
 
-impl<'a> PartialEq<&'a str> for IriBuf {
-	fn eq(&self, other: &&'a str) -> bool {
-		self.as_str() == *other
+impl TryFrom<IriBuf> for UriRefBuf {
+	type Error = InvalidUriRef<IriBuf>;
+
+	fn try_from(value: IriBuf) -> Result<Self, Self::Error> {
+		value.try_into_uri_ref()
 	}
 }
 
-impl PartialEq<String> for IriBuf {
-	fn eq(&self, other: &String) -> bool {
-		self.as_str() == other.as_str()
+str_eq!(IriBuf);
+
+impl PartialEq<IriRef> for IriBuf {
+	fn eq(&self, other: &IriRef) -> bool {
+		*self.as_iri_ref() == *other
+	}
+}
+
+impl<'a> PartialEq<&'a IriRef> for IriBuf {
+	fn eq(&self, other: &&'a IriRef) -> bool {
+		*self.as_iri_ref() == **other
+	}
+}
+
+impl PartialEq<IriRefBuf> for IriBuf {
+	fn eq(&self, other: &IriRefBuf) -> bool {
+		*self.as_iri_ref() == *other.as_iri_ref()
+	}
+}
+
+impl PartialOrd<IriRef> for IriBuf {
+	fn partial_cmp(&self, other: &IriRef) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(other)
+	}
+}
+
+impl<'a> PartialOrd<&'a IriRef> for IriBuf {
+	fn partial_cmp(&self, other: &&'a IriRef) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(*other)
+	}
+}
+
+impl PartialOrd<IriRefBuf> for IriBuf {
+	fn partial_cmp(&self, other: &IriRefBuf) -> Option<std::cmp::Ordering> {
+		self.as_iri_ref().partial_cmp(other.as_iri_ref())
 	}
 }

@@ -28,6 +28,8 @@ pub struct Segment([u8]);
 impl SegmentImpl for Segment {
 	const PARENT: &'static Self = Self::PARENT;
 
+	const EMPTY: &'static Self = Self::EMPTY;
+
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
 		Self::new_unchecked(bytes)
 	}

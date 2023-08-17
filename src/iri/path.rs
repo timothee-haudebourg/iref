@@ -48,6 +48,10 @@ impl PathBufImpl for PathBuf {
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		self.0.as_mut_vec()
 	}
+
+	fn as_bytes(&self) -> &[u8] {
+		self.0.as_bytes()
+	}
 }
 
 impl Path {
@@ -133,6 +137,21 @@ impl Path {
 	#[inline]
 	pub fn file_name(&self) -> Option<&Segment> {
 		PathImpl::file_name(self)
+	}
+
+	/// Returns the directory path, which is the path without the file name.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # use iref::iri::Path;
+	/// assert_eq!(Path::new("/foo/bar").unwrap().directory(), "/foo/");
+	/// assert_eq!(Path::new("/foo").unwrap().directory(), "/");
+	/// assert_eq!(Path::new("//foo").unwrap().directory(), "//");
+	/// assert_eq!(Path::new("/").unwrap().directory(), "/");
+	/// ```
+	pub fn directory(&self) -> &Self {
+		PathImpl::directory(self)
 	}
 
 	/// Returns the path without its final segment, if there is one.
@@ -549,16 +568,16 @@ mod tests {
 			("", ""),
 			("a/b/c", "a/b/c"),
 			("a/..", ""),
-			("a/b/..", "a"),
+			("a/b/..", "a/"),
 			("a/b/../", "a/"),
-			("a/b/c/..", "a/b"),
-			("a/b/c/.", "a/b/c"),
-			("a/../..", ".."),
-			("/a/../..", "/.."),
+			("a/b/c/..", "a/b/"),
+			("a/b/c/.", "a/b/c/"),
+			("a/../..", "../"),
+			("/a/../..", "/../"),
 		];
 
 		for (input, expected) in vectors {
-			eprintln!("{input}, {expected}");
+			// eprintln!("{input}, {expected}");
 			let path = Path::new(input).unwrap();
 			let output = path.normalized();
 			assert_eq!(output.as_str(), expected);
@@ -644,6 +663,7 @@ mod tests {
 		];
 
 		for (path, prefix, expected_suffix) in vectors {
+			// eprintln!("{path} over {prefix} => {expected_suffix:?}");
 			let path = Path::new(path).unwrap();
 			let suffix = path.suffix(Path::new(prefix).unwrap());
 			assert_eq!(suffix.as_deref().map(Path::as_str), expected_suffix)

@@ -1,6 +1,6 @@
 use static_regular_grammar::RegularGrammar;
 use std::{
-	borrow::Cow,
+	borrow::{Borrow, Cow},
 	hash::{self, Hash},
 };
 
@@ -22,7 +22,10 @@ pub use query::*;
 pub use reference::*;
 pub use scheme::*;
 
-use crate::common::{parse, RiBufImpl, RiImpl, RiRefBufImpl, RiRefImpl};
+use crate::{
+	common::{bytestr_eq, parse, RiBufImpl, RiImpl, RiRefBufImpl, RiRefImpl},
+	Iri, IriBuf, IriRef, IriRefBuf,
+};
 
 macro_rules! uri_error {
 	($($(#[$meta:meta])* $variant:ident : $ident:ident),*) => {
@@ -97,6 +100,7 @@ uri_error! {
 	Fragment: InvalidFragment
 }
 
+/// Uniform Resource Identifier (URI).
 #[derive(RegularGrammar)]
 #[grammar(
 	file = "src/uri/grammar.abnf",
@@ -113,6 +117,8 @@ impl RiRefImpl for Uri {
 	type Path = Path;
 	type Query = Query;
 	type Fragment = Fragment;
+
+	type RiRefBuf = UriRefBuf;
 
 	fn as_bytes(&self) -> &[u8] {
 		&self.0
@@ -150,6 +156,21 @@ impl Uri {
 		}
 	}
 
+	/// Converts this URI into an URI reference.
+	///
+	/// All IRI are valid URI references.
+	pub fn as_uri_ref(&self) -> &UriRef {
+		unsafe { UriRef::new_unchecked(&self.0) }
+	}
+
+	pub fn as_iri(&self) -> &Iri {
+		unsafe { Iri::new_unchecked(std::str::from_utf8_unchecked(&self.0)) }
+	}
+
+	pub fn as_iri_ref(&self) -> &IriRef {
+		unsafe { IriRef::new_unchecked(std::str::from_utf8_unchecked(&self.0)) }
+	}
+
 	/// Returns the scheme of the URI.
 	#[inline]
 	pub fn scheme(&self) -> &Scheme {
@@ -175,53 +196,41 @@ impl Uri {
 	}
 }
 
-macro_rules! bytestr_eq {
-	($ident:ident) => {
-		impl<const N: usize> PartialEq<[u8; N]> for $ident {
-			fn eq(&self, other: &[u8; N]) -> bool {
-				self.as_bytes() == other
-			}
-		}
-
-		impl<'a, const N: usize> PartialEq<&'a [u8; N]> for $ident {
-			fn eq(&self, other: &&'a [u8; N]) -> bool {
-				self.as_bytes() == *other
-			}
-		}
-
-		impl PartialEq<[u8]> for $ident {
-			fn eq(&self, other: &[u8]) -> bool {
-				self.as_bytes() == other
-			}
-		}
-
-		impl<'a> PartialEq<&'a [u8]> for $ident {
-			fn eq(&self, other: &&'a [u8]) -> bool {
-				self.as_bytes() == *other
-			}
-		}
-
-		impl PartialEq<str> for $ident {
-			fn eq(&self, other: &str) -> bool {
-				self.as_str() == other
-			}
-		}
-
-		impl<'a> PartialEq<&'a str> for $ident {
-			fn eq(&self, other: &&'a str) -> bool {
-				self.as_str() == *other
-			}
-		}
-
-		impl PartialEq<String> for $ident {
-			fn eq(&self, other: &String) -> bool {
-				self.as_str() == other.as_str()
-			}
-		}
-	};
+impl AsRef<UriRef> for Uri {
+	fn as_ref(&self) -> &UriRef {
+		self.as_uri_ref()
+	}
 }
 
-pub(crate) use bytestr_eq;
+impl AsRef<Iri> for Uri {
+	fn as_ref(&self) -> &Iri {
+		self.as_iri()
+	}
+}
+
+impl AsRef<IriRef> for Uri {
+	fn as_ref(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
+
+impl Borrow<UriRef> for Uri {
+	fn borrow(&self) -> &UriRef {
+		self.as_uri_ref()
+	}
+}
+
+impl Borrow<Iri> for Uri {
+	fn borrow(&self) -> &Iri {
+		self.as_iri()
+	}
+}
+
+impl Borrow<IriRef> for Uri {
+	fn borrow(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
 
 bytestr_eq!(Uri);
 
@@ -231,11 +240,71 @@ impl PartialEq for Uri {
 	}
 }
 
+impl<'a> PartialEq<&'a Uri> for Uri {
+	fn eq(&self, other: &&'a Self) -> bool {
+		*self == **other
+	}
+}
+
+impl PartialEq<UriBuf> for Uri {
+	fn eq(&self, other: &UriBuf) -> bool {
+		*self == *other.as_uri()
+	}
+}
+
+impl PartialEq<UriRef> for Uri {
+	fn eq(&self, other: &UriRef) -> bool {
+		*self.as_uri_ref() == *other
+	}
+}
+
+impl<'a> PartialEq<&'a UriRef> for Uri {
+	fn eq(&self, other: &&'a UriRef) -> bool {
+		*self.as_uri_ref() == **other
+	}
+}
+
+impl PartialEq<UriRefBuf> for Uri {
+	fn eq(&self, other: &UriRefBuf) -> bool {
+		*self.as_uri_ref() == *other.as_uri_ref()
+	}
+}
+
 impl Eq for Uri {}
 
 impl PartialOrd for Uri {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
+	}
+}
+
+impl<'a> PartialOrd<&'a Uri> for Uri {
+	fn partial_cmp(&self, other: &&'a Self) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(*other)
+	}
+}
+
+impl PartialOrd<UriBuf> for Uri {
+	fn partial_cmp(&self, other: &UriBuf) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_uri())
+	}
+}
+
+impl PartialOrd<UriRef> for Uri {
+	fn partial_cmp(&self, other: &UriRef) -> Option<std::cmp::Ordering> {
+		self.as_uri_ref().partial_cmp(other)
+	}
+}
+
+impl<'a> PartialOrd<&'a UriRef> for Uri {
+	fn partial_cmp(&self, other: &&'a UriRef) -> Option<std::cmp::Ordering> {
+		self.as_uri_ref().partial_cmp(*other)
+	}
+}
+
+impl PartialOrd<UriRefBuf> for Uri {
+	fn partial_cmp(&self, other: &UriRefBuf) -> Option<std::cmp::Ordering> {
+		self.partial_cmp(other.as_uri_ref())
 	}
 }
 
@@ -257,6 +326,8 @@ impl RiRefImpl for UriBuf {
 	type Query = Query;
 	type Fragment = Fragment;
 
+	type RiRefBuf = UriRefBuf;
+
 	fn as_bytes(&self) -> &[u8] {
 		&self.0
 	}
@@ -268,6 +339,10 @@ impl RiRefBufImpl for UriBuf {
 	type Ri = Uri;
 	type RiBuf = Self;
 
+	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
+		Self::new_unchecked(bytes)
+	}
+
 	unsafe fn as_mut_vec(&mut self) -> &mut Vec<u8> {
 		&mut self.0
 	}
@@ -277,11 +352,7 @@ impl RiRefBufImpl for UriBuf {
 	}
 }
 
-impl RiBufImpl for UriBuf {
-	unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
-		Self::new_unchecked(bytes)
-	}
-}
+impl RiBufImpl for UriBuf {}
 
 impl UriBuf {
 	pub fn from_scheme(scheme: SchemeBuf) -> Self {
@@ -290,6 +361,14 @@ impl UriBuf {
 
 	pub fn into_uri_ref(self) -> UriRefBuf {
 		unsafe { UriRefBuf::new_unchecked(self.0) }
+	}
+
+	pub fn into_iri(self) -> IriBuf {
+		unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(self.0)) }
+	}
+
+	pub fn into_iri_ref(self) -> IriRefBuf {
+		unsafe { IriRefBuf::new_unchecked(String::from_utf8_unchecked(self.0)) }
 	}
 
 	/// Returns a mutable reference to the underlying `Vec<u8>` buffer
@@ -408,6 +487,42 @@ impl UriBuf {
 	}
 }
 
+impl AsRef<UriRef> for UriBuf {
+	fn as_ref(&self) -> &UriRef {
+		self.as_uri_ref()
+	}
+}
+
+impl AsRef<Iri> for UriBuf {
+	fn as_ref(&self) -> &Iri {
+		self.as_iri()
+	}
+}
+
+impl AsRef<IriRef> for UriBuf {
+	fn as_ref(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
+
+impl Borrow<UriRef> for UriBuf {
+	fn borrow(&self) -> &UriRef {
+		self.as_uri_ref()
+	}
+}
+
+impl Borrow<Iri> for UriBuf {
+	fn borrow(&self) -> &Iri {
+		self.as_iri()
+	}
+}
+
+impl Borrow<IriRef> for UriBuf {
+	fn borrow(&self) -> &IriRef {
+		self.as_iri_ref()
+	}
+}
+
 impl From<UriBuf> for UriRefBuf {
 	fn from(value: UriBuf) -> Self {
 		value.into_uri_ref()
@@ -415,3 +530,39 @@ impl From<UriBuf> for UriRefBuf {
 }
 
 bytestr_eq!(UriBuf);
+
+impl PartialEq<UriRef> for UriBuf {
+	fn eq(&self, other: &UriRef) -> bool {
+		*self.as_uri_ref() == *other
+	}
+}
+
+impl<'a> PartialEq<&'a UriRef> for UriBuf {
+	fn eq(&self, other: &&'a UriRef) -> bool {
+		*self.as_uri_ref() == **other
+	}
+}
+
+impl PartialEq<UriRefBuf> for UriBuf {
+	fn eq(&self, other: &UriRefBuf) -> bool {
+		*self.as_uri_ref() == *other.as_uri_ref()
+	}
+}
+
+impl PartialOrd<UriRef> for UriBuf {
+	fn partial_cmp(&self, other: &UriRef) -> Option<std::cmp::Ordering> {
+		self.as_uri_ref().partial_cmp(other)
+	}
+}
+
+impl<'a> PartialOrd<&'a UriRef> for UriBuf {
+	fn partial_cmp(&self, other: &&'a UriRef) -> Option<std::cmp::Ordering> {
+		self.as_uri_ref().partial_cmp(*other)
+	}
+}
+
+impl PartialOrd<UriRefBuf> for UriBuf {
+	fn partial_cmp(&self, other: &UriRefBuf) -> Option<std::cmp::Ordering> {
+		self.as_uri_ref().partial_cmp(other.as_uri_ref())
+	}
+}
