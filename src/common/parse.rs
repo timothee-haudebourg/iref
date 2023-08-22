@@ -32,6 +32,7 @@ pub fn looks_like_scheme(bytes: &[u8]) -> bool {
 	false
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum SchemeAuthorityOrPath {
 	Scheme,
 	Authority,
@@ -121,6 +122,7 @@ pub fn find_scheme(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
 	None
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum AuthorityOrPath {
 	Authority,
 	Path,
@@ -185,6 +187,7 @@ pub fn find_authority(bytes: &[u8], i: usize) -> Result<Range<usize>, usize> {
 	}
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum UserInfoOrHost {
 	UserInfo,
 	Host,
@@ -245,8 +248,8 @@ pub fn host(bytes: &[u8], mut i: usize) -> usize {
 pub fn find_host(bytes: &[u8], i: usize) -> Range<usize> {
 	match user_info_or_host(bytes, i) {
 		(UserInfoOrHost::UserInfo, i) => {
-			let end = host(bytes, i);
-			i..end
+			let end = host(bytes, i + 1);
+			(i + 1)..end
 		}
 		(UserInfoOrHost::Host, end) => i..end,
 	}
@@ -269,13 +272,15 @@ pub fn port(bytes: &[u8], i: usize) -> (bool, usize) {
 pub fn find_port(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
 	'host: while i < bytes.len() {
 		if bytes[i] == b':' {
-			let start = i;
+			let start = i + 1;
 
 			while i < bytes.len() {
 				if bytes[i] == b'@' {
 					i += 1;
 					continue 'host;
 				}
+
+				i += 1;
 			}
 
 			return Some(start..i);
@@ -458,5 +463,251 @@ pub fn parts(bytes: &[u8], i: usize) -> Parts {
 		path,
 		query,
 		fragment,
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{AuthorityOrPath, SchemeAuthorityOrPath, UserInfoOrHost};
+
+	#[test]
+	fn scheme_authority_or_path() {
+		let vectors = [
+			("http://example.org", (SchemeAuthorityOrPath::Scheme, 4)),
+			("//example.org/path", (SchemeAuthorityOrPath::Authority, 13)),
+			("", (SchemeAuthorityOrPath::Path, 0)),
+			("/", (SchemeAuthorityOrPath::Path, 1)),
+			("path", (SchemeAuthorityOrPath::Path, 4)),
+			("/path", (SchemeAuthorityOrPath::Path, 5)),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::scheme_authority_or_path(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn scheme() {
+		let vectors = [("http://example.org", 0..4), ("https:foo:bar", 0..5)];
+
+		for (input, expected) in vectors {
+			let output = super::scheme(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_scheme() {
+		let vectors = [
+			("http://example.org", Some(0..4)),
+			("https:foo:bar", Some(0..5)),
+			("", None),
+			("/foo:bar", None),
+			("//user:1@host.org/", None),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::find_scheme(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn authority_or_path() {
+		let vectors = [
+			("//example.org/path", (AuthorityOrPath::Authority, 13)),
+			("", (AuthorityOrPath::Path, 0)),
+			("/", (AuthorityOrPath::Path, 1)),
+			("path", (AuthorityOrPath::Path, 4)),
+			("/path", (AuthorityOrPath::Path, 5)),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::authority_or_path(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_authority() {
+		let vectors = [
+			("http://example.org", Ok("example.org")),
+			("https:foo:bar", Err(6)),
+			("", Err(0)),
+			("/foo:bar", Err(0)),
+			("//user:1@host.org/", Ok("user:1@host.org")),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::find_authority(input.as_bytes(), 0).map(|r| &input[r]);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn user_info_or_host() {
+		let vectors = [
+			("user@example.org", (UserInfoOrHost::UserInfo, 4)),
+			("user:12@example.org", (UserInfoOrHost::UserInfo, 7)),
+			(":12:user@example.org", (UserInfoOrHost::UserInfo, 8)),
+			("example.org", (UserInfoOrHost::Host, 11)),
+			("example.org:12", (UserInfoOrHost::Host, 11)),
+			(":12", (UserInfoOrHost::Host, 0)),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::user_info_or_host(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_user_info() {
+		let vectors = [
+			("example.org:12", None),
+			("user@example.org:12", Some("user")),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::find_user_info(input.as_bytes(), 0).map(|r| &input[r]);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn host() {
+		let vectors = [("example.org:12", 11), ("example.org", 11), ("", 0)];
+
+		for (input, expected) in vectors {
+			let output = super::host(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_host() {
+		let vectors = [
+			("example.org:12", "example.org"),
+			("user@example.org:12", "example.org"),
+			("example.org", "example.org"),
+			("user:21@example.org:12", "example.org"),
+			("user:32@example.org", "example.org"),
+		];
+
+		for (input, expected) in vectors {
+			let r = super::find_host(input.as_bytes(), 0);
+			let output = &input[r];
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn port() {
+		let vectors = [(":12", (true, 3)), ("", (false, 0))];
+
+		for (input, expected) in vectors {
+			let output = super::port(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_port() {
+		let vectors = [
+			("example.org:12", Some("12")),
+			("user@example.org:12", Some("12")),
+			("example.org", None),
+			("user:21@example.org:12", Some("12")),
+			("user:32@example.org", None),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::find_port(input.as_bytes(), 0).map(|r| &input[r]);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn path() {
+		let vectors = [
+			("foo/bar?query", 7),
+			("foo/bar#fragment", 7),
+			("foo/bar", 7),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::path(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_path() {
+		let vectors = [
+			("scheme:", ""),
+			("scheme://example.org/", "/"),
+			("foo/bar?query", "foo/bar"),
+			("foo/bar#fragment", "foo/bar"),
+			("foo/bar", "foo/bar"),
+		];
+
+		for (input, expected) in vectors {
+			let r = super::find_path(input.as_bytes(), 0);
+			let output = &input[r];
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn query() {
+		let vectors = [
+			("", (false, 0)),
+			("?query", (true, 6)),
+			("?query#fragment", (true, 6)),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::query(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_query() {
+		let vectors = [
+			("path?query", Ok(5..10)),
+			("path?query#fragment", Ok(5..10)),
+			("path#fragment", Err(4)),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::find_query(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn fragment() {
+		let vectors = [("", (false, 0)), ("#fragment", (true, 9))];
+
+		for (input, expected) in vectors {
+			let output = super::fragment(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
+	}
+
+	#[test]
+	fn find_fragment() {
+		let vectors = [
+			("path?query", Err(10)),
+			("path?query#fragment", Ok(11..19)),
+			("path#fragment", Ok(5..13)),
+		];
+
+		for (input, expected) in vectors {
+			let output = super::find_fragment(input.as_bytes(), 0);
+			assert_eq!(output, expected)
+		}
 	}
 }
