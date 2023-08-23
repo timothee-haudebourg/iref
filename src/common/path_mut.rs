@@ -116,13 +116,18 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 
 	/// Pop the last non-`..` segment of the path.
 	///
-	/// If the path is empty or ends in `..`, then a `..` segment
+	/// If the path is empty and relative, or ends in `..`, then a `..` segment
 	/// will be added instead.
-	pub fn pop(&mut self) {
+	///
+	/// Returns `true` if the path has been modified, or `false` otherwise.
+	pub fn pop(&mut self) -> bool {
 		let is_empty = self.is_empty();
 
-		if is_empty || self.last().map(SegmentImpl::as_bytes) == Some(PARENT_SEGMENT) {
-			self.push(<P::Segment as SegmentImpl>::PARENT)
+		if (is_empty && self.is_relative())
+			|| self.last().map(SegmentImpl::as_bytes) == Some(PARENT_SEGMENT)
+		{
+			self.push(<P::Segment as SegmentImpl>::PARENT);
+			true
 		} else if !is_empty {
 			let start = self.first_segment_offset();
 			let mut i = self.end - 1;
@@ -133,6 +138,9 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 
 			replace(self.buffer, i..self.end, &[]);
 			self.end = i;
+			true
+		} else {
+			false
 		}
 	}
 
@@ -151,10 +159,7 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 	pub fn symbolic_push(&mut self, segment: &P::Segment, is_open: bool) -> bool {
 		match segment.as_bytes() {
 			CURRENT_SEGMENT => true,
-			PARENT_SEGMENT => {
-				self.pop();
-				true
-			}
+			PARENT_SEGMENT => self.pop(),
 			_ => {
 				if !segment.is_empty() || !is_open || !self.is_empty() {
 					self.push(segment);

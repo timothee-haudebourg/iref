@@ -445,6 +445,7 @@ pub struct NormalizedSegmentsImpl<'a, P: ?Sized + PathImpl>(
 
 impl<'a, P: ?Sized + PathImpl> NormalizedSegmentsImpl<'a, P> {
 	fn new(path: &'a P) -> NormalizedSegmentsImpl<P> {
+		let relative = path.is_relative();
 		let mut stack = SmallVec::<[&'a P::Segment; NORMALIZE_STACK_SIZE]>::new();
 
 		for segment in path.segments() {
@@ -454,7 +455,7 @@ impl<'a, P: ?Sized + PathImpl> NormalizedSegmentsImpl<'a, P> {
 					if stack
 						.last()
 						.map(|s| s.as_bytes() == PARENT_SEGMENT)
-						.unwrap_or(true)
+						.unwrap_or(relative)
 					{
 						stack.push(segment)
 					} else {

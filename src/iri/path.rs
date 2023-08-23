@@ -575,7 +575,7 @@ mod tests {
 			("a/b/c/..", "a/b/"),
 			("a/b/c/.", "a/b/c/"),
 			("a/../..", "../"),
-			("/a/../..", "/../"),
+			("/a/../..", "/"), // Errata 4547 is only implemented for relative paths.
 		];
 
 		for (input, expected) in vectors {

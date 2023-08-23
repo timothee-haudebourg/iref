@@ -820,7 +820,7 @@ mod tests {
 	fn unambiguous_resolution() {
 		let base_iri = Iri::new("http:/a/b").unwrap();
 
-		let tests = [("../..//", "http:/..//")];
+		let tests = [("../..//", "http:/.//")];
 
 		for (relative, absolute) in &tests {
 			// println!("{} => {}", relative, absolute);
@@ -872,10 +872,10 @@ mod tests {
 		let base_iri = Iri::new("http://a/b/c/d;p?q").unwrap();
 
 		let tests = [
-			("../../../g", "http://a/../g"), // NOTE without Errata 4547: "http://a/g"
-			("../../../../g", "http://a/../../g"), // NOTE without Errata 4547: "http://a/g"
+			("../../../g", "http://a/g"),
+			("../../../../g", "http://a/g"),
 			("/./g", "http://a/g"),
-			("/../g", "http://a/../g"), // NOTE without Errata 4547: "http://a/g"
+			("/../g", "http://a/g"),
 			("g.", "http://a/b/c/g."),
 			(".g", "http://a/b/c/.g"),
 			("g..", "http://a/b/c/g.."),

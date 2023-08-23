@@ -71,7 +71,7 @@ impl<'a> PathMut<'a> {
 	/// If the path is empty or ends in `..`, then a `..` segment
 	/// will be added instead.
 	pub fn pop(&mut self) {
-		self.0.pop()
+		self.0.pop();
 	}
 
 	pub fn clear(&mut self) {
@@ -136,7 +136,7 @@ mod tests {
 	fn pop() {
 		let vectors = [
 			("", ".."),
-			("/", "/.."),
+			("/", "/"),
 			("/..", "/../.."),
 			("foo", ""),
 			("foo/bar", "foo"),
@@ -162,7 +162,7 @@ mod tests {
 			("a/b/c/..", "a/b"),
 			("a/b/c/.", "a/b/c"),
 			("a/../..", ".."),
-			("/a/../..", "/.."),
+			("/a/../..", "/"),
 		];
 
 		for (input, expected) in vectors {

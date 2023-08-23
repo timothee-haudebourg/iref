@@ -588,7 +588,7 @@ mod tests {
 			(b"a/b/c/..", b"a/b/"),
 			(b"a/b/c/.", b"a/b/c/"),
 			(b"a/../..", b"../"),
-			(b"/a/../..", b"/../"),
+			(b"/a/../..", b"/"),
 		];
 
 		for (input, expected) in vectors {
