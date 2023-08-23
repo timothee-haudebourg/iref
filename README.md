@@ -1,225 +1,243 @@
-# Internationalized Resource Identifiers and References
+# Changelog
 
-[![CI](https://github.com/timothee-haudebourg/iref/workflows/CI/badge.svg)](https://github.com/timothee-haudebourg/iref/actions)
-[![Crate informations](https://img.shields.io/crates/v/iref.svg?style=flat-square)](https://crates.io/crates/iref)
-[![License](https://img.shields.io/crates/l/iref.svg?style=flat-square)](https://github.com/timothee-haudebourg/iref#license)
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/iref)
+All notable changes to this project will be documented in this file.
 
-<!-- cargo-rdme start -->
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-This crates provides an implementation of
-[Uniform Resource Identifiers (URIs, aka URLs)][uri] and [Internationalized
-Resource Identifiers (IRIs)][iri] following [RFC 3987][uri-rfc] and [RFC
-3986][iri-rfc] defined by the [Internet Engineering Task Force
-(IETF)][ietf] to uniquely identify objects across the web. IRIs are a
-superclass of URIs accepting international characters defined in the
-[Unicode][unicode] table.
+## [3.1.2] - 2023-08-23
 
-[uri]: <https://en.wikipedia.org/wiki/Uniform_Resource_Identifier>
-[uri-rfc]: <https://tools.ietf.org/html/rfc3986>
-[iri]: <https://en.wikipedia.org/wiki/Internationalized_resource_identifier>
-[iri-rfc]: <https://tools.ietf.org/html/rfc3987>
-[ietf]: <ietf.org>
-[unicode]: <https://en.wikipedia.org/wiki/Unicode>
+### Fixed
 
-URI/IRIs are defined as a sequence of characters with distinguishable
-components: a scheme, an authority, a path, a query and a fragment.
+- [db16295] Fix path resolution with empty segments.
 
-```text
-    foo://example.com:8042/over/there?name=ferret#nose
-    \_/   \______________/\_________/ \_________/ \__/
-     |           |            |            |        |
-  scheme     authority       path        query   fragment
-```
+## [3.1.1] - 2023-08-23
 
-This crate provides types to represent borrowed and owned URIs and IRIs
-(`Uri`, `Iri`, `UriBuf`, `IriBuf`), borrowed and owned URIs and IRIs
-references (`UriRef`, `IriRef`, `UriRefBuf`, `IriRefBuf`) and similar
-types for every part of an URI/IRI. Theses allows the easy access and
-manipulation of every components.
-It features:
-  - borrowed and owned URI/IRIs and URI/IRI-reference;
-  - mutable URI/IRI buffers (in-place);
-  - path normalization;
-  - comparison modulo normalization;
-  - URI/IRI-reference resolution;
-  - static URI/IRI parsing with the [`static-iref`] crate and its `iri`
-    macro; and
-  - `serde` support (by enabling the `serde` feature).
+### Fixed
 
-[`static-iref`]: https://crates.io/crates/static-iref
+- [e562701] Fix Errata 4547 implementation, only on relative paths.
 
-### Basic usage
+## [3.1.0] - 2023-08-23
 
-You can parse IRI strings by wrapping an `Iri` instance around a `str` slice.
-Note that no memory allocation occurs using `Iri`, it only borrows the input data.
-Access to each component is done in constant time.
+### Added
 
-```rust
-use iref::Iri;
+- [5ef5b65] Impl `Display` for error types.
 
-let iri = Iri::new("https://www.rust-lang.org/foo/bar?query#frag")?;
+## [3.0.2] - 2023-08-23
 
-println!("scheme: {}", iri.scheme());
-println!("authority: {}", iri.authority().unwrap());
-println!("path: {}", iri.path());
-println!("query: {}", iri.query().unwrap());
-println!("fragment: {}", iri.fragment().unwrap());
-```
+### Added
 
-IRIs can be created and modified using the `IriBuf` type.
-With this type, the IRI is held in a single buffer,
-modified in-place to reduce memory allocation and optimize memory accesses.
-This also allows the conversion from `IriBuf` into `Iri`.
+- [47b1f24] Add `relative_to`, `suffix` and `base` to `Uri` and `Iri`.
 
-```rust
-use iref::IriBuf;
+## [3.0.1] - 2023-08-22
 
-let mut iri = IriBuf::new("https://www.rust-lang.org".to_string())?;
+### Fixed
 
-iri.authority_mut().unwrap().set_port(Some("40".try_into()?));
-iri.set_path("/foo".try_into()?);
-iri.path_mut().push("bar".try_into()?);
-iri.set_query(Some("query".try_into()?));
-iri.set_fragment(Some("fragment".try_into()?));
+- [204b002] Fix & Test all the parsing query functions.
+- [204b002] Fixes #20
 
-assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
-```
+## [3.0.0] - 2023-08-17
 
-The `try_into` method is used to ensure that each string is syntactically correct with regard to its corresponding component (for instance, it is not possible to replace `"query"` with `"query?"` since `?` is not a valid query character).
+### Fixed
 
-### Detailed Usage
+- [3d09f00] Fix panic in `parse_ipv6_literal`. ([#17](https://github.com/timothee-haudebourg/grdf/issues/17))
+- [d054f27] Fix clippy CI.
 
-#### Path manipulation
+## [2.2.3] - 2023-01-11
 
-The IRI path is accessed through the `path` or `path_mut` methods.
-It is possible to access the segments of a path using the iterator returned by the `segments` method.
+### Added
 
-```rust
-for segment in iri.path().segments() {
-  println!("{}", segment);
-}
-```
+- [a3b99a5] Add `hashbrown` optional feature.
+- [a3b99a5] Impl `hashbrown::Equivalent` for `Iri`.
+- [a3b99a5] Impl `hashbrown::Equivalent` for `IriRef`.
 
-One can use the `normalized_segments` method to iterate over the normalized
-version of the path where dot segments (`.` and `..`) are removed.
-In addition, it is possible to push or pop segments to a path using the
-corresponding methods:
-```rust
-let mut iri = IriBuf::new("https://rust-lang.org/a/c".to_string())?;
-let mut path = iri.path_mut();
+## [2.2.2] - 2022-12-20
 
-path.pop();
-path.push("b".try_into()?);
-path.push("c".try_into()?);
-path.push("".try_into()?); // the empty segment is valid.
+### Added
 
-assert_eq!(iri.path(), "/a/b/c/");
-```
+- [88f65d9] Add `into_string` functions.
 
-#### IRI references
+## [2.2.1] - 2022-12-20
 
-This crate provides the two types `IriRef` and `IriRefBuf` to represent
-IRI references. An IRI reference is either an IRI or a relative IRI.
-Contrarily to regular IRIs, relative IRI references may have no scheme.
+### Added
 
-```rust
-let mut iri_ref = IriRefBuf::default(); // an IRI reference can be empty.
+- [5bb37c8] Add missing `AsRef` & `Borrow` implementations.
+- [4265293] Add `serde` support.
 
-// An IRI reference with a scheme is a valid IRI.
-iri_ref.set_scheme(Some("https".try_into()?));
-let iri: &Iri = iri_ref.as_iri().unwrap();
+### Changed
 
-// An IRI can be safely converted into an IRI reference.
-let iri_ref: &IriRef = iri.into();
-```
+- [dcf2dd0] Move to version 2.2.1.
 
-Given a base IRI, references can be resolved into a regular IRI using the
-[Reference Resolution Algorithm](https://tools.ietf.org/html/rfc3986#section-5)
-defined in [RFC 3986](https://tools.ietf.org/html/rfc3986).
-This crate provides a *strict* implementation of this algorithm.
+### Fixed
 
-```rust
-let base_iri = Iri::new("http://a/b/c/d;p?q")?;
-let mut iri_ref = IriRefBuf::new("g;x=1/../y".to_string())?;
+- [fdd4855] Fix #15 IPv4/6 parser bug.
 
-// non mutating resolution.
-assert_eq!(iri_ref.resolved(base_iri), "http://a/b/c/y");
+## [2.1.2] - 2022-03-23
 
-// in-place resolution.
-iri_ref.resolve(base_iri);
-assert_eq!(iri_ref, "http://a/b/c/y");
-```
+### Fixed
 
-This crate implements
-[Errata 4547](https://www.rfc-editor.org/errata/eid4547) about the
-abnormal use of dot segments in relative paths.
-This means that for instance, the path `a/b/../../../` is normalized into
-`../`.
+- [b076269] Fix IRI reference resolution. Fixes #14
 
-#### IRI comparison
+## [2.1.1] - 2022-02-24
 
-Here are the features of the IRI comparison method implemented in this crate.
+### Fixed
 
-##### Protocol agnostic
+- [8f51470] Fix UTF-8 decoder bug.
 
-This implementation does not know anything about existing protocols.
-For instance, even if the
-[HTTP protocol](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol)
-defines `80` as the default port,
-the two IRIs `http://example.org` and `http://example.org:80` are **not** equivalent.
+## [2.1.0] - 2021-12-02
 
-##### Every `/` counts
+### Added
 
-The path `/foo/bar` is **not** equivalent to `/foo/bar/`.
+- [8d80e7e] Add from_vec/string and from/to raw parts.
 
-##### Path normalization
+### Changed
 
-Paths are normalized during comparison by removing dot segments (`.` and `..`).
-This means for instance that the paths `a/b/c` and `a/../a/./b/../b/c` **are**
-equivalent.
-Note however that this crate implements
-[Errata 4547](https://www.rfc-editor.org/errata/eid4547) about the
-abnormal use of dot segments in relative paths.
-This means that for instance, the IRI `http:a/b/../../../` is equivalent to
-`http:../` and **not** `http:`.
+- [2a1df9e] Move to version 2.0.3.
 
-##### Percent-encoded characters
+## [2.0.2] - 2021-09-09
 
-Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
-percent encoded characters are correctly handled.
-The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
+### Changed
 
-<!-- cargo-rdme end -->
+- [deed1ca] Move to 2.0.2.
 
-## What is missing
+### Fixed
 
-For now, this crate lacks of a proper way to compare strings in a case
-insensitive manner. As a result, the IRIs `http://example.org` and
-`htTp://ExAmpLe.Org` that should be equivalent are not.
+- [8e97fa5] Fix #13
 
-## What's next?
+## [2.0.1] - 2021-09-02
 
-I am waiting for [Custom DSTs](https://github.com/rust-lang/rfcs/pull/2594) to
-be available in order to
-turn the types `Iri` and `IriRef` (and `Path`, `Authority`, etc.) into
-dynamically sized types just like `str`, `OsStr`, etc.
-This would allow buffered types (`IriBuf`, `PathBuf`, etc.) to `Deref` into
-those DSTs and be far more easy to use while simplifying the API.
+### Changed
 
-We just need to wait...
+- [de909f9] Move to 2.0.1
 
-## License
+### Fixed
 
-Licensed under either of
+- [f345670] Fix `set_query` bug.
+- [4c00407] Fix rust fmt.
 
- * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+## [2.0.0] - 2021-09-02
 
-at your option.
+### Added
 
-### Contribution
+- [4846893] impl AsIri/Ref for &'a T.
+- [fd6554b] Add CI to run test, rustfmt and clippy on push/PR
+- [56f18b0] Add CI to run test, rustfmt and clippy on push/PR
+- [350ae25] Add from_str and to_owned methods
+- [538fc8a] Add from_str and to_owned methods
+- [7a43a39] Impl `Eq` for `Error`.
+- [a3e8e33] Add tests for fragment parsing issue.
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
-additional terms or conditions.
+### Changed
+
+- [63cbec1] Move to 1.4.0
+- [cabafde] Move to 2.0.0
+
+### Fixed
+
+- [efbf824] Fix `IriRef::relative_to`. Version 1.4.1.
+- [5d42595] Fix `IriRef::relative_to` again + proper tests.
+- [d539b60] Fix corner case for `IriRef::relative_to`
+- [5aae749] Fixing some clippy warnings.
+- [4f0423a] Fix typo to link to correct type
+- [7bfb545] Fix FUNDING.yml
+- [fbfaaa5] Fixes #12
+- [64d2642] Fix doc link.
+
+### Removed
+
+- [82cc03d] Remove warnings.
+
+## [1.3.0] - 2020-10-02
+
+### Added
+
+- [44b4f08] Impl From<Path> for IriRef.
+- [693da03] Impl From<&PathBuf> for IriRef.
+- [0805e2a] Add IriRef::relative_to.
+
+## [1.2.0] - 2020-09-10
+
+### Added
+
+- [4e8d67f] Implement Clone and Error for Error enum
+- [3c6c077] Implement Clone and Error for Error enum
+- [9493dc9] Add a changelog. Move to version 1.2.0.
+
+## [1.1.4] - 2020-04-19
+
+### Added
+
+- [6de9a3a] Add a new test catching issue #2.
+
+### Changed
+
+- [c2f57e5] Move to version 1.1.4.
+
+### Fixed
+
+- [b6d9389] Fix the path/segment parser.
+- [c541e07] Fix#2
+
+## [1.1.3] - 2020-03-31
+
+### Added
+
+- [6277102] Add into_* methods
+
+### Changed
+
+- [8b2541f] Move to version 1.1.3
+
+### Fixed
+
+- [df9cbfd] Fix lifetimes
+
+## [1.1.2] - 2020-03-31
+
+### Changed
+
+- [c2af478] Move to 1.1.2
+
+## [1.1.1] - 2020-03-31
+
+### Added
+
+- [ebf37fa] Add infos about `static-iref`.
+
+## [1.1.0] - 2020-03-31
+
+### Added
+
+- [b705b91] Add methods to inspect and build IRIs in `static-iref`.
+
+### Changed
+
+- [b614ead] Move to version 1.1
+
+### Fixed
+
+- [1d6adc7] Fix typo.
+
+## [1.0.1] - 2020-03-16
+
+### Removed
+
+- [d3de7bb] Remove build files
+
+## [1.0.0] - 2020-03-16
+
+### Added
+
+- [043a15e] Add gitignore.
+
+### Changed
+
+- [3afe663] Move percent-encoded strings in a dedicated crate.
+- [de90577] Refactoring.
+- [8f94dac] Refactoring.
+
+### Removed
+
+- [d76fd66] Remove useless files.
+- [3f05716] Remove warnings.
+
