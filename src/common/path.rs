@@ -234,7 +234,7 @@ pub trait PathImpl: 'static {
 
 		let mut open = false;
 		for segment in self.segments() {
-			open = result.as_path_mut().symbolic_push(segment, open)
+			open = result.as_path_mut().symbolic_push(segment)
 		}
 
 		if open && !result.is_empty() {

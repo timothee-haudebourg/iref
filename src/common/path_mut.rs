@@ -156,12 +156,15 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 	/// Returns wether or not a special segment has been push and should be
 	/// followed by an empty segment when doing reference resolution.
 	#[inline]
-	pub fn symbolic_push(&mut self, segment: &P::Segment, is_open: bool) -> bool {
+	pub fn symbolic_push(&mut self, segment: &P::Segment) -> bool {
 		match segment.as_bytes() {
 			CURRENT_SEGMENT => true,
-			PARENT_SEGMENT => self.pop(),
+			PARENT_SEGMENT => {
+				self.pop();
+				true
+			}
 			_ => {
-				if !segment.is_empty() || !is_open || !self.is_empty() {
+				if !segment.is_empty() || !self.is_empty() {
 					self.push(segment);
 				}
 
@@ -179,7 +182,7 @@ impl<'a, P: ?Sized + PathImpl> PathMutImpl<'a, P> {
 	pub fn symbolic_append<'s, S: IntoIterator<Item = &'s P::Segment>>(&mut self, path: S) {
 		let mut open = false;
 		for segment in path {
-			open = self.symbolic_push(segment, open);
+			open = self.symbolic_push(segment);
 		}
 
 		if open && !self.is_empty() {

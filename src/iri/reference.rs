@@ -819,8 +819,7 @@ mod tests {
 	#[test]
 	fn unambiguous_resolution() {
 		let base_iri = Iri::new("http:/a/b").unwrap();
-
-		let tests = [("../..//", "http:/.//")];
+		let tests = [("../..//", "http:/")];
 
 		for (relative, absolute) in &tests {
 			// println!("{} => {}", relative, absolute);
@@ -947,6 +946,19 @@ mod tests {
 
 		for (relative, absolute) in &tests {
 			println!("{} => {}", relative, absolute);
+			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
+			assert_eq!(buffer.as_str(), *absolute);
+		}
+	}
+
+	#[test]
+	fn more_resolutions4() {
+		let base_iri = Iri::new("http://a/bb/ccc/../d;p?q").unwrap();
+
+		let tests = [("../../", "http://a/")];
+
+		for (relative, absolute) in &tests {
+			// println!("{} => {}", relative, absolute);
 			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
 			assert_eq!(buffer.as_str(), *absolute);
 		}
