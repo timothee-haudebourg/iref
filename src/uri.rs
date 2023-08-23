@@ -195,6 +195,54 @@ impl Uri {
 	pub fn fragment(&self) -> Option<&Fragment> {
 		RiRefImpl::fragment(self)
 	}
+
+	/// Get this IRI relatively to the given IRI reference.
+	///
+	/// # Example
+	/// ```
+	/// # use iref::Uri;
+	/// let a = Uri::new(b"https://crates.io/").unwrap();
+	/// let b = Uri::new(b"https://crates.io/crates/iref").unwrap();
+	/// let c = Uri::new(b"https://crates.io/crates/json-ld").unwrap();
+	/// assert_eq!(b.relative_to(a.as_uri_ref()), "crates/iref");
+	/// assert_eq!(a.relative_to(b.as_uri_ref()), "..");
+	/// assert_eq!(b.relative_to(c.as_uri_ref()), "iref");
+	/// assert_eq!(c.relative_to(b.as_uri_ref()), "json-ld");
+	/// ```
+	pub fn relative_to(&self, other: &(impl ?Sized + AsRef<UriRef>)) -> UriRefBuf {
+		self.as_uri_ref().relative_to(other)
+	}
+
+	/// Get the suffix of this URI, if any, with regard to the given prefix URI.
+	///
+	/// Returns `Some((suffix, query, fragment))` if this URI is of the form
+	/// `prefix/suffix?query#fragment` where `prefix` is given as parameter.
+	/// Returns `None` otherwise.
+	/// If the `suffix` scheme or authority is different from this path, it will return `None`.
+	///
+	/// See [`Path::suffix`] for more details.
+	#[inline]
+	pub fn suffix(
+		&self,
+		prefix: &(impl ?Sized + AsRef<Uri>),
+	) -> Option<(PathBuf, Option<&Query>, Option<&Fragment>)> {
+		RiRefImpl::suffix(self, prefix.as_ref())
+	}
+
+	/// The URI without the file name, query and fragment.
+	///
+	/// # Example
+	/// ```
+	/// # use iref::Uri;
+	/// let a = Uri::new(b"https://crates.io/crates/iref?query#fragment").unwrap();
+	/// let b = Uri::new(b"https://crates.io/crates/iref/?query#fragment").unwrap();
+	/// assert_eq!(a.base(), "https://crates.io/crates/");
+	/// assert_eq!(b.base(), "https://crates.io/crates/iref/")
+	/// ```
+	#[inline]
+	pub fn base(&self) -> &Self {
+		unsafe { Self::new_unchecked(RiRefImpl::base(self)) }
+	}
 }
 
 impl AsRef<UriRef> for Uri {
