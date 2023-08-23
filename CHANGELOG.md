@@ -5,32 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.2] - 2023-08-23
+
+### Added
+
+- [47b1f24] Add `relative_to`, `suffix` and `base` to `Uri` and `Iri`.
+
 ## [3.0.1] - 2023-08-22
 
 ### Fixed
 
-- Fixed the `parse::find_port` function, fixing the `Authority::port` function.
+- [204b002] Fix & Test all the parsing query functions.
+- [204b002] Fixes #20
 
 ## [3.0.0] - 2023-08-17
 
-### Changed
-
-- `Iri`, `IriRef` are now DST types.
-- Component types such as `Path` are now also DST types.
-- Moved all IRI types in the `iri` module.
-- Segments can no longer be terminated with `/`. Instead, a path can be
-  terminated by an empty segment.
-
-### Added
-
-- IRI owned component types, such as `iri::PathBuf`.
-- URI types `Uri`, `UriRef`, `UriBuf`, `UriRefBuf` and component types.
-
-## [2.2.3] - 2023-01-11
-
 ### Fixed
 
-- [ab8e85c] Fixes #16
+- [3d09f00] Fix panic in `parse_ipv6_literal`. ([#17](https://github.com/timothee-haudebourg/grdf/issues/17))
+- [d054f27] Fix clippy CI.
 
 ## [2.2.3] - 2023-01-11
 
