@@ -13,6 +13,7 @@ use crate::common::QueryImpl;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "query",
+	name = "URI query",
 	ascii,
 	no_deref,
 	cache = "automata/uri/query.aut.cbor"

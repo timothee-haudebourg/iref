@@ -14,6 +14,7 @@ use crate::common::path::SegmentImpl;
 #[grammar(
 	file = "src/iri/grammar.abnf",
 	entry_point = "isegment",
+	name = "IRI path segment",
 	no_deref,
 	cache = "automata/iri/segment.aut.cbor"
 )]

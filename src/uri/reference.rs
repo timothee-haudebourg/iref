@@ -14,6 +14,7 @@ use super::{bytestr_eq, Authority, AuthorityMut, Fragment, Path, PathBuf, PathMu
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "URI-reference",
+	name = "URI reference",
 	cache = "automata/uri/reference.aut.cbor",
 	ascii
 )]

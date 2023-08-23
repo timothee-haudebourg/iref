@@ -14,6 +14,7 @@ use crate::common::FragmentImpl;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "fragment",
+	name = "URI fragment",
 	ascii,
 	no_deref,
 	cache = "automata/uri/fragment.aut.cbor"

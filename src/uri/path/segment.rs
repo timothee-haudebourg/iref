@@ -14,6 +14,7 @@ use crate::common::path::SegmentImpl;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "segment",
+	name = "URI path segment",
 	ascii,
 	no_deref,
 	cache = "automata/uri/segment.aut.cbor"

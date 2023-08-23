@@ -13,6 +13,7 @@ use crate::common::UserInofImpl;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "userinfo",
+	name = "URI user info",
 	ascii,
 	no_deref,
 	cache = "automata/uri/userinfo.aut.cbor"

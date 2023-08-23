@@ -14,6 +14,7 @@ use crate::common::FragmentImpl;
 #[grammar(
 	file = "src/iri/grammar.abnf",
 	entry_point = "ifragment",
+	name = "IRI fragment",
 	no_deref,
 	cache = "automata/iri/fragment.aut.cbor"
 )]

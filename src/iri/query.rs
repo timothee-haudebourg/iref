@@ -14,6 +14,7 @@ use crate::common::QueryImpl;
 #[grammar(
 	file = "src/iri/grammar.abnf",
 	entry_point = "iquery",
+	name = "IRI query",
 	no_deref,
 	cache = "automata/iri/query.aut.cbor"
 )]

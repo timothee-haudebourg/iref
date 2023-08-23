@@ -13,6 +13,7 @@ use super::PathMut;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "path",
+	name = "URI path",
 	ascii,
 	cache = "automata/uri/path.aut.cbor"
 )]

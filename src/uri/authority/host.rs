@@ -14,6 +14,7 @@ use crate::common::HostImpl;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "host",
+	name = "URI host",
 	ascii,
 	no_deref,
 	cache = "automata/uri/host.aut.cbor"

@@ -20,6 +20,7 @@ pub use userinfo::*;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "authority",
+	name = "URI authority",
 	ascii,
 	cache = "automata/uri/authority.aut.cbor"
 )]

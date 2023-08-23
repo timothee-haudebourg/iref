@@ -13,6 +13,7 @@ use crate::common::authority::UserInofImpl;
 #[grammar(
 	file = "src/iri/grammar.abnf",
 	entry_point = "iuserinfo",
+	name = "IRI user info",
 	no_deref,
 	cache = "automata/iri/userinfo.aut.cbor"
 )]

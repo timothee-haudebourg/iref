@@ -4,6 +4,7 @@ use static_regular_grammar::RegularGrammar;
 #[grammar(
 	file = "src/uri/grammar.abnf",
 	entry_point = "scheme",
+	name = "Scheme",
 	ascii,
 	cache = "automata/uri/scheme.aut.cbor"
 )]

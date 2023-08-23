@@ -15,6 +15,7 @@ use super::{Authority, AuthorityMut, Fragment, Path, PathBuf, PathMut, Query, Sc
 #[grammar(
 	file = "src/iri/grammar.abnf",
 	entry_point = "IRI-reference",
+	name = "IRI reference",
 	cache = "automata/iri/reference.aut.cbor"
 )]
 #[grammar(sized(

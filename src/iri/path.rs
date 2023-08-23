@@ -13,6 +13,7 @@ use super::PathMut;
 #[grammar(
 	file = "src/iri/grammar.abnf",
 	entry_point = "ipath",
+	name = "IRI path",
 	cache = "automata/iri/path.aut.cbor"
 )]
 #[grammar(sized(PathBuf, derive(Debug, Display)))]

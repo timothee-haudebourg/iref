@@ -18,6 +18,7 @@ pub use userinfo::*;
 #[grammar(
 	file = "src/iri/grammar.abnf",
 	entry_point = "iauthority",
+	name = "IRI authority",
 	cache = "automata/iri/authority.aut.cbor"
 )]
 #[grammar(sized(
