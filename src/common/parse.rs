@@ -62,6 +62,7 @@ pub fn scheme_authority_or_path(bytes: &[u8], mut i: usize) -> (SchemeAuthorityO
 				State::SchemeOrPath => match c {
 					b':' => break SchemeAuthorityOrPath::Scheme,
 					b'?' | b'#' => break SchemeAuthorityOrPath::Path,
+					b'/' => State::Path,
 					_ => State::SchemeOrPath,
 				},
 				State::Path => match c {
@@ -74,8 +75,7 @@ pub fn scheme_authority_or_path(bytes: &[u8], mut i: usize) -> (SchemeAuthorityO
 					_ => State::Path,
 				},
 				State::Authority => match c {
-					b'/' => break SchemeAuthorityOrPath::Authority,
-					b'?' | b'#' => break SchemeAuthorityOrPath::Authority,
+					b'/' | b'?' | b'#' => break SchemeAuthorityOrPath::Authority,
 					_ => State::Authority,
 				},
 			};
@@ -199,6 +199,7 @@ pub enum UserInfoOrHost {
 pub fn user_info_or_host(bytes: &[u8], mut i: usize) -> (UserInfoOrHost, usize) {
 	while i < bytes.len() {
 		match bytes[i] {
+			b'[' => return (UserInfoOrHost::Host, bytes.len()),
 			b'@' => return (UserInfoOrHost::UserInfo, i),
 			b':' => {
 				// end of the host, or still in the user-info.
@@ -238,6 +239,14 @@ pub fn find_user_info(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
 }
 
 pub fn host(bytes: &[u8], mut i: usize) -> usize {
+	if !bytes.is_empty() && bytes[0] == b'[' {
+		// IP-literal.
+		i += 1;
+		while i < bytes.len() && bytes[i] != b']' {
+			i += 1
+		}
+	}
+
 	while i < bytes.len() && bytes[i] != b':' {
 		i += 1
 	}
@@ -577,7 +586,12 @@ mod tests {
 
 	#[test]
 	fn host() {
-		let vectors = [("example.org:12", 11), ("example.org", 11), ("", 0)];
+		let vectors = [
+			("example.org:12", 11),
+			("example.org", 11),
+			("[::]", 4),
+			("", 0),
+		];
 
 		for (input, expected) in vectors {
 			let output = super::host(input.as_bytes(), 0);
@@ -593,6 +607,7 @@ mod tests {
 			("example.org", "example.org"),
 			("user:21@example.org:12", "example.org"),
 			("user:32@example.org", "example.org"),
+			("[::]", "[::]"),
 		];
 
 		for (input, expected) in vectors {
@@ -650,6 +665,7 @@ mod tests {
 			("foo/bar?query", "foo/bar"),
 			("foo/bar#fragment", "foo/bar"),
 			("foo/bar", "foo/bar"),
+			("a/:", "a/:"),
 		];
 
 		for (input, expected) in vectors {

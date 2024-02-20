@@ -11,7 +11,6 @@ mod userinfo;
 
 use crate::common::AuthorityImpl;
 
-pub use super::{InvalidScheme, Scheme, SchemeBuf};
 pub use host::*;
 pub use port::*;
 pub use userinfo::*;

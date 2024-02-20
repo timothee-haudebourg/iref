@@ -80,7 +80,7 @@ impl Eq for Segment {}
 
 impl PartialOrd for Segment {
 	fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-		self.as_pct_str().partial_cmp(other.as_pct_str())
+		Some(self.cmp(other))
 	}
 }
 
