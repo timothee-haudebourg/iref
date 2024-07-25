@@ -1,15 +1,23 @@
-[package]
-name = "iref"
-version = "3.1.4"
+[workspace.package]
+version = "3.2.0"
 edition = "2021"
 authors = ["Timothée Haudebourg <author@haudebourg.net>"]
 categories = ["web-programming", "internationalization"]
 keywords = ["iri", "uri", "url", "resource", "identifier"]
+license = "MIT/Apache-2.0"
+
+[package]
+name = "iref"
 description = "Uniform & Internationalized Resource Identifiers (URIs/IRIs), borrowed and owned."
 repository = "https://github.com/timothee-haudebourg/iref"
 documentation = "https://docs.rs/iref"
-license = "MIT/Apache-2.0"
 readme = "README.md"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+categories.workspace = true
+keywords.workspace = true
+license.workspace = true
 
 [features]
 default = []
@@ -18,8 +26,8 @@ serde = ["iref-core/serde"]
 data = ["iref-core/data"]
 
 [workspace.dependencies]
-iref-core = { path = "crates/core", version = "3.1.4" }
-iref-macros = { path = "crates/macros", version = "3.1.4" }
+iref-core = { path = "crates/core", version = "3.2.0" }
+iref-macros = { path = "crates/macros", version = "3.2.0" }
 
 [dependencies]
 iref-core.workspace = true

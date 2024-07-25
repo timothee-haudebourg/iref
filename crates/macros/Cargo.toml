@@ -1,15 +1,15 @@
 [package]
 name = "iref-macros"
-version = "3.1.4"
-edition = "2021"
-authors = ["Timothée Haudebourg <author@haudebourg.net>"]
-categories = ["web-programming", "internationalization"]
-keywords = ["iri", "uri", "url", "resource", "identifier"]
 description = "Macros for the `iref` library"
 repository = "https://github.com/timothee-haudebourg/iref"
 documentation = "https://docs.rs/iref"
-license = "MIT/Apache-2.0"
 readme = "README.md"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+categories.workspace = true
+keywords.workspace = true
+license.workspace = true
 
 [lib]
 proc-macro = true
