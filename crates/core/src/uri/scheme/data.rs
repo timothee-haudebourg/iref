@@ -196,7 +196,7 @@ impl DataUrlBuf {
 	}
 
 	pub fn as_data_url(&self) -> &DataUrl {
-		unsafe { DataUrl::new_unchecked(&self.0) }
+		unsafe { DataUrl::new_unchecked(&self.url) }
 	}
 }
 
