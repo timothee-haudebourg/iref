@@ -1,5 +1,5 @@
 [workspace.package]
-version = "3.2.1"
+version = "3.2.2"
 edition = "2021"
 authors = ["Timothée Haudebourg <author@haudebourg.net>"]
 categories = ["web-programming", "internationalization"]
@@ -27,8 +27,8 @@ data = ["iref-core/data"]
 hashbrown = ["iref-core/hashbrown"]
 
 [workspace.dependencies]
-iref-core = { path = "crates/core", version = "3.2.1" }
-iref-macros = { path = "crates/macros", version = "3.2.1" }
+iref-core = { path = "crates/core", version = "3.2.2" }
+iref-macros = { path = "crates/macros", version = "3.2.2" }
 
 [dependencies]
 iref-core.workspace = true
