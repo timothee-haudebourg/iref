@@ -35,3 +35,6 @@ members = ["crates/*"]
 [[example]]
 name = "serde"
 required-features = [ "serde" ]
+
+[package.metadata.docs.rs]
+all-features = true
