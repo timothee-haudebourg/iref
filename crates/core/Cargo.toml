@@ -1,5 +1,5 @@
 [package]
-name = "iref"
+name = "iref-core"
 version = "3.1.4"
 edition = "2021"
 authors = ["Timothée Haudebourg <author@haudebourg.net>"]
@@ -13,25 +13,14 @@ readme = "README.md"
 
 [features]
 default = []
-macros = ["dep:iref-macros"]
-serde = ["iref-core/serde"]
-data = ["iref-core/data"]
-
-[workspace.dependencies]
-iref-core = { path = "crates/core", version = "3.1.4" }
-iref-macros = { path = "crates/macros", version = "3.1.4" }
+serde = ["dep:serde"]
+data = ["dep:base64"]
 
 [dependencies]
-iref-core.workspace = true
-iref-macros = { workspace = true, optional = true }
-
-[dev-dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-[workspace]
-members = ["crates/*"]
-
-[[example]]
-name = "serde"
-required-features = [ "serde" ]
+pct-str = "2.0"
+smallvec = "1.2"
+thiserror = "1.0.40"
+static-regular-grammar = "2.0"
+serde = { version = "1.0", optional = true }
+hashbrown = { version = "0.14.0", optional = true }
+base64 = { version = "0.22.1", optional = true }

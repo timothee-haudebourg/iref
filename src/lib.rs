@@ -34,11 +34,10 @@
 //!   - path normalization;
 //!   - comparison modulo normalization;
 //!   - URI/IRI-reference resolution;
-//!   - static URI/IRI parsing with the [`static-iref`] crate and its `iri`
-//!     macro; and
+//!   - static URI/IRI parsing using the `uri`/`iri` macros (provided by
+//!     enabling the `macros` feature).
 //!   - `serde` support (by enabling the `serde` feature).
-//!
-//! [`static-iref`]: https://crates.io/crates/static-iref
+//!   - data URL support (by enabling the `data` feature).
 //!
 //! ## Basic usage
 //!
@@ -204,10 +203,7 @@
 //! Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 //! percent encoded characters are correctly handled.
 //! The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
-pub(crate) mod common;
-pub mod iri;
-pub mod uri;
-pub(crate) mod utils;
+pub use iref_core::*;
 
-pub use iri::{InvalidIri, Iri, IriBuf, IriError, IriRef, IriRefBuf};
-pub use uri::{InvalidUri, Uri, UriBuf, UriError, UriRef, UriRefBuf};
+#[cfg(feature = "macros")]
+pub use iref_macros::*;
