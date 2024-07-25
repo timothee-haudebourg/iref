@@ -5,12 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.1.4] - 2024-02-20
+## [3.2.1] - 2024-07-25
 
 ### Fixed
 
-- [d545415] Fixes #21
-- [7fb32b3] Fix incorrect extraction of URI components.
+- [0c82b55] Fix missing "hashbrown" feature.
+
+## [3.2.0] - 2024-07-25
+
+### Fixed
+
+- [64f7d6d] Fix automata paths.
 
 ## [3.1.3] - 2023-10-20
 
@@ -134,9 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [4846893] impl AsIri/Ref for &'a T.
 - [fd6554b] Add CI to run test, rustfmt and clippy on push/PR
-- [56f18b0] Add CI to run test, rustfmt and clippy on push/PR
 - [350ae25] Add from_str and to_owned methods
-- [538fc8a] Add from_str and to_owned methods
 - [7a43a39] Impl `Eq` for `Error`.
 - [a3e8e33] Add tests for fragment parsing issue.
 
@@ -153,7 +156,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [5aae749] Fixing some clippy warnings.
 - [4f0423a] Fix typo to link to correct type
 - [7bfb545] Fix FUNDING.yml
-- [fbfaaa5] Fixes #12
 - [64d2642] Fix doc link.
 
 ### Removed
@@ -173,7 +175,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [4e8d67f] Implement Clone and Error for Error enum
-- [3c6c077] Implement Clone and Error for Error enum
 - [9493dc9] Add a changelog. Move to version 1.2.0.
 
 ## [1.1.4] - 2020-04-19
@@ -189,7 +190,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - [b6d9389] Fix the path/segment parser.
-- [c541e07] Fix#2
 
 ## [1.1.3] - 2020-03-31
 
