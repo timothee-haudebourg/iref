@@ -15,6 +15,7 @@ license.workspace = true
 default = []
 serde = ["dep:serde"]
 data = ["dep:base64"]
+hashbrown = ["dep:hashbrown"]
 
 [dependencies]
 pct-str = "2.0"

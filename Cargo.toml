@@ -24,6 +24,7 @@ default = []
 macros = ["dep:iref-macros"]
 serde = ["iref-core/serde"]
 data = ["iref-core/data"]
+hashbrown = ["iref-core/hashbrown"]
 
 [workspace.dependencies]
 iref-core = { path = "crates/core", version = "3.2.0" }
