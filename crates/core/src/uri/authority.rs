@@ -17,11 +17,11 @@ pub use userinfo::*;
 
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/uri/grammar.abnf",
+	file = "src/uri/grammar.abnf",
 	entry_point = "authority",
 	name = "URI authority",
 	ascii,
-	cache = "crates/core/automata/uri/authority.aut.cbor"
+	cache = "automata/uri/authority.aut.cbor"
 )]
 #[grammar(sized(
 	AuthorityBuf,

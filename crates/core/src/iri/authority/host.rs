@@ -12,11 +12,11 @@ use crate::common::authority::HostImpl;
 /// IRI authority host.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/iri/grammar.abnf",
+	file = "src/iri/grammar.abnf",
 	entry_point = "ihost",
 	name = "IRI host",
 	no_deref,
-	cache = "crates/core/automata/iri/host.aut.cbor"
+	cache = "automata/iri/host.aut.cbor"
 )]
 #[grammar(sized(HostBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", grammar(serde))]

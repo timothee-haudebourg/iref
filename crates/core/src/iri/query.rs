@@ -12,11 +12,11 @@ use crate::common::QueryImpl;
 /// IRI query.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/iri/grammar.abnf",
+	file = "src/iri/grammar.abnf",
 	entry_point = "iquery",
 	name = "IRI query",
 	no_deref,
-	cache = "crates/core/automata/iri/query.aut.cbor"
+	cache = "automata/iri/query.aut.cbor"
 )]
 #[grammar(sized(QueryBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", grammar(serde))]

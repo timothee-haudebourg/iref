@@ -103,10 +103,10 @@ uri_error! {
 /// Uniform Resource Identifier (URI).
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/uri/grammar.abnf",
+	file = "src/uri/grammar.abnf",
 	entry_point = "URI",
 	ascii,
-	cache = "crates/core/automata/uri.aut.cbor"
+	cache = "automata/uri.aut.cbor"
 )]
 #[grammar(sized(UriBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", grammar(serde))]

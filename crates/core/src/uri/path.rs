@@ -11,11 +11,11 @@ use super::PathMut;
 /// IRI path.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/uri/grammar.abnf",
+	file = "src/uri/grammar.abnf",
 	entry_point = "path",
 	name = "URI path",
 	ascii,
-	cache = "crates/core/automata/uri/path.aut.cbor"
+	cache = "automata/uri/path.aut.cbor"
 )]
 #[grammar(sized(PathBuf, derive(Debug, Display)))]
 #[cfg_attr(feature = "serde", grammar(serde))]

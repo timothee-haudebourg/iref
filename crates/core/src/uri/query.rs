@@ -11,12 +11,12 @@ use crate::common::QueryImpl;
 
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/uri/grammar.abnf",
+	file = "src/uri/grammar.abnf",
 	entry_point = "query",
 	name = "URI query",
 	ascii,
 	no_deref,
-	cache = "crates/core/automata/uri/query.aut.cbor"
+	cache = "automata/uri/query.aut.cbor"
 )]
 #[grammar(sized(QueryBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", grammar(serde))]

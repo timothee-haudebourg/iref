@@ -12,11 +12,11 @@ use crate::common::FragmentImpl;
 /// IRI fragment.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/iri/grammar.abnf",
+	file = "src/iri/grammar.abnf",
 	entry_point = "ifragment",
 	name = "IRI fragment",
 	no_deref,
-	cache = "crates/core/automata/iri/fragment.aut.cbor"
+	cache = "automata/iri/fragment.aut.cbor"
 )]
 #[grammar(sized(
 	FragmentBuf,

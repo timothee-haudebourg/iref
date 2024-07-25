@@ -12,11 +12,11 @@ use crate::common::path::SegmentImpl;
 /// IRI path segment.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/iri/grammar.abnf",
+	file = "src/iri/grammar.abnf",
 	entry_point = "isegment",
 	name = "IRI path segment",
 	no_deref,
-	cache = "crates/core/automata/iri/segment.aut.cbor"
+	cache = "automata/iri/segment.aut.cbor"
 )]
 #[grammar(sized(
 	SegmentBuf,

@@ -121,9 +121,9 @@ iri_error! {
 /// ```
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/iri/grammar.abnf",
+	file = "src/iri/grammar.abnf",
 	entry_point = "IRI",
-	cache = "crates/core/automata/iri.aut.cbor"
+	cache = "automata/iri.aut.cbor"
 )]
 #[grammar(sized(IriBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", grammar(serde))]

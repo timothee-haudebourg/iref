@@ -11,12 +11,12 @@ use crate::common::UserInofImpl;
 
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/uri/grammar.abnf",
+	file = "src/uri/grammar.abnf",
 	entry_point = "userinfo",
 	name = "URI user info",
 	ascii,
 	no_deref,
-	cache = "crates/core/automata/uri/userinfo.aut.cbor"
+	cache = "automata/uri/userinfo.aut.cbor"
 )]
 #[grammar(sized(
 	UserInfoBuf,

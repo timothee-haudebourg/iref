@@ -5,11 +5,11 @@ pub mod data;
 
 #[derive(RegularGrammar, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[grammar(
-	file = "crates/core/src/uri/grammar.abnf",
+	file = "src/uri/grammar.abnf",
 	entry_point = "scheme",
 	name = "Scheme",
 	ascii,
-	cache = "crates/core/automata/uri/scheme.aut.cbor"
+	cache = "automata/uri/scheme.aut.cbor"
 )]
 #[grammar(sized(
 	SchemeBuf,

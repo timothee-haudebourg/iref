@@ -12,10 +12,10 @@ use super::{bytestr_eq, Authority, AuthorityMut, Fragment, Path, PathBuf, PathMu
 /// URI reference.
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/uri/grammar.abnf",
+	file = "src/uri/grammar.abnf",
 	entry_point = "URI-reference",
 	name = "URI reference",
-	cache = "crates/core/automata/uri/reference.aut.cbor",
+	cache = "automata/uri/reference.aut.cbor",
 	ascii
 )]
 #[grammar(sized(

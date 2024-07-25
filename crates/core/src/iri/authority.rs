@@ -16,10 +16,10 @@ pub use userinfo::*;
 
 #[derive(RegularGrammar)]
 #[grammar(
-	file = "crates/core/src/iri/grammar.abnf",
+	file = "src/iri/grammar.abnf",
 	entry_point = "iauthority",
 	name = "IRI authority",
-	cache = "crates/core/automata/iri/authority.aut.cbor"
+	cache = "automata/iri/authority.aut.cbor"
 )]
 #[grammar(sized(
 	AuthorityBuf,
