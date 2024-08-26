@@ -23,7 +23,6 @@ use super::{Authority, AuthorityMut, Fragment, Path, PathBuf, PathMut, Query, Sc
 	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
 ))]
 #[cfg_attr(feature = "serde", grammar(serde))]
-#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct IriRef(str);
 
 impl RiRefImpl for IriRef {

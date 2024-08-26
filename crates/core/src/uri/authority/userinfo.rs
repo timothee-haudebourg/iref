@@ -23,7 +23,6 @@ use crate::common::UserInofImpl;
 	derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)
 ))]
 #[cfg_attr(feature = "serde", grammar(serde))]
-#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct UserInfo([u8]);
 
 impl UserInofImpl for UserInfo {

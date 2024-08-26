@@ -18,7 +18,6 @@ use super::PathMut;
 )]
 #[grammar(sized(PathBuf, derive(Debug, Display)))]
 #[cfg_attr(feature = "serde", grammar(serde))]
-#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Path(str);
 
 impl PathImpl for Path {

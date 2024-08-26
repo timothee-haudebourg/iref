@@ -10,5 +10,4 @@ use static_regular_grammar::RegularGrammar;
 )]
 #[grammar(sized(PortBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", grammar(serde))]
-#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Port([u8]);

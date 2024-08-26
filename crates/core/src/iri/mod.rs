@@ -127,7 +127,6 @@ iri_error! {
 )]
 #[grammar(sized(IriBuf, derive(Debug, Display, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", grammar(serde))]
-#[cfg_attr(feature = "ignore-grammars", grammar(disable))]
 pub struct Iri(str);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
