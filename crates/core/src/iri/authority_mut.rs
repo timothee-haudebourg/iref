@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use core::ops::Deref;
 
 use crate::common::authority_mut::AuthorityMutImpl;
 

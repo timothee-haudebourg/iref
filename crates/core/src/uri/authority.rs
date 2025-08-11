@@ -1,4 +1,4 @@
-use std::{
+use core::{
 	cmp,
 	hash::{self, Hash},
 };

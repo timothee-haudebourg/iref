@@ -1,5 +1,5 @@
 use pct_str::{PctStr, PctString};
-use std::{
+use core::{
 	cmp,
 	hash::{self, Hash},
 	ops,

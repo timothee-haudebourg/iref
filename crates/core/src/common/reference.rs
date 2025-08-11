@@ -1,4 +1,4 @@
-use std::ops::Range;
+use core::ops::Range;
 
 use super::{
 	parse, AuthorityImpl, AuthorityMutImpl, FragmentImpl, PathImpl, PathMutImpl, QueryImpl,

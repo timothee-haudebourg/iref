@@ -1,4 +1,4 @@
-use std::ops::Range;
+use core::ops::Range;
 
 pub fn allocate_range(buffer: &mut Vec<u8>, range: Range<usize>, len: usize) {
 	let range_len = range.end - range.start;

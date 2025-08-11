@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, ops::Range};
+use core::{marker::PhantomData, ops::Range};
 
 use super::{
 	authority::{AuthorityImpl, HostImpl, UserInofImpl},

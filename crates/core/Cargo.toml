@@ -12,7 +12,9 @@ keywords.workspace = true
 license.workspace = true
 
 [features]
-default = []
+default = ["std"]
+std = []
+ignore-grammars = []
 serde = ["dep:serde"]
 data = ["dep:base64"]
 hashbrown = ["dep:hashbrown"]

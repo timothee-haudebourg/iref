@@ -332,7 +332,7 @@ pub trait PathImpl: 'static {
 	///
 	/// # Example
 	/// ```
-	/// # use std::convert::TryFrom;
+	/// # use core::convert::TryFrom;
 	/// # use iref_core as iref;
 	/// use iref::iri::{Path, PathBuf};
 	///

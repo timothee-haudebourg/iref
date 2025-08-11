@@ -1,5 +1,5 @@
 use pct_str::PctStr;
-use std::{
+use core::{
 	cmp,
 	hash::{self, Hash},
 	ops,
@@ -32,7 +32,7 @@ impl SegmentImpl for Segment {
 	const EMPTY: &'static Self = Self::EMPTY;
 
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
-		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+		Self::new_unchecked(core::str::from_utf8_unchecked(bytes))
 	}
 
 	fn as_bytes(&self) -> &[u8] {

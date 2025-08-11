@@ -1,4 +1,4 @@
-use std::{
+use core::{
 	borrow::{Borrow, Cow},
 	ops::Deref,
 	str::FromStr,
@@ -49,7 +49,7 @@ impl DataUrl {
 	///
 	/// The input value must be a data URL.
 	pub unsafe fn new_unchecked(url: &(impl ?Sized + AsRef<[u8]>)) -> &Self {
-		std::mem::transmute(url.as_ref())
+		core::mem::transmute(url.as_ref())
 	}
 
 	pub fn parts(&self) -> DataUrlPartsRef {

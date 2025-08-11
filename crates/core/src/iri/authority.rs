@@ -1,4 +1,4 @@
-use std::{
+use core::{
 	cmp,
 	hash::{self, Hash},
 };
@@ -34,7 +34,7 @@ impl AuthorityImpl for Authority {
 	type Host = Host;
 
 	unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
-		Self::new_unchecked(std::str::from_utf8_unchecked(bytes))
+		Self::new_unchecked(core::str::from_utf8_unchecked(bytes))
 	}
 
 	fn as_bytes(&self) -> &[u8] {
