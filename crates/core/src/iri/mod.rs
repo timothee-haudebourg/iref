@@ -3,10 +3,7 @@ use core::{
 	hash::{self, Hash},
 };
 
-#[cfg(not(feature = "std"))]
-use alloc::borrow::Cow;
-#[cfg(feature = "std")]
-use std::borrow::Cow;
+use crate::Cow;
 
 use static_regular_grammar::RegularGrammar;
 

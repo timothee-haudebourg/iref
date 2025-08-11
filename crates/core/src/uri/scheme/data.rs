@@ -1,8 +1,5 @@
-use core::{
-	borrow::{Borrow, Cow},
-	ops::Deref,
-	str::FromStr,
-};
+use crate::Cow;
+use core::{borrow::Borrow, ops::Deref, str::FromStr};
 
 use base64::Engine;
 
