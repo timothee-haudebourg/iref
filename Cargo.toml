@@ -20,6 +20,7 @@ keywords.workspace = true
 license.workspace = true
 
 [features]
+std = ["iref-core/std"]
 default = []
 macros = ["dep:iref-macros"]
 serde = ["iref-core/serde"]

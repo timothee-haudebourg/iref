@@ -1,8 +1,13 @@
-use static_regular_grammar::RegularGrammar;
 use core::{
-	borrow::{Borrow, Cow},
+	borrow::Borrow,
 	hash::{self, Hash},
 };
+use static_regular_grammar::RegularGrammar;
+
+#[cfg(not(feature = "std"))]
+use alloc::borrow::Cow;
+#[cfg(feature = "std")]
+use std::borrow::Cow;
 
 mod authority;
 mod authority_mut;

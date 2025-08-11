@@ -203,7 +203,7 @@
 //! Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 //! percent encoded characters are correctly handled.
 //! The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
-#![cfg_attr(not(any(feature = "std", test)), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 pub use iref_core::*;
 
