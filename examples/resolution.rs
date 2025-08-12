@@ -1,4 +1,4 @@
-use core::borrow::Cow;
+use std::borrow::Cow;
 
 use iref::{Iri, IriError, IriRefBuf};
 
