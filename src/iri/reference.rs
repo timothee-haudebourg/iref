@@ -1,6 +1,9 @@
 use std::hash::{Hash, Hasher};
 
-use super::{Authority, AuthorityMut, Fragment, Path, PathBuf, PathMut, Query, Scheme, Segment};
+use super::{
+	Authority, AuthorityMut, Fragment, InvalidAuthority, InvalidFragment, InvalidPath,
+	InvalidQuery, Path, PathBuf, PathMut, Query, Scheme, Segment,
+};
 use crate::{
 	InvalidIri, InvalidUri, Iri, IriBuf, Uri, UriBuf, UriRef, UriRefBuf, uri::InvalidUriRef,
 };
@@ -548,6 +551,7 @@ mod tests {
 		for (relative, absolute) in &tests {
 			println!("{} => {}", relative, absolute);
 			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+			assert_eq!(base_iri.try_joined(relative).unwrap(), *absolute);
 		}
 	}
 
@@ -580,8 +584,9 @@ mod tests {
 		];
 
 		for (relative, absolute) in &tests {
-			// println!("{} => {}", relative, absolute);
+			println!("{} => {}", relative, absolute);
 			assert_eq!(IriRef::new(relative).unwrap().resolved(base_iri), *absolute);
+			assert_eq!(base_iri.try_joined(relative).unwrap(), *absolute);
 		}
 	}
 
@@ -598,6 +603,7 @@ mod tests {
 			println!("{} => {}", relative, absolute);
 			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
 			assert_eq!(buffer.as_str(), *absolute);
+			assert_eq!(base_iri.try_joined(relative).unwrap(), *absolute);
 		}
 	}
 
@@ -618,6 +624,7 @@ mod tests {
 			// println!("{} => {}", relative, absolute);
 			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
 			assert_eq!(buffer.as_str(), *absolute);
+			assert_eq!(base_iri.try_joined(relative).unwrap(), *absolute);
 		}
 	}
 
@@ -635,6 +642,7 @@ mod tests {
 			println!("{} => {}", relative, absolute);
 			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
 			assert_eq!(buffer.as_str(), *absolute);
+			assert_eq!(base_iri.try_joined(relative).unwrap(), *absolute);
 		}
 	}
 
@@ -648,6 +656,7 @@ mod tests {
 			// println!("{} => {}", relative, absolute);
 			let buffer: crate::IriBuf = IriRef::new(relative).unwrap().resolved(base_iri);
 			assert_eq!(buffer.as_str(), *absolute);
+			assert_eq!(base_iri.try_joined(relative).unwrap(), *absolute);
 		}
 	}
 

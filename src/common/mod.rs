@@ -71,6 +71,14 @@ macro_rules! borrowed {
 				let end = path_start + directory_path.len();
 				unsafe { Self::new_unchecked_from_bytes(&bytes[..end]) }
 			}
+
+			pub fn joined(&self, input: impl AsRef<$uri_ref>) -> $uri_buf {
+                input.as_ref().resolved(self)
+			}
+
+			pub fn try_joined<'r>(&self, input: &'r str) -> Result<$uri_buf, <&'r $uri_ref as TryFrom<&'r str>>::Error> {
+                $uri_ref::new(input).map(|r| self.joined(r))
+			}
 		}
 
 		impl PartialEq for $uri {
@@ -147,6 +155,58 @@ macro_rules! borrowed {
 			pub fn set_scheme(&mut self, new_scheme: &Scheme) {
 				let range = crate::common::parse::scheme(self.as_bytes(), 0);
 				unsafe { self.replace(range, new_scheme.as_bytes()) }
+			}
+
+			/// Joins the given relative
+			#[doc = $name]
+			/// to this absolute
+			#[doc = $name]
+			/// .
+			///
+			/// This is quivalent to `input.resolve(self)`.
+			pub fn join(&mut self, input: impl AsRef<$uri_ref>) {
+			    let input = input.as_ref();
+    			let parts = input.parts();
+
+                match parts.scheme {
+                    Some(scheme) => {
+                        self.set_scheme(scheme);
+        				self.set_authority(parts.authority);
+                        self.set_and_normalize_path(parts.path);
+                        self.set_query(parts.query);
+                        self.set_fragment(parts.fragment);
+                    }
+                    None => {
+                        match parts.authority {
+                            Some(authority) => {
+                                self.set_authority(Some(authority));
+                                self.set_and_normalize_path(parts.path);
+                                self.set_query(parts.query);
+                                self.set_fragment(parts.fragment);
+                            }
+                            None => {
+                                if parts.path.is_relative() && parts.path.is_empty() {
+                                    if let Some(query) = parts.query {
+                                        self.set_query(Some(query))
+                                    }
+                                } else if parts.path.is_absolute() {
+                                    self.set_query(parts.query);
+                                    self.set_and_normalize_path(parts.path);
+                                } else {
+                                    self.set_query(parts.query);
+                                    self.path_mut().append(parts.path);
+                                }
+
+                                self.set_fragment(parts.fragment);
+                            }
+                        }
+                    }
+                }
+			}
+
+			pub fn try_join<'r>(&mut self, input: &'r str) -> Result<(), <&'r $uri_ref as TryFrom<&'r str>>::Error> {
+				self.join($uri_ref::new(input)?);
+				Ok(())
 			}
 		}
 	};
@@ -257,8 +317,20 @@ macro_rules! owned_maybe_reference {
 				}
 			}
 
+			/// Tries to set the authority.
+			///
+			/// Same as [`Self::set_authority`] but accepts a `&str` instead of
+			/// an [`&Authority`](Authority).
+			pub fn try_set_authority<'s>(
+				&mut self,
+				authority: Option<&'s str>,
+			) -> Result<(), InvalidAuthority<&'s str>> {
+				self.set_authority(authority.map(TryInto::try_into).transpose()?);
+				Ok(())
+			}
+
 			#[inline]
-			pub fn path_mut(&mut self) -> PathMut {
+			pub fn path_mut(&mut self) -> PathMut<'_> {
 				let range = crate::common::parse::find_path(self.as_bytes(), 0);
 				unsafe { PathMut::new(self.as_mut_vec(), range.start, range.end) }
 			}
@@ -305,53 +377,22 @@ macro_rules! owned_maybe_reference {
 			/// ```
 			#[inline]
 			pub fn set_path(&mut self, path: &Path) {
-				let range = crate::common::parse::find_path(self.as_bytes(), 0);
+				self.path_mut().replace(path);
+			}
 
-				let has_authority = self.authority().is_some();
-				if !has_authority && path.as_bytes().starts_with(b"//") {
-					// AMBIGUITY: The URI `http:old/path` would become
-					//            `http://new_path`, but `//new_path` is not the
-					//            authority.
-					// SOLUTION:  We change `//new_path` to `/.//new_path`.
-					unsafe {
-						let start = range.start;
-						let actual_start = start + 2;
-						self.allocate(range, path.len() + 2);
-						let bytes = self.as_mut_vec();
-						bytes[start..actual_start].copy_from_slice(b"/.");
-						bytes[actual_start..(actual_start + path.len())]
-							.copy_from_slice(path.as_bytes())
-					}
-				} else if has_authority && path.is_relative() {
-					// VALIDITY: When an authority is present, the path must be
-					//           absolute.
-					unsafe {
-						let start = range.start;
-						let actual_start = start + 1;
-						self.allocate(range, path.len() + 1);
-						let bytes = self.as_mut_vec();
-						bytes[start] = b'/';
-						bytes[actual_start..(actual_start + path.len())]
-							.copy_from_slice(path.as_bytes())
-					}
-				} else if range.start == 0 && path.looks_like_scheme() {
-					// AMBIGUITY: The URI `old/path` would become `new:path`, but `new`
-					//            is not the scheme.
-					// SOLUTION:  We change `new:path` to `./new:path`.
-					unsafe {
-						let start = range.start;
-						let actual_start = start + 2;
-						self.allocate(range, path.len() + 2);
-						let bytes = self.as_mut_vec();
-						bytes[start..actual_start].copy_from_slice(b"./");
-						bytes[actual_start..(actual_start + path.len())]
-							.copy_from_slice(path.as_bytes())
-					}
-				} else {
-					unsafe {
-						self.replace(range, path.as_bytes());
-					}
-				}
+			/// Tries to set the path.
+			///
+			/// Same as [`Self::set_path`] but accepts a `&str` instead of
+			/// an [`&Path`](Path).
+			pub fn try_set_path<'s>(&mut self, path: &'s str) -> Result<(), InvalidPath<&'s str>> {
+				self.set_path(path.try_into()?);
+				Ok(())
+			}
+
+			/// Sets and normalizes the path.
+			pub fn set_and_normalize_path(&mut self, path: &Path) {
+				self.set_path(path);
+				self.path_mut().normalize();
 			}
 
 			#[inline]
@@ -378,6 +419,18 @@ macro_rules! owned_maybe_reference {
 				}
 			}
 
+			/// Tries to set the query part.
+			///
+			/// Same as [`Self::set_query`] but accepts a `&str` instead of
+			/// an [`&Query`](Query).
+			pub fn try_set_query<'s>(
+				&mut self,
+				query: Option<&'s str>,
+			) -> Result<(), InvalidQuery<&'s str>> {
+				self.set_query(query.map(TryInto::try_into).transpose()?);
+				Ok(())
+			}
+
 			#[inline]
 			pub fn set_fragment(&mut self, fragment: Option<&Fragment>) {
 				match fragment {
@@ -402,6 +455,18 @@ macro_rules! owned_maybe_reference {
 						}
 					}
 				}
+			}
+
+			/// Tries to set the fragment part.
+			///
+			/// Same as [`Self::set_fragment`] but accepts a `&str` instead of
+			/// an [`&Fragment`](Fragment).
+			pub fn try_set_fragment<'s>(
+				&mut self,
+				fragment: Option<&'s str>,
+			) -> Result<(), InvalidFragment<&'s str>> {
+				self.set_fragment(fragment.map(TryInto::try_into).transpose()?);
+				Ok(())
 			}
 		}
 	};

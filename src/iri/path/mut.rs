@@ -26,7 +26,7 @@ mod tests {
 			let mut path = PathBuf::new(path.to_string()).unwrap();
 			let mut path_mut = PathMut::from_path(&mut path);
 			let segment = Segment::new(&segment).unwrap();
-			path_mut.push(segment);
+			path_mut.lazy_push(segment);
 			assert_eq!(path_mut.as_str(), expected)
 		}
 	}
