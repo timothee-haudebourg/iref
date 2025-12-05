@@ -78,34 +78,9 @@ macro_rules! path_mut_impl {
 
 			/// Add a segment at the end of the path.
 			///
-			/// # Ambiguities
-			///
-			/// Adding a segment to an empty path may introduce ambiguities in several
-			/// cases. Here is how this function deals with those cases.
-			///
-			/// ## Empty segment
-			///
-			/// Adding an empty segment on an empty path may add ambiguity in two
-			/// cases:
-			/// 1. if the path is relative, adding a `/` would make the path
-			///    absolute (e.g. `scheme:` becomes `scheme:/`) ;
-			/// 2. if the path is absolute adding a `/` would add two empty segments
-			///    (e.g. `scheme:/` becomes `scheme://`), and it may be confused with an
-			///    authority part ;
-			///
-			/// To avoid such ambiguity, in both cases this function will add a `.`
-			/// segment to the path, preserving its semantics:
-			/// 1. `scheme:` becomes `scheme:./` instead of `scheme:/` ;
-			/// 2. `scheme:/` becomes `scheme:/./` instead of `scheme://`.
-			///
-			/// ## Segment containing a `:`
-			///
-			/// If the path does not follow a scheme and/or authority part, a `:` in
-			/// the first segment may be confused with a scheme separator
-			/// (e.g. `looks-like-a-scheme:rest`).
-			/// To avoid such ambiguity, this function will add a `.` segment to the
-			/// path, preserving its semantics (e.g. `./looks-like-a-scheme:rest`).
-			pub fn push(&mut self, segment: &super::Segment) {
+			/// Same as [`Self::push`] but does not interpret the `.` and `..`
+			/// segments. They will be added literaly to the path.
+			pub fn lazy_push(&mut self, segment: &super::Segment) {
 				// Disambiguate if the path is empty and one of the following is true:
 				// - `segment` looks like a scheme and path is a the start.
 				// - `segment` is empty, path is absolute and following an authority.
@@ -143,6 +118,156 @@ macro_rules! path_mut_impl {
 				}
 			}
 
+			/// Adds a segment at the end of the path.
+			///
+			/// Same as [`Self::lazy_push`] but accepts a `&str` instead of a
+			/// [`&Segment`](super::Segment). Returns an error if the input
+			/// string is not a valid path segment.
+			pub fn try_lazy_push<'s>(
+				&mut self,
+				segment: &'s str,
+			) -> Result<(), super::InvalidSegment<&'s str>> {
+				self.lazy_push(segment.try_into()?);
+				Ok(())
+			}
+
+			/// Push the given segment to this path using the `.` and `..` segments
+			/// semantics.
+			///
+			/// Returns wether or not a special segment has been pushed and
+			/// should be followed by an empty segment when doing reference
+			/// resolution.
+			#[inline]
+			pub(crate) fn push_inner(&mut self, segment: &super::Segment) -> bool {
+				match segment.as_bytes() {
+					CURRENT_SEGMENT => true,
+					PARENT_SEGMENT => {
+						self.pop();
+						true
+					}
+					_ => {
+						if !segment.is_empty() || !self.is_empty() {
+							self.lazy_push(segment);
+						}
+
+						false
+					}
+				}
+			}
+
+			/// Adds a segment at the end of the path.
+			///
+			/// # Ambiguities
+			///
+			/// Adding a segment to an empty path may introduce ambiguities in several
+			/// cases. Here is how this function deals with those cases.
+			///
+			/// ## Empty segment
+			///
+			/// Adding an empty segment on an empty path may add ambiguity in two
+			/// cases:
+			/// 1. if the path is relative, adding a `/` would make the path
+			///    absolute (e.g. `scheme:` becomes `scheme:/`) ;
+			/// 2. if the path is absolute adding a `/` would add two empty segments
+			///    (e.g. `scheme:/` becomes `scheme://`), and it may be confused with an
+			///    authority part ;
+			///
+			/// To avoid such ambiguity, in both cases this function will add a `.`
+			/// segment to the path, preserving its semantics:
+			/// 1. `scheme:` becomes `scheme:./` instead of `scheme:/` ;
+			/// 2. `scheme:/` becomes `scheme:/./` instead of `scheme://`.
+			///
+			/// ## Segment containing a `:`
+			///
+			/// If the path does not follow a scheme and/or authority part, a `:` in
+			/// the first segment may be confused with a scheme separator
+			/// (e.g. `looks-like-a-scheme:rest`).
+			/// To avoid such ambiguity, this function will add a `.` segment to the
+			/// path, preserving its semantics (e.g. `./looks-like-a-scheme:rest`).
+			///
+			/// ## `.` and `..`
+			///
+			/// This method will interpret `.` and `..` such that pushing `.`
+			/// has no effect, and `..` is equivalent to [`Self::pop`].
+			/// Use [`Self::lazy_push`] to not interpret those segments.
+			#[inline]
+			pub fn push(&mut self, segment: &super::Segment) {
+				if self.push_inner(segment) && !self.is_empty() {
+					self.lazy_push(super::Segment::EMPTY)
+				}
+			}
+
+			/// Pushes the given segment to this path using the `.` and `..` segments
+			/// semantics.
+			///
+			/// Same as [`Self::push`] but accepts a `&str` instead of
+			/// a [`&Segment`](super::Segment). Returns an error if the input
+			/// string is not a valid path segment.
+			#[inline]
+			pub fn try_push<'s>(
+				&mut self,
+				segment: &'s str,
+			) -> Result<(), super::InvalidSegment<&'s str>> {
+				self.push(segment.try_into()?);
+				Ok(())
+			}
+
+			/// Append the given path to this path using the `.` and `..` segments semantics.
+			///
+			/// Note that this does not normalize the segments already in the path.
+			/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
+			/// `a/` because the semantics of `..` is applied on the last `.` in the path.
+			#[inline]
+			pub fn append<'s, S: IntoIterator<Item = &'s super::Segment>>(&mut self, path: S) {
+				let mut open = false;
+				for segment in path {
+					open = self.push_inner(segment);
+				}
+
+				if open && !self.is_empty() {
+					self.lazy_push(super::Segment::EMPTY)
+				}
+			}
+
+			/// Append the given path to this path using the `.` and `..` segments semantics.
+			///
+			/// Note that this does not normalize the segments already in the path.
+			/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
+			/// `a/` because the semantics of `..` is applied on the last `.` in the path.
+			///
+			/// Same as [`Self::append`], but accepts `&str` instead of
+			/// [`&Segment`](super::Segment). Returns an error if one item is
+			/// not a valid segment.
+			#[inline]
+			pub fn try_append<'s, S: IntoIterator<Item = &'s str>>(
+				&mut self,
+				path: S,
+			) -> Result<(), super::InvalidSegment<&'s str>> {
+				let mut open = false;
+				for segment in path {
+					open = self.push_inner(segment.try_into()?);
+				}
+
+				if open && !self.is_empty() {
+					self.lazy_push(super::Segment::EMPTY)
+				}
+
+				Ok(())
+			}
+
+			/// Joins this path to the given path.
+			///
+			/// If the input path is absolute, this is equivalent to
+			/// [`Self::replace`]. If the input path is relative, this is
+			/// equivalent to [`Self::append`].
+			pub fn join(&mut self, path: &super::Path) {
+				if path.is_absolute() {
+					self.replace(path);
+				} else {
+					self.append(path);
+				}
+			}
+
 			/// Pop the last non-`..` segment of the path.
 			///
 			/// If the path is empty and relative, or ends in `..`, then a `..` segment
@@ -153,7 +278,7 @@ macro_rules! path_mut_impl {
 				let is_empty = self.is_empty();
 
 				if (is_empty && self.is_relative()) || self.last() == Some(super::Segment::PARENT) {
-					self.push(super::Segment::PARENT);
+					self.lazy_push(super::Segment::PARENT);
 					true
 				} else if !is_empty {
 					let start = self.first_segment_offset();
@@ -177,56 +302,46 @@ macro_rules! path_mut_impl {
 				self.end = start
 			}
 
-			/// Push the given segment to this path using the `.` and `..` segments
-			/// semantics.
-			///
-			/// Returns wether or not a special segment has been pushed and
-			/// should be followed by an empty segment when doing reference
-			/// resolution.
-			#[inline]
-			pub(crate) fn push_inner(&mut self, segment: &super::Segment) -> bool {
-				match segment.as_bytes() {
-					CURRENT_SEGMENT => true,
-					PARENT_SEGMENT => {
-						self.pop();
-						true
-					}
-					_ => {
-						if !segment.is_empty() || !self.is_empty() {
-							self.push(segment);
-						}
+			pub fn replace(&mut self, path: &super::Path) {
+				let range = self.start..self.end;
 
-						false
-					}
-				}
-			}
-
-			/// Push the given segment to this path using the `.` and `..` segments
-			/// semantics.
-			#[inline]
-			pub fn symbolic_push(&mut self, segment: &super::Segment) {
-				if self.symbolic_push_inner(segment) && !self.is_empty() {
-					self.push(super::Segment::EMPTY)
-				}
-			}
-
-			/// Append the given path to this path using the `.` and `..` segments semantics.
-			///
-			/// Note that this does not normalize the segments already in the path.
-			/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
-			/// `a/` because the semantics of `..` is applied on the last `.` in the path.
-			#[inline]
-			pub fn symbolic_append<'s, S: IntoIterator<Item = &'s super::Segment>>(
-				&mut self,
-				path: S,
-			) {
-				let mut open = false;
-				for segment in path {
-					open = self.push_inner(segment.try_into()?);
-				}
-
-				if open && !self.is_empty() {
-					self.push(super::Segment::EMPTY)
+				let has_authority = self.follows_authority;
+				if !has_authority && path.as_bytes().starts_with(b"//") {
+					// AMBIGUITY: The URI `http:old/path` would become
+					//            `http://new_path`, but `//new_path` is not the
+					//            authority.
+					// SOLUTION:  We change `//new_path` to `/.//new_path`.
+					let start = range.start;
+					let actual_start = start + 2;
+					crate::utils::allocate_range(self.buffer, range, path.len() + 2);
+					self.buffer[start..actual_start].copy_from_slice(b"/.");
+					self.buffer[actual_start..(actual_start + path.len())]
+						.copy_from_slice(path.as_bytes());
+					self.end = self.start + path.len() + 2;
+				} else if has_authority && path.is_relative() {
+					// VALIDITY: When an authority is present, the path must be
+					//           absolute.
+					let start = range.start;
+					let actual_start = start + 1;
+					crate::utils::allocate_range(self.buffer, range, path.len() + 1);
+					self.buffer[start] = b'/';
+					self.buffer[actual_start..(actual_start + path.len())]
+						.copy_from_slice(path.as_bytes());
+					self.end = self.start + path.len() + 1;
+				} else if range.start == 0 && path.looks_like_scheme() {
+					// AMBIGUITY: The URI `old/path` would become `new:path`, but `new`
+					//            is not the scheme.
+					// SOLUTION:  We change `new:path` to `./new:path`.
+					let start = range.start;
+					let actual_start = start + 2;
+					crate::utils::allocate_range(self.buffer, range, path.len() + 2);
+					self.buffer[start..actual_start].copy_from_slice(b"./");
+					self.buffer[actual_start..(actual_start + path.len())]
+						.copy_from_slice(path.as_bytes());
+					self.end = self.start + path.len() + 2;
+				} else {
+					crate::utils::replace(self.buffer, range, path.as_bytes());
+					self.end = self.start + path.len();
 				}
 			}
 

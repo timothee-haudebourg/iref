@@ -57,6 +57,13 @@ macro_rules! reference {
 					.map(|range| unsafe { Scheme::new_unchecked_from_bytes(&bytes[range]) })
 			}
 
+			/// Adds the given scheme to the reference, turning it into an
+			#[doc = $name]
+			/// .
+			pub fn with_scheme(&self, scheme: &Scheme) -> $uri_buf {
+			    self.to_owned().into_with_scheme(scheme)
+			}
+
 			/// Returns the authority part of the IRI reference, if any.
 			pub fn authority(&self) -> Option<&Authority> {
 				let bytes = self.as_bytes();
@@ -131,11 +138,11 @@ macro_rules! reference {
 				}
 
 				for _segment in base_segments {
-					result.path_mut().push(Segment::PARENT);
+					result.path_mut().lazy_push(Segment::PARENT);
 				}
 
 				for segment in self_segments {
-					result.path_mut().push(segment)
+					result.path_mut().lazy_push(segment)
 				}
 
 				if (self.query().is_some() || self.fragment().is_some())
@@ -195,14 +202,33 @@ macro_rules! reference {
 				unsafe { Self::new_unchecked_from_bytes(&bytes[..end]) }
 			}
 
-			/// Resolve the URI reference against the given *base URI*.
+			/// Resolves the
+			#[doc = $name]
+			/// reference against the given
+			#[doc = concat!("*base ", $name, "*.")]
 			///
-			/// Return the resolved URI.
-			/// See the [`UriRefBuf::resolve`] method for more information about the resolution process.
+			/// See the
+			#[doc = concat!("[`", stringify!($uri_ref_buf), "::resolve`]")]
+			/// method for more information about
+			/// the resolution process.
 			#[inline]
 			pub fn resolved(&self, base_iri: impl AsRef<$uri>) -> $uri_buf {
 				let iri_ref = self.to_owned();
 				iri_ref.into_resolved(base_iri)
+			}
+
+			/// Resolves the
+			#[doc = $name]
+			/// reference against the given
+			#[doc = concat!("*base ", $name, "*.")]
+			///
+			/// Same as [`Self::resolved`] but accepts a `&str` instead of an
+			#[doc = $name]
+			/// . Returns an error if the input is not a valid
+			#[doc = $name]
+			/// .
+			pub fn try_resolved<'r>(&self, base_iri: &'r str) -> Result<$uri_buf, <&'r $uri as TryFrom<&'r str>>::Error> {
+			    $uri::new(base_iri).map(|u| self.resolved(u))
 			}
 		}
 
@@ -269,13 +295,46 @@ macro_rules! reference {
 				}
 			}
 
+			/// Tries to set the scheme part.
+			///
+			/// Same [`Self::set_scheme`] but accepts an `&str` instead of a
+			/// [`&Scheme`](Scheme). Returns an error if the input string is not
+			/// a valid scheme.
+			pub fn try_set_scheme<'s>(&mut self, scheme: Option<&'s str>) -> Result<(), super::InvalidScheme<&'s str>> {
+			    self.set_scheme(scheme.map(TryInto::try_into).transpose()?);
+				Ok(())
+			}
+
+			/// Adds the given scheme to the reference, turning it into an
+			#[doc = $name]
+			/// .
+			pub fn into_with_scheme(mut self, scheme: &Scheme) -> $uri_buf {
+			    self.set_scheme(Some(scheme));
+				unsafe { $uri_buf::new_unchecked(self.0) }
+			}
+
+			/// Tries to add the given scheme to the reference, turning it into
+			/// an
+			#[doc = $name]
+			/// .
+			///
+			/// Same [`Self::into_with_scheme`] but accepts an `&str` instead of
+			/// a [`&Scheme`](Scheme). Returns an error if the input string is
+			/// not a valid scheme.
+			pub fn try_into_with_scheme<'s>(mut self, scheme: &'s str) -> Result<$uri_buf, (Self, super::InvalidScheme<&'s str>)> {
+			    match self.try_set_scheme(Some(scheme)) {
+					Ok(_) => Ok(unsafe { $uri_buf::new_unchecked(self.0) }),
+					Err(e) => Err((self, e))
+				}
+			}
+
 			/// Resolve the URI/IRI reference.
 			///
 			/// ## Abnormal use of dot segments.
 			///
 			/// See <https://www.rfc-editor.org/errata/eid4547>
 			pub fn resolve(&mut self, base_iri: impl AsRef<$uri>) {
-				let base_iri = base_iri.as_ref();
+			    let base_iri = base_iri.as_ref();
 				let parts = crate::common::parse::reference_parts(self.as_bytes(), 0);
 
 				if parts.scheme.is_some() {
@@ -302,22 +361,34 @@ macro_rules! reference {
 						if base_iri.authority().is_some() && base_iri.path().is_empty() {
 							path_buffer.set_path(Path::EMPTY_ABSOLUTE);
 						} else {
-							path_buffer.set_path(base_iri.path().parent_or_empty());
+						    path_buffer.set_path(base_iri.path().parent_or_empty());
 							path_buffer.path_mut().normalize();
 						}
 
 						path_buffer
 							.path_mut()
-							.symbolic_append(self.path().segments());
+							.append(self.path().segments());
 
 						self.set_path(path_buffer.path());
 					}
 				}
 			}
 
+			pub fn try_resolve<'r>(&mut self, base_iri: &'r str) -> Result<(), <&'r $uri as TryFrom<&'r str>>::Error> {
+			    self.resolve($uri::new(base_iri)?);
+				Ok(())
+			}
+
 			pub fn into_resolved(mut self, base_iri: impl AsRef<$uri>) -> $uri_buf {
 				self.resolve(base_iri);
 				unsafe { <$uri_buf>::new_unchecked(self.into_bytes()) }
+			}
+
+			pub fn try_into_resolved<'r>(mut self, base_iri: &'r str) -> Result<$uri_buf, (Self, <&'r $uri as TryFrom<&'r str>>::Error)> {
+				match self.try_resolve(base_iri) {
+    				Ok(_) => Ok(unsafe { <$uri_buf>::new_unchecked(self.into_bytes()) }),
+    				Err(e) => Err((self, e))
+				}
 			}
 		}
 	};

@@ -2,7 +2,10 @@ use std::hash::{self, Hash};
 
 use crate::{InvalidIri, InvalidUri, Iri, IriBuf, IriRef, IriRefBuf, Uri, UriBuf};
 
-use super::{Authority, AuthorityMut, Fragment, Path, PathBuf, PathMut, Query, Scheme, Segment};
+use super::{
+	Authority, AuthorityMut, Fragment, InvalidAuthority, InvalidFragment, InvalidPath,
+	InvalidQuery, Path, PathBuf, PathMut, Query, Scheme, Segment,
+};
 
 crate::common::reference!("URI": Uri, UriBuf, UriRef, UriRefBuf);
 

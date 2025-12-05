@@ -1,3 +1,5 @@
+use super::{InvalidHost, InvalidPort, InvalidUserInfo};
+
 crate::common::authority_mut!();
 
 #[cfg(test)]

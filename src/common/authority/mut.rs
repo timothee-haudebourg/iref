@@ -16,6 +16,7 @@ macro_rules! authority_mut {
 			///
 			/// The buffer content between the range `start..end` must be a valid
 			/// authority.
+			#[inline]
 			pub unsafe fn new(data: &'a mut Vec<u8>, start: usize, end: usize) -> Self {
 				Self { data, start, end }
 			}
@@ -28,16 +29,24 @@ macro_rules! authority_mut {
 				crate::utils::allocate_range(self.data, range, len)
 			}
 
+			#[inline]
 			pub fn as_authority(&self) -> &super::Authority {
 				unsafe {
 					super::Authority::new_unchecked_from_bytes(&self.data[self.start..self.end])
 				}
 			}
 
+			#[inline]
 			pub fn into_authority(self) -> &'a super::Authority {
 				unsafe {
 					super::Authority::new_unchecked_from_bytes(&self.data[self.start..self.end])
 				}
+			}
+
+			#[inline]
+			pub fn replace(&mut self, other: &super::Authority) {
+				self.replace_bytes(self.start..self.end, other.as_bytes());
+				self.end = self.start + other.len();
 			}
 
 			#[inline]
@@ -69,6 +78,15 @@ macro_rules! authority_mut {
 						}
 					}
 				}
+			}
+
+			#[inline]
+			pub fn try_set_userinfo<'s>(
+				&mut self,
+				userinfo: Option<&'s str>,
+			) -> Result<(), InvalidUserInfo<&'s str>> {
+				self.set_userinfo(userinfo.map(TryInto::try_into).transpose()?);
+				Ok(())
 			}
 
 			#[inline]
@@ -115,6 +133,15 @@ macro_rules! authority_mut {
 						}
 					}
 				}
+			}
+
+			#[inline]
+			pub fn try_set_port<'s>(
+				&mut self,
+				port: Option<&'s str>,
+			) -> Result<(), InvalidPort<&'s str>> {
+				self.set_port(port.map(TryInto::try_into).transpose()?);
+				Ok(())
 			}
 		}
 

@@ -205,7 +205,7 @@ macro_rules! path_impl {
 				}
 
 				if open && !result.is_empty() {
-					result.as_path_mut().push(Segment::EMPTY)
+					result.as_path_mut().lazy_push(Segment::EMPTY)
 				}
 
 				result
@@ -350,7 +350,7 @@ macro_rules! path_impl {
 						(Some(self_seg), Some(prefix_seg))
 							if self_seg.as_pct_str() == prefix_seg.as_pct_str() => {}
 						(_, Some(_)) => return None,
-						(Some(seg), None) => buf.as_path_mut().push(seg),
+						(Some(seg), None) => buf.as_path_mut().lazy_push(seg),
 						(None, None) => break,
 					}
 				}
@@ -567,12 +567,12 @@ macro_rules! path_impl {
 				unsafe { self.0.as_mut_vec() }
 			}
 
-			pub fn as_path_mut(&mut self) -> PathMut {
+			pub fn as_path_mut(&mut self) -> PathMut<'_> {
 				PathMut::from_path(self)
 			}
 
-			pub fn push(&mut self, segment: &Segment) {
-				self.as_path_mut().push(segment)
+			pub fn lazy_push(&mut self, segment: &Segment) {
+				self.as_path_mut().lazy_push(segment)
 			}
 
 			/// Pop the last non-`..` segment of the path.
@@ -590,7 +590,7 @@ macro_rules! path_impl {
 			/// Push the given segment to this path using the `.` and `..` segments semantics.
 			#[inline]
 			pub fn symbolic_push(&mut self, segment: &Segment) {
-				self.as_path_mut().symbolic_push(segment)
+				self.as_path_mut().push(segment)
 			}
 
 			/// Append the given path to this path using the `.` and `..` segments semantics.
@@ -599,8 +599,8 @@ macro_rules! path_impl {
 			/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
 			/// `a/` because the semantics of `..` is applied on the last `.` in the path.
 			#[inline]
-			pub fn symbolic_append<'s, P: IntoIterator<Item = &'s Segment>>(&mut self, path: P) {
-				self.as_path_mut().symbolic_append(path)
+			pub fn append<'s, P: IntoIterator<Item = &'s Segment>>(&mut self, path: P) {
+				self.as_path_mut().append(path)
 			}
 
 			#[inline]
