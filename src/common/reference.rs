@@ -321,7 +321,7 @@ macro_rules! reference {
 			/// Same [`Self::into_with_scheme`] but accepts an `&str` instead of
 			/// a [`&Scheme`](Scheme). Returns an error if the input string is
 			/// not a valid scheme.
-			pub fn try_into_with_scheme<'s>(mut self, scheme: &'s str) -> Result<$uri_buf, (Self, super::InvalidScheme<&'s str>)> {
+			pub fn try_into_with_scheme(mut self, scheme: &str) -> Result<$uri_buf, (Self, super::InvalidScheme<&str>)> {
 			    match self.try_set_scheme(Some(scheme)) {
 					Ok(_) => Ok(unsafe { $uri_buf::new_unchecked(self.0) }),
 					Err(e) => Err((self, e))
@@ -384,7 +384,7 @@ macro_rules! reference {
 				unsafe { <$uri_buf>::new_unchecked(self.into_bytes()) }
 			}
 
-			pub fn try_into_resolved<'r>(mut self, base_iri: &'r str) -> Result<$uri_buf, (Self, <&'r $uri as TryFrom<&'r str>>::Error)> {
+			pub fn try_into_resolved(mut self, base_iri: &str) -> Result<$uri_buf, (Self, <&$uri as TryFrom<&str>>::Error)> {
 				match self.try_resolve(base_iri) {
     				Ok(_) => Ok(unsafe { <$uri_buf>::new_unchecked(self.into_bytes()) }),
     				Err(e) => Err((self, e))
