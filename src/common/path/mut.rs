@@ -180,10 +180,11 @@ macro_rules! path_mut_impl {
 			/// Push the given segment to this path using the `.` and `..` segments
 			/// semantics.
 			///
-			/// Returns wether or not a special segment has been push and should be
-			/// followed by an empty segment when doing reference resolution.
+			/// Returns wether or not a special segment has been pushed and
+			/// should be followed by an empty segment when doing reference
+			/// resolution.
 			#[inline]
-			pub(crate) fn symbolic_push_inner(&mut self, segment: &super::Segment) -> bool {
+			pub(crate) fn push_inner(&mut self, segment: &super::Segment) -> bool {
 				match segment.as_bytes() {
 					CURRENT_SEGMENT => true,
 					PARENT_SEGMENT => {
@@ -221,7 +222,7 @@ macro_rules! path_mut_impl {
 			) {
 				let mut open = false;
 				for segment in path {
-					open = self.symbolic_push_inner(segment);
+					open = self.push_inner(segment.try_into()?);
 				}
 
 				if open && !self.is_empty() {
@@ -233,6 +234,7 @@ macro_rules! path_mut_impl {
 			pub fn normalize(&mut self) {
 				let mut buffer: smallvec::SmallVec<[u8; NORMALIZE_IN_PLACE_BUFFER_LEN]> =
 					smallvec::SmallVec::new();
+
 				for (i, segment) in self.normalized_segments().enumerate() {
 					if i > 0 {
 						buffer.push(b'/')

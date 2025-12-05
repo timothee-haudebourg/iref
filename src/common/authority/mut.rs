@@ -20,13 +20,11 @@ macro_rules! authority_mut {
 				Self { data, start, end }
 			}
 
-			#[inline]
-			fn replace(&mut self, range: core::ops::Range<usize>, content: &[u8]) {
+			fn replace_bytes(&mut self, range: core::ops::Range<usize>, content: &[u8]) {
 				crate::utils::replace(self.data, range, content)
 			}
 
-			#[inline]
-			fn allocate(&mut self, range: core::ops::Range<usize>, len: usize) {
+			fn allocate_bytes(&mut self, range: core::ops::Range<usize>, len: usize) {
 				crate::utils::allocate_range(self.data, range, len)
 			}
 
@@ -50,11 +48,11 @@ macro_rules! authority_mut {
 					Some(new_userinfo) => {
 						match crate::common::parse::find_user_info(bytes, self.start) {
 							Some(userinfo_range) => {
-								self.replace(userinfo_range, new_userinfo.as_bytes())
+								self.replace_bytes(userinfo_range, new_userinfo.as_bytes())
 							}
 							None => {
 								let added_len = new_userinfo.len() + 1;
-								self.allocate(self.start..self.start, added_len);
+								self.allocate_bytes(self.start..self.start, added_len);
 								self.data[self.start..(self.start + new_userinfo.len())]
 									.copy_from_slice(new_userinfo.as_bytes());
 								self.data[self.start + new_userinfo.len()] = b'@';
@@ -66,7 +64,7 @@ macro_rules! authority_mut {
 						if let Some(userinfo_range) =
 							crate::common::parse::find_user_info(bytes, self.start)
 						{
-							self.replace(userinfo_range.start..(userinfo_range.end + 1), b"");
+							self.replace_bytes(userinfo_range.start..(userinfo_range.end + 1), b"");
 							self.end -= userinfo_range.end - userinfo_range.start;
 						}
 					}
@@ -85,7 +83,13 @@ macro_rules! authority_mut {
 					self.end -= host.len() - host_len
 				}
 
-				self.replace(range, host.as_bytes());
+				self.replace_bytes(range, host.as_bytes());
+			}
+
+			#[inline]
+			pub fn try_set_host<'s>(&mut self, host: &'s str) -> Result<(), InvalidHost<&'s str>> {
+				self.set_host(host.try_into()?);
+				Ok(())
 			}
 
 			#[inline]
@@ -93,10 +97,10 @@ macro_rules! authority_mut {
 				let bytes = &self.data[..self.end];
 				match port {
 					Some(new_port) => match crate::common::parse::find_port(bytes, self.start) {
-						Some(range) => self.replace(range, new_port.as_bytes()),
+						Some(range) => self.replace_bytes(range, new_port.as_bytes()),
 						None => {
 							let added_len = new_port.len() + 1;
-							self.allocate(self.end..self.end, added_len);
+							self.allocate_bytes(self.end..self.end, added_len);
 							self.data[self.end] = b':';
 							self.data[(self.end + 1)..(self.end + added_len)]
 								.copy_from_slice(new_port.as_bytes());
@@ -106,7 +110,7 @@ macro_rules! authority_mut {
 					None => {
 						if let Some(port_range) = crate::common::parse::find_port(bytes, self.start)
 						{
-							self.replace((port_range.start - 1)..port_range.end, b"");
+							self.replace_bytes((port_range.start - 1)..port_range.end, b"");
 							self.end -= port_range.end - port_range.start;
 						}
 					}
