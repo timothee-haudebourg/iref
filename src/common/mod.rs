@@ -21,7 +21,7 @@ macro_rules! borrowed {
 		pub struct $uri(str);
 
 		impl $uri {
-			pub fn parts(&self) -> Parts {
+			pub fn parts(&self) -> Parts<'_> {
 				let bytes = self.as_bytes();
 				let ranges = crate::common::parse::parts(bytes, 0);
 
@@ -168,7 +168,7 @@ macro_rules! owned_maybe_reference {
 			}
 
 			#[inline]
-			pub fn authority_mut(&mut self) -> Option<AuthorityMut> {
+			pub fn authority_mut(&mut self) -> Option<AuthorityMut<'_>> {
 				crate::common::parse::find_authority(self.as_bytes(), 0)
 					.ok()
 					.map(|range| unsafe {

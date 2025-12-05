@@ -53,9 +53,11 @@ crate::common::borrowed! {
 #[macro_export]
 macro_rules! iri {
 	($value:literal) => {
-		match $crate::iri::Iri::from_str($value) {
-			Ok(value) => value,
-			Err(_) => panic!("invalid IRI"),
+		const {
+			match $crate::iri::Iri::from_str($value) {
+				Ok(value) => value,
+				Err(_) => panic!("invalid IRI"),
+			}
 		}
 	};
 }

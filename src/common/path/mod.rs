@@ -169,7 +169,7 @@ macro_rules! path_impl {
 			/// [`Self::normalized_segments`] to iterate over the normalized segments
 			/// of a path.
 			#[inline]
-			pub fn segments(&self) -> Segments {
+			pub fn segments(&self) -> Segments<'_> {
 				if self.is_empty() {
 					Segments::Empty
 				} else {
@@ -187,7 +187,7 @@ macro_rules! path_impl {
 			/// the usual path semantics for dot segments. This may be expensive for
 			/// large paths since it will need to internally normalize the path first.
 			#[inline]
-			pub fn normalized_segments(&self) -> NormalizedSegments {
+			pub fn normalized_segments(&self) -> NormalizedSegments<'_> {
 				NormalizedSegments::new(self)
 			}
 
@@ -201,7 +201,7 @@ macro_rules! path_impl {
 
 				let mut open = false;
 				for segment in self.segments() {
-					open = result.as_path_mut().symbolic_push_inner(segment)
+					open = result.as_path_mut().push_inner(segment)
 				}
 
 				if open && !result.is_empty() {

@@ -10,7 +10,7 @@ macro_rules! authority {
 		pub struct Authority(str);
 
 		impl Authority {
-			pub fn parts(&self) -> AuthorityParts {
+			pub fn parts(&self) -> AuthorityParts<'_> {
 				let bytes = self.as_bytes();
 
 				let (user_info, host) = match crate::common::parse::user_info_or_host(bytes, 0) {

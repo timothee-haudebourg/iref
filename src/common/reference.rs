@@ -28,7 +28,7 @@ macro_rules! reference {
 		impl $uri_ref {
 			pub const EMPTY: &'static Self = unsafe { Self::new_unchecked("") };
 
-			pub fn parts(&self) -> Parts {
+			pub fn parts(&self) -> Parts<'_> {
 				let bytes = self.as_bytes();
 				let ranges = crate::common::parse::reference_parts(bytes, 0);
 
@@ -295,6 +295,7 @@ macro_rules! reference {
 						self.path_mut().normalize();
 					} else {
 						self.set_authority(base_iri.authority());
+
 						let mut path_buffer = <$uri_buf>::from_scheme(base_iri.scheme().to_owned()); // we set the scheme to avoid path disambiguation.
 						path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
 
