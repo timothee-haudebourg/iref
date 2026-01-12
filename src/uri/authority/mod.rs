@@ -98,6 +98,77 @@ pub struct AuthorityParts<'a> {
 	pub port: Option<&'a Port>,
 }
 
+impl AuthorityBuf {
+	pub fn as_authority_mut(&mut self) -> AuthorityMut<'_> {
+		let len = self.0.len();
+		unsafe { AuthorityMut::new_unchecked(self.0.as_mut_vec(), 0..len) }
+	}
+
+	/// Replaces the value.
+	#[inline]
+	pub fn replace(&mut self, other: &Authority) -> &mut Self {
+		self.as_authority_mut().replace(other);
+		self
+	}
+
+	#[inline]
+	pub fn try_replace<'s>(
+		&mut self,
+		other: &'s str,
+	) -> Result<&mut Self, InvalidAuthority<&'s str>> {
+		self.as_authority_mut().try_replace(other)?;
+		Ok(self)
+	}
+
+	#[inline]
+	pub fn set_user_info(&mut self, user_info: Option<&UserInfo>) -> &mut Self {
+		self.as_authority_mut().set_user_info(user_info);
+		self
+	}
+
+	#[inline]
+	pub fn try_set_user_info<'s>(
+		&mut self,
+		user_info: Option<&'s str>,
+	) -> Result<&mut Self, InvalidUserInfo<&'s str>> {
+		self.as_authority_mut().try_set_user_info(user_info)?;
+		Ok(self)
+	}
+
+	#[inline]
+	pub fn set_host(&mut self, host: &Host) -> &mut Self {
+		self.as_authority_mut().set_host(host);
+		self
+	}
+
+	#[inline]
+	pub fn try_set_host<'s>(&mut self, host: &'s str) -> Result<&mut Self, InvalidHost<&'s str>> {
+		self.as_authority_mut().try_set_host(host)?;
+		Ok(self)
+	}
+
+	#[inline]
+	pub fn set_port(&mut self, port: Option<&Port>) -> &mut Self {
+		self.as_authority_mut().set_port(port);
+		self
+	}
+
+	#[inline]
+	pub fn set_port_u32(&mut self, port: Option<u32>) -> &mut Self {
+		self.as_authority_mut().set_port_u32(port);
+		self
+	}
+
+	#[inline]
+	pub fn try_set_port<'s>(
+		&mut self,
+		port: Option<&'s str>,
+	) -> Result<&mut Self, InvalidPort<&'s str>> {
+		self.as_authority_mut().try_set_port(port)?;
+		Ok(self)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::Uri;
