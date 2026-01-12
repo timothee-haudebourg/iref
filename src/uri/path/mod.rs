@@ -570,8 +570,18 @@ impl PathBuf {
 		PathMut::from_path(self)
 	}
 
-	pub fn lazy_push(&mut self, segment: &Segment) {
+	pub fn lazy_push(&mut self, segment: &Segment) -> &mut Self {
 		self.as_path_mut().lazy_push(segment);
+		self
+	}
+
+	/// Pop the last non-`..` segment of the path.
+	///
+	/// If the path is empty or ends in `..`, then a `..` segment
+	/// will be added instead.
+	pub fn try_pop(&mut self) -> Result<&mut Self, EmptyPath> {
+		self.as_path_mut().try_pop()?;
+		Ok(self)
 	}
 
 	/// Pop the last non-`..` segment of the path.
@@ -582,14 +592,16 @@ impl PathBuf {
 		self.as_path_mut().try_pop().is_ok()
 	}
 
-	pub fn clear(&mut self) {
+	pub fn clear(&mut self) -> &mut Self {
 		self.as_path_mut().clear();
+		self
 	}
 
 	/// Push the given segment to this path using the `.` and `..` segments semantics.
 	#[inline]
-	pub fn symbolic_push(&mut self, segment: &Segment) {
+	pub fn symbolic_push(&mut self, segment: &Segment) -> &mut Self {
 		self.as_path_mut().push(segment);
+		self
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
@@ -598,8 +610,9 @@ impl PathBuf {
 	/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
 	#[inline]
-	pub fn append<'s, P: IntoIterator<Item = &'s Segment>>(&mut self, path: P) {
+	pub fn append<'s, P: IntoIterator<Item = &'s Segment>>(&mut self, path: P) -> &mut Self {
 		self.as_path_mut().append(path);
+		self
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
@@ -611,14 +624,15 @@ impl PathBuf {
 	pub fn try_append<'s, P: IntoIterator<Item = &'s str>>(
 		&mut self,
 		path: P,
-	) -> Result<(), InvalidSegment<&'s str>> {
+	) -> Result<&mut Self, InvalidSegment<&'s str>> {
 		self.as_path_mut().try_append(path)?;
-		Ok(())
+		Ok(self)
 	}
 
 	#[inline]
-	pub fn normalize(&mut self) {
+	pub fn normalize(&mut self) -> &mut Self {
 		self.as_path_mut().normalize();
+		self
 	}
 }
 
