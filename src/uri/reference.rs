@@ -203,13 +203,13 @@ impl UriRef {
 		}
 
 		for segment in self_segments {
-			result.path_mut().lazy_push(segment)
+			result.path_mut().lazy_push(segment);
 		}
 
 		if (self.query().is_some() || self.fragment().is_some())
 			&& Some(result.path().as_bytes()) == other.path().last().map(|s| s.as_bytes())
 		{
-			result.path_mut().clear()
+			result.path_mut().clear();
 		}
 
 		result.set_query(self.query());
@@ -557,10 +557,10 @@ impl UriRefBuf {
 	/// use iref::{UriRefBuf, uri::Segment};
 	///
 	/// let mut uri_ref = UriRefBuf::new("/foo/../bar?query".to_string()).unwrap();
-	/// uri_ref.path_mut().normalize();
-	/// assert_eq!(uri_ref, "/bar?query");
-	///
-	/// uri_ref.path_mut().push(Segment::new("baz").unwrap());
+	/// uri_ref.path_mut()
+	///     .normalize()
+	///     .try_push("baz")
+	///     .unwrap();
 	/// assert_eq!(uri_ref, "/bar/baz?query");
 	/// ```
 	#[inline]
