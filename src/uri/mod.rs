@@ -51,11 +51,30 @@ pub(crate) mod grammar {}
 pub struct Uri(str);
 
 impl Uri {
-	pub fn parts(&self) -> Parts<'_> {
+	/// Returns all the parts of this URI.
+	///
+	/// This method parses the URI and returns a [`Parts`] struct containing
+	/// references to each component: scheme, authority, path, query, and fragment.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::Uri;
+	///
+	/// let uri = Uri::new("https://example.org:8080/path?query#fragment").unwrap();
+	/// let parts = uri.parts();
+	///
+	/// assert_eq!(parts.scheme, "https");
+	/// assert_eq!(parts.authority.unwrap(), "example.org:8080");
+	/// assert_eq!(parts.path, "/path");
+	/// assert_eq!(parts.query.unwrap(), "query");
+	/// assert_eq!(parts.fragment.unwrap(), "fragment");
+	/// ```
+	pub fn parts(&self) -> UriParts<'_> {
 		let bytes = self.as_bytes();
 		let ranges = crate::common::parse::parts(bytes, 0);
 
-		Parts {
+		UriParts {
 			scheme: unsafe { Scheme::new_unchecked_from_bytes(&bytes[ranges.scheme]) },
 			authority: ranges
 				.authority
@@ -71,6 +90,15 @@ impl Uri {
 	}
 
 	/// Returns the scheme of the IRI.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::Uri;
+	///
+	/// let uri = Uri::new("https://example.org/path").unwrap();
+	/// assert_eq!(uri.scheme(), "https");
+	/// ```
 	#[inline]
 	pub fn scheme(&self) -> &Scheme {
 		let bytes = self.as_bytes();
@@ -100,12 +128,42 @@ impl Uri {
 		unsafe { Self::new_unchecked_from_bytes(&bytes[..end]) }
 	}
 
+	/// Joins a URI reference to this URI, returning a new owned URI.
+	///
+	/// This method resolves the given URI reference against this URI as a base,
+	/// following the reference resolution algorithm defined in RFC 3986.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{Uri, UriRef};
+	///
+	/// let base = Uri::new("https://example.org/foo/bar").unwrap();
+	/// let reference = UriRef::new("../baz").unwrap();
+	///
+	/// assert_eq!(base.joined(reference), "https://example.org/baz");
+	/// ```
 	pub fn joined(&self, input: impl AsRef<UriRef>) -> UriBuf {
 		let mut result = self.to_owned();
 		result.join(input);
 		result
 	}
 
+	/// Tries to join a string as a URI reference to this URI.
+	///
+	/// Same as [`Self::joined`] but accepts a `&str` instead of a [`&UriRef`](UriRef).
+	/// Returns an error if the input string is not a valid URI reference.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::Uri;
+	///
+	/// let base = Uri::new("https://example.org/foo/bar").unwrap();
+	///
+	/// assert_eq!(base.try_joined("../baz").unwrap(), "https://example.org/baz");
+	/// assert!(base.try_joined("not a valid uri ref\0").is_err());
+	/// ```
 	pub fn try_joined<'r>(&self, input: &'r str) -> Result<UriBuf, InvalidUriRef<&'r str>> {
 		UriRef::new(input).map(|r| self.joined(r))
 	}
@@ -164,13 +222,30 @@ impl Hash for Uri {
 	}
 }
 
-/// URI parts.
+/// Individual components of a URI.
+///
+/// Contains references to each component of a URI as defined
+/// in RFC 3986: scheme, authority, path, query, and fragment.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Parts<'a> {
+pub struct UriParts<'a> {
+	/// Scheme component (e.g., `https`, `http`, `file`).
 	pub scheme: &'a Scheme,
+
+	/// Authority component, if present.
+	///
+	/// Contains the host and optionally userinfo and port
+	/// (e.g., `user@example.org:8080`).
 	pub authority: Option<&'a Authority>,
+
+	/// Path component.
+	///
+	/// May be empty, but is always present.
 	pub path: &'a Path,
+
+	/// Query component, if present.
 	pub query: Option<&'a Query>,
+
+	/// Fragment component, if present.
 	pub fragment: Option<&'a Fragment>,
 }
 
@@ -185,6 +260,24 @@ impl UriBuf {
 		crate::utils::allocate_range(unsafe { self.as_mut_vec() }, range, len)
 	}
 
+	/// Returns a mutable reference to the authority part, if present.
+	///
+	/// The returned [`AuthorityMut`] allows in-place modification of the
+	/// authority component (host, port, userinfo).
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriBuf;
+	///
+	/// let mut uri = UriBuf::new("https://example.org:8080/path".to_string()).unwrap();
+	///
+	/// if let Some(mut authority) = uri.authority_mut() {
+	///     authority.set_host("other.com".try_into().unwrap());
+	/// }
+	///
+	/// assert_eq!(uri, "https://other.com:8080/path");
+	/// ```
 	#[inline]
 	pub fn authority_mut(&mut self) -> Option<AuthorityMut<'_>> {
 		crate::common::parse::find_authority(self.as_bytes(), 0)
@@ -285,6 +378,23 @@ impl UriBuf {
 		Ok(())
 	}
 
+	/// Returns a mutable reference to the path part.
+	///
+	/// The returned [`PathMut`] allows in-place modification of the path,
+	/// including appending segments, normalizing, and replacing the entire path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriBuf, uri::Segment};
+	///
+	/// let mut uri = UriBuf::new("https://example.org/foo/../bar?query#frag".to_string()).unwrap();
+	/// uri.path_mut().normalize();
+	/// assert_eq!(uri, "https://example.org/bar?query#frag");
+	///
+	/// uri.path_mut().push(Segment::new("baz").unwrap());
+	/// assert_eq!(uri, "https://example.org/bar/baz?query#frag");
+	/// ```
 	#[inline]
 	pub fn path_mut(&mut self) -> PathMut<'_> {
 		let range = crate::common::parse::find_path(self.as_bytes(), 0);
@@ -351,6 +461,24 @@ impl UriBuf {
 		self.path_mut().normalize();
 	}
 
+	/// Sets the query part.
+	///
+	/// If `query` is `Some`, the query component is set to the given value.
+	/// If `query` is `None`, the query component is removed entirely.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriBuf, uri::Query};
+	///
+	/// let mut uri = UriBuf::new("https://example.org/path".to_string()).unwrap();
+	///
+	/// uri.set_query(Some(Query::new("key=value").unwrap()));
+	/// assert_eq!(uri, "https://example.org/path?key=value");
+	///
+	/// uri.set_query(None);
+	/// assert_eq!(uri, "https://example.org/path");
+	/// ```
 	#[inline]
 	pub fn set_query(&mut self, query: Option<&Query>) {
 		match query {
@@ -387,6 +515,24 @@ impl UriBuf {
 		Ok(())
 	}
 
+	/// Sets the fragment part.
+	///
+	/// If `fragment` is `Some`, the fragment component is set to the given value.
+	/// If `fragment` is `None`, the fragment component is removed entirely.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriBuf, uri::Fragment};
+	///
+	/// let mut uri = UriBuf::new("https://example.org/path".to_string()).unwrap();
+	///
+	/// uri.set_fragment(Some(Fragment::new("section").unwrap()));
+	/// assert_eq!(uri, "https://example.org/path#section");
+	///
+	/// uri.set_fragment(None);
+	/// assert_eq!(uri, "https://example.org/path");
+	/// ```
 	#[inline]
 	pub fn set_fragment(&mut self, fragment: Option<&Fragment>) {
 		match fragment {
@@ -423,6 +569,21 @@ impl UriBuf {
 		Ok(())
 	}
 
+	/// Creates a new URI from a scheme.
+	///
+	/// The resulting URI contains only the scheme followed by a colon,
+	/// with no authority, path, query, or fragment.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriBuf, SchemeBuf};
+	///
+	/// let scheme = SchemeBuf::new(b"https".to_vec()).unwrap();
+	/// let uri = UriBuf::from_scheme(scheme);
+	///
+	/// assert_eq!(uri, "https:");
+	/// ```
 	#[inline]
 	pub fn from_scheme(scheme: SchemeBuf) -> Self {
 		let mut bytes = scheme.into_bytes();
@@ -447,12 +608,24 @@ impl UriBuf {
 		unsafe { self.replace(range, new_scheme.as_bytes()) }
 	}
 
-	/// Joins the given relative URI to this absolute URI.
+	/// Joins the given URI reference to this absolute URI in place.
 	///
-	/// This is similar to [`UriRefBuf::resolve`], but with the subject and
-	/// object swapped.
+	/// This resolves the given URI reference against this URI as a base,
+	/// modifying `self` to contain the result. This is similar to
+	/// [`UriRefBuf::resolve`], but with the subject and object swapped.
 	///
-	/// ## Abnormal use of dot segments.
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriBuf, UriRef};
+	///
+	/// let mut uri = UriBuf::new("https://example.org/foo/bar".to_string()).unwrap();
+	/// uri.join(UriRef::new("../baz?query").unwrap());
+	///
+	/// assert_eq!(uri, "https://example.org/baz?query");
+	/// ```
+	///
+	/// ## Abnormal use of dot segments
 	///
 	/// See <https://www.rfc-editor.org/errata/eid4547>
 	pub fn join(&mut self, input: impl AsRef<UriRef>) {
@@ -501,6 +674,21 @@ impl UriBuf {
 		}
 	}
 
+	/// Tries to join a string as a URI reference to this absolute URI.
+	///
+	/// Same as [`Self::join`] but accepts a `&str` instead of a [`&UriRef`](UriRef).
+	/// Returns an error if the input string is not a valid URI reference.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriBuf;
+	///
+	/// let mut uri = UriBuf::new("https://example.org/foo/bar".to_string()).unwrap();
+	/// uri.try_join("../baz").unwrap();
+	///
+	/// assert_eq!(uri, "https://example.org/baz");
+	/// ```
 	pub fn try_join<'r>(
 		&mut self,
 		input: &'r str,
@@ -522,6 +710,9 @@ macro_rules! uri {
 }
 
 impl UriBuf {
+	/// Converts this URI into a URI reference.
+	///
+	/// Since all URIs are valid URI references, this conversion is infallible.
 	pub fn into_uri_ref(self) -> UriRefBuf {
 		unsafe { UriRefBuf::new_unchecked(self.0) }
 	}
