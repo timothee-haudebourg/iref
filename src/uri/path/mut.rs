@@ -11,6 +11,10 @@ const PARENT_SEGMENT: &[u8] = b"..";
 /// needs more space, it will allocate memory on the heap.
 const NORMALIZE_IN_PLACE_BUFFER_LEN: usize = 512;
 
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("path is empty")]
+pub struct EmptyPath;
+
 /// Mutable URI path reference.
 pub struct PathMut<'a> {
 	/// Arbitrary byte buffer containing the path.
@@ -106,7 +110,7 @@ impl<'a> PathMut<'a> {
 	///
 	/// Same as [`Self::push`] but does not interpret the `.` and `..`
 	/// segments. They will be added literally to the path.
-	pub fn lazy_push(&mut self, segment: &super::Segment) {
+	pub fn lazy_push(&mut self, segment: &super::Segment) -> &mut Self {
 		let absolutize = self.follows_authority && self.is_empty() && self.is_relative();
 
 		// Disambiguate if the path is empty and one of the following is true:
@@ -167,6 +171,8 @@ impl<'a> PathMut<'a> {
 			let segment_offset = start + 1;
 			self.buffer[segment_offset..self.range.end].copy_from_slice(segment.as_bytes());
 		}
+
+		self
 	}
 
 	/// Adds a segment at the end of the path.
@@ -177,9 +183,9 @@ impl<'a> PathMut<'a> {
 	pub fn try_lazy_push<'s>(
 		&mut self,
 		segment: &'s str,
-	) -> Result<(), super::InvalidSegment<&'s str>> {
+	) -> Result<&mut Self, super::InvalidSegment<&'s str>> {
 		self.lazy_push(segment.try_into()?);
-		Ok(())
+		Ok(self)
 	}
 
 	/// Push the given segment to this path using the `.` and `..` segments
@@ -247,9 +253,11 @@ impl<'a> PathMut<'a> {
 	/// has no effect, and `..` is equivalent to [`Self::pop`].
 	/// Use [`Self::lazy_push`] to not interpret those segments.
 	#[inline]
-	pub fn push(&mut self, segment: &super::Segment) {
+	pub fn push(&mut self, segment: &super::Segment) -> &mut Self {
 		if self.push_inner(segment) && !self.is_empty() {
 			self.lazy_push(super::Segment::EMPTY)
+		} else {
+			self
 		}
 	}
 
@@ -260,9 +268,11 @@ impl<'a> PathMut<'a> {
 	/// a [`&Segment`](super::Segment). Returns an error if the input
 	/// string is not a valid path segment.
 	#[inline]
-	pub fn try_push<'s>(&mut self, segment: &'s str) -> Result<(), super::InvalidSegment<&'s str>> {
-		self.push(segment.try_into()?);
-		Ok(())
+	pub fn try_push<'s>(
+		&mut self,
+		segment: &'s str,
+	) -> Result<&mut Self, super::InvalidSegment<&'s str>> {
+		Ok(self.push(segment.try_into()?))
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
@@ -271,7 +281,7 @@ impl<'a> PathMut<'a> {
 	/// For instance `'/a/b/.'.append('../')` will return `/a/b/` and not
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
 	#[inline]
-	pub fn append<'s, S: IntoIterator<Item = &'s Segment>>(&mut self, path: S) {
+	pub fn append<'s, S: IntoIterator<Item = &'s Segment>>(&mut self, path: S) -> &mut Self {
 		let mut open = false;
 		for segment in path {
 			open = self.push_inner(segment);
@@ -279,6 +289,8 @@ impl<'a> PathMut<'a> {
 
 		if open && !self.is_empty() {
 			self.lazy_push(super::Segment::EMPTY)
+		} else {
+			self
 		}
 	}
 
@@ -295,17 +307,17 @@ impl<'a> PathMut<'a> {
 	pub fn try_append<'s, S: IntoIterator<Item = &'s str>>(
 		&mut self,
 		path: S,
-	) -> Result<(), InvalidSegment<&'s str>> {
+	) -> Result<&mut Self, InvalidSegment<&'s str>> {
 		let mut open = false;
 		for segment in path {
 			open = self.push_inner(segment.try_into()?);
 		}
 
 		if open && !self.is_empty() {
-			self.lazy_push(Segment::EMPTY)
+			Ok(self.lazy_push(Segment::EMPTY))
+		} else {
+			Ok(self)
 		}
-
-		Ok(())
 	}
 
 	/// Joins this path to the given path.
@@ -313,11 +325,11 @@ impl<'a> PathMut<'a> {
 	/// If the input path is absolute, this is equivalent to
 	/// [`Self::replace`]. If the input path is relative, this is
 	/// equivalent to [`Self::append`].
-	pub fn join(&mut self, path: &Path) {
+	pub fn join(&mut self, path: &Path) -> &mut Self {
 		if path.is_absolute() {
-			self.replace(path);
+			self.replace(path)
 		} else {
-			self.append(path);
+			self.append(path)
 		}
 	}
 
@@ -327,12 +339,23 @@ impl<'a> PathMut<'a> {
 	/// will be added instead.
 	///
 	/// Returns `true` if the path has been modified, or `false` otherwise.
-	pub fn pop(&mut self) -> bool {
+	pub fn pop(&mut self) -> &mut Self {
+		let _ = self.try_pop();
+		self
+	}
+
+	/// Pop the last non-`..` segment of the path.
+	///
+	/// If the path is empty and relative, or ends in `..`, then a `..` segment
+	/// will be added instead.
+	///
+	/// Returns `Ok(self)` if the path has been modified, or `Err(EmptyPath)`
+	/// otherwise.
+	pub fn try_pop(&mut self) -> Result<&mut Self, EmptyPath> {
 		let is_empty = self.is_empty();
 
 		if (is_empty && self.is_relative()) || self.last() == Some(super::Segment::PARENT) {
-			self.lazy_push(super::Segment::PARENT);
-			true
+			Ok(self.lazy_push(super::Segment::PARENT))
 		} else if !is_empty {
 			let start = self.first_segment_offset();
 			let mut i = self.range.end - 1;
@@ -343,19 +366,20 @@ impl<'a> PathMut<'a> {
 
 			crate::utils::replace(self.buffer, i..self.range.end, &[]);
 			self.range.end = i;
-			true
+			Ok(self)
 		} else {
-			false
+			Err(EmptyPath)
 		}
 	}
 
-	pub fn clear(&mut self) {
+	pub fn clear(&mut self) -> &mut Self {
 		let start = self.first_segment_offset();
 		crate::utils::replace(self.buffer, start..self.range.end, b"");
-		self.range.end = start
+		self.range.end = start;
+		self
 	}
 
-	pub fn replace(&mut self, path: &Path) {
+	pub fn replace(&mut self, path: &Path) -> &mut Self {
 		let range = self.range.start..self.range.end;
 
 		let has_authority = self.follows_authority;
@@ -393,15 +417,17 @@ impl<'a> PathMut<'a> {
 			crate::utils::replace(self.buffer, range, path.as_bytes());
 			self.range.end = self.range.start + path.len();
 		}
+
+		self
 	}
 
-	pub fn try_replace<'p>(&mut self, path: &'p str) -> Result<(), InvalidPath<&'p str>> {
+	pub fn try_replace<'p>(&mut self, path: &'p str) -> Result<&mut Self, InvalidPath<&'p str>> {
 		self.replace(Path::new(path)?);
-		Ok(())
+		Ok(self)
 	}
 
 	#[inline]
-	pub fn normalize(&mut self) {
+	pub fn normalize(&mut self) -> &mut Self {
 		let mut buffer: smallvec::SmallVec<[u8; NORMALIZE_IN_PLACE_BUFFER_LEN]> =
 			smallvec::SmallVec::new();
 
@@ -416,6 +442,7 @@ impl<'a> PathMut<'a> {
 		let start = self.first_segment_offset();
 		crate::utils::replace(self.buffer, start..self.range.end, &buffer);
 		self.range.end = start + buffer.len();
+		self
 	}
 }
 

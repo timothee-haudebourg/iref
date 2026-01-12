@@ -202,7 +202,7 @@ impl Path {
 		}
 
 		if open && !result.is_empty() {
-			result.as_path_mut().lazy_push(Segment::EMPTY)
+			result.as_path_mut().lazy_push(Segment::EMPTY);
 		}
 
 		result
@@ -347,7 +347,9 @@ impl Path {
 				(Some(self_seg), Some(prefix_seg))
 					if self_seg.as_pct_str() == prefix_seg.as_pct_str() => {}
 				(_, Some(_)) => return None,
-				(Some(seg), None) => buf.as_path_mut().lazy_push(seg),
+				(Some(seg), None) => {
+					buf.as_path_mut().lazy_push(seg);
+				}
 				(None, None) => break,
 			}
 		}
@@ -569,7 +571,7 @@ impl PathBuf {
 	}
 
 	pub fn lazy_push(&mut self, segment: &Segment) {
-		self.as_path_mut().lazy_push(segment)
+		self.as_path_mut().lazy_push(segment);
 	}
 
 	/// Pop the last non-`..` segment of the path.
@@ -577,17 +579,17 @@ impl PathBuf {
 	/// If the path is empty or ends in `..`, then a `..` segment
 	/// will be added instead.
 	pub fn pop(&mut self) -> bool {
-		self.as_path_mut().pop()
+		self.as_path_mut().try_pop().is_ok()
 	}
 
 	pub fn clear(&mut self) {
-		self.as_path_mut().clear()
+		self.as_path_mut().clear();
 	}
 
 	/// Push the given segment to this path using the `.` and `..` segments semantics.
 	#[inline]
 	pub fn symbolic_push(&mut self, segment: &Segment) {
-		self.as_path_mut().push(segment)
+		self.as_path_mut().push(segment);
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
@@ -597,7 +599,7 @@ impl PathBuf {
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
 	#[inline]
 	pub fn append<'s, P: IntoIterator<Item = &'s Segment>>(&mut self, path: P) {
-		self.as_path_mut().append(path)
+		self.as_path_mut().append(path);
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
@@ -610,12 +612,13 @@ impl PathBuf {
 		&mut self,
 		path: P,
 	) -> Result<(), InvalidSegment<&'s str>> {
-		self.as_path_mut().try_append(path)
+		self.as_path_mut().try_append(path)?;
+		Ok(())
 	}
 
 	#[inline]
 	pub fn normalize(&mut self) {
-		self.as_path_mut().normalize()
+		self.as_path_mut().normalize();
 	}
 }
 
