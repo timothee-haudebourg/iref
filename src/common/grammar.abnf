@@ -1,0 +1,3 @@
+scheme        = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+
+port          = *DIGIT

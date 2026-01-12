@@ -2,6 +2,7 @@ use static_automata::Validate;
 use std::hash::Hash;
 use str_newtype::StrNewType;
 
+/// URI or IRI scheme.
 #[derive(Validate, StrNewType)]
 #[automaton(super::grammar::Scheme)]
 #[newtype(
@@ -14,13 +15,13 @@ use str_newtype::StrNewType;
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Scheme(str);
 
-/// Parses an URI/IRI [`Scheme`] at compile time.
+/// Parses an IRI/IRI [`Scheme`] at compile time.
 #[macro_export]
 macro_rules! scheme {
 	($value:literal) => {
-		match $crate::uri::Scheme::from_str($value) {
+		match $crate::iri::Scheme::from_str($value) {
 			Ok(value) => value,
-			Err(_) => panic!("invalid URI/IRI scheme"),
+			Err(_) => panic!("invalid IRI/IRI scheme"),
 		}
 	};
 }
