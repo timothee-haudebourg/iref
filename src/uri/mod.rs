@@ -53,8 +53,9 @@ pub struct Uri(str);
 impl Uri {
 	/// Returns all the parts of this URI.
 	///
-	/// This method parses the URI and returns a [`Parts`] struct containing
-	/// references to each component: scheme, authority, path, query, and fragment.
+	/// This method parses the URI and returns a [`UriParts`] struct containing
+	/// references to each component: scheme, authority, path, query, and
+	/// fragment.
 	///
 	/// # Example
 	///
