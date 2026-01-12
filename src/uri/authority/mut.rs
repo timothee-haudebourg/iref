@@ -59,19 +59,23 @@ impl<'a> AuthorityMut<'a> {
 
 	/// Replaces the value.
 	#[inline]
-	pub fn replace(&mut self, other: &Authority) {
+	pub fn replace(&mut self, other: &Authority) -> &mut Self {
 		self.replace_bytes(self.range.clone(), other.as_bytes());
 		self.range.end = self.range.start + other.len();
+		self
 	}
 
 	#[inline]
-	pub fn try_replace<'s>(&mut self, other: &'s str) -> Result<(), InvalidAuthority<&'s str>> {
+	pub fn try_replace<'s>(
+		&mut self,
+		other: &'s str,
+	) -> Result<&mut Self, InvalidAuthority<&'s str>> {
 		self.replace(Authority::new(other)?);
-		Ok(())
+		Ok(self)
 	}
 
 	#[inline]
-	pub fn set_user_info(&mut self, user_info: Option<&UserInfo>) {
+	pub fn set_user_info(&mut self, user_info: Option<&UserInfo>) -> &mut Self {
 		let bytes = &self.data[..self.range.end];
 
 		match user_info {
@@ -99,19 +103,20 @@ impl<'a> AuthorityMut<'a> {
 				}
 			}
 		}
+
+		self
 	}
 
 	#[inline]
 	pub fn try_set_user_info<'s>(
 		&mut self,
 		user_info: Option<&'s str>,
-	) -> Result<(), InvalidUserInfo<&'s str>> {
-		self.set_user_info(user_info.map(TryInto::try_into).transpose()?);
-		Ok(())
+	) -> Result<&mut Self, InvalidUserInfo<&'s str>> {
+		Ok(self.set_user_info(user_info.map(TryInto::try_into).transpose()?))
 	}
 
 	#[inline]
-	pub fn set_host(&mut self, host: &Host) {
+	pub fn set_host(&mut self, host: &Host) -> &mut Self {
 		let bytes = &self.data[..self.range.end];
 		let range = crate::common::parse::find_host(bytes, self.range.start);
 		let host_len = range.end - range.start;
@@ -123,16 +128,16 @@ impl<'a> AuthorityMut<'a> {
 		}
 
 		self.replace_bytes(range, host.as_bytes());
+		self
 	}
 
 	#[inline]
-	pub fn try_set_host<'s>(&mut self, host: &'s str) -> Result<(), InvalidHost<&'s str>> {
-		self.set_host(host.try_into()?);
-		Ok(())
+	pub fn try_set_host<'s>(&mut self, host: &'s str) -> Result<&mut Self, InvalidHost<&'s str>> {
+		Ok(self.set_host(host.try_into()?))
 	}
 
 	#[inline]
-	pub fn set_port(&mut self, port: Option<&Port>) {
+	pub fn set_port(&mut self, port: Option<&Port>) -> &mut Self {
 		let bytes = &self.data[..self.range.end];
 		match port {
 			Some(new_port) => match crate::common::parse::find_port(bytes, self.range.start) {
@@ -153,18 +158,22 @@ impl<'a> AuthorityMut<'a> {
 				}
 			}
 		}
+
+		self
 	}
 
 	#[inline]
-	pub fn set_port_u32(&mut self, port: Option<u32>) {
+	pub fn set_port_u32(&mut self, port: Option<u32>) -> &mut Self {
 		let port: Option<PortBuf> = port.map(Into::into);
-		self.set_port(port.as_deref());
+		self.set_port(port.as_deref())
 	}
 
 	#[inline]
-	pub fn try_set_port<'s>(&mut self, port: Option<&'s str>) -> Result<(), InvalidPort<&'s str>> {
-		self.set_port(port.map(TryInto::try_into).transpose()?);
-		Ok(())
+	pub fn try_set_port<'s>(
+		&mut self,
+		port: Option<&'s str>,
+	) -> Result<&mut Self, InvalidPort<&'s str>> {
+		Ok(self.set_port(port.map(TryInto::try_into).transpose()?))
 	}
 }
 
