@@ -3,9 +3,10 @@ use std::hash::{self, Hash};
 use crate::{InvalidUri, Uri, UriBuf};
 
 use super::{
-	Authority, AuthorityMut, Fragment, InvalidAuthority, InvalidFragment, InvalidPath,
-	InvalidQuery, Path, PathBuf, PathMut, Query, Scheme, Segment,
+	Authority, AuthorityMut, Fragment, Host, InvalidAuthority, InvalidFragment, InvalidPath,
+	InvalidQuery, Path, PathBuf, PathMut, Query, Scheme, Segment, UserInfo,
 };
+use crate::Port;
 
 /// URI reference.
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
@@ -54,8 +55,8 @@ impl UriRef {
 
 	/// Returns all the parts of this URI reference.
 	///
-	/// This method parses the URI reference and returns a [`Parts`] struct
-	/// containing references to each component: scheme, authority, path,
+	/// This method parses the URI reference and returns a [`UriRefParts`]
+	/// struct containing references to each component: scheme, authority, path,
 	/// query, and fragment. Unlike [`Uri::parts`], the scheme is optional.
 	///
 	/// # Example
@@ -93,7 +94,19 @@ impl UriRef {
 		}
 	}
 
-	/// Returns the scheme of the IRI reference, if any.
+	/// Returns the scheme of the URI reference, if any.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let absolute = UriRef::new("https://example.org/path").unwrap();
+	/// assert_eq!(absolute.scheme().unwrap(), "https");
+	///
+	/// let relative = UriRef::new("/path").unwrap();
+	/// assert!(relative.scheme().is_none());
+	/// ```
 	#[inline]
 	pub fn scheme(&self) -> Option<&Scheme> {
 		let bytes = self.as_bytes();
@@ -101,12 +114,35 @@ impl UriRef {
 			.map(|range| unsafe { Scheme::new_unchecked_from_bytes(&bytes[range]) })
 	}
 
-	/// Adds the given scheme to the reference, turning it into an URI.
+	/// Adds the given scheme to the reference, returning a URI.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriRef, Scheme};
+	///
+	/// let uri_ref = UriRef::new("//example.org/path").unwrap();
+	/// let uri = uri_ref.with_scheme(Scheme::new(b"https").unwrap());
+	///
+	/// assert_eq!(uri, "https://example.org/path");
+	/// ```
 	pub fn with_scheme(&self, scheme: &Scheme) -> UriBuf {
 		self.to_owned().into_with_scheme(scheme)
 	}
 
-	/// Returns the authority part of the IRI reference, if any.
+	/// Returns the authority part of the URI reference, if any.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri_ref = UriRef::new("https://user@example.org:8080/path").unwrap();
+	/// assert_eq!(uri_ref.authority().unwrap(), "user@example.org:8080");
+	///
+	/// let no_authority = UriRef::new("/path").unwrap();
+	/// assert!(no_authority.authority().is_none());
+	/// ```
 	pub fn authority(&self) -> Option<&Authority> {
 		let bytes = self.as_bytes();
 		crate::common::parse::find_authority(bytes, 0)
@@ -114,7 +150,72 @@ impl UriRef {
 			.map(|range| unsafe { Authority::new_unchecked_from_bytes(&bytes[range]) })
 	}
 
-	/// Returns the path of the IRI reference.
+	/// Returns the host of the URI reference, if an authority is present.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri_ref = UriRef::new("https://example.org:8080/path").unwrap();
+	/// assert_eq!(uri_ref.host().unwrap(), "example.org");
+	///
+	/// let no_authority = UriRef::new("/path").unwrap();
+	/// assert!(no_authority.host().is_none());
+	/// ```
+	pub fn host(&self) -> Option<&Host> {
+		self.authority().map(Authority::host)
+	}
+
+	/// Returns the user info of the URI reference, if present.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri_ref = UriRef::new("https://user:pass@example.org/path").unwrap();
+	/// assert_eq!(uri_ref.user_info().unwrap(), "user:pass");
+	///
+	/// let no_userinfo = UriRef::new("https://example.org/path").unwrap();
+	/// assert!(no_userinfo.user_info().is_none());
+	/// ```
+	pub fn user_info(&self) -> Option<&UserInfo> {
+		self.authority().and_then(Authority::user_info)
+	}
+
+	/// Returns the port of the URI reference, if present.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri_ref = UriRef::new("https://example.org:8080/path").unwrap();
+	/// assert_eq!(uri_ref.port().unwrap(), "8080");
+	///
+	/// let no_port = UriRef::new("https://example.org/path").unwrap();
+	/// assert!(no_port.port().is_none());
+	/// ```
+	pub fn port(&self) -> Option<&Port> {
+		self.authority().and_then(Authority::port)
+	}
+
+	/// Returns the path of the URI reference.
+	///
+	/// The path is always present, though it may be empty.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri_ref = UriRef::new("https://example.org/foo/bar?query").unwrap();
+	/// assert_eq!(uri_ref.path(), "/foo/bar");
+	///
+	/// let empty_path = UriRef::new("https://example.org").unwrap();
+	/// assert_eq!(empty_path.path(), "");
+	/// ```
 	pub fn path(&self) -> &Path {
 		let bytes = self.as_bytes();
 		let range = crate::common::parse::find_path(bytes, 0);
@@ -218,14 +319,28 @@ impl UriRef {
 		result
 	}
 
-	/// Get the suffix of this URI, if any, with regard to the given prefix URI.
+	/// Returns the suffix of this URI relative to the given prefix.
 	///
 	/// Returns `Some((suffix, query, fragment))` if this URI is of the form
 	/// `prefix/suffix?query#fragment` where `prefix` is given as parameter.
 	/// Returns `None` otherwise.
-	/// If the `suffix` scheme or authority is different from this path, it will return `None`.
+	/// If the scheme or authority differs from the prefix, returns `None`.
 	///
 	/// See [`Path::suffix`] for more details.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri = UriRef::new("https://example.org/foo/bar/baz?query").unwrap();
+	/// let prefix = UriRef::new("https://example.org/foo/").unwrap();
+	///
+	/// let (suffix, query, fragment) = uri.suffix(prefix).unwrap();
+	/// assert_eq!(suffix, "bar/baz");
+	/// assert_eq!(query.unwrap(), "query");
+	/// assert!(fragment.is_none());
+	/// ```
 	#[inline]
 	pub fn suffix(
 		&self,
