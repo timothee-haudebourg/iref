@@ -989,14 +989,11 @@ impl UriRefBuf {
 				let mut path_buffer = <UriBuf>::from_scheme(base_iri.scheme().to_owned()); // we set the scheme to avoid path disambiguation.
 				path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
 
-				// if base_iri.authority().is_some() && base_iri.path().is_empty() {
-				// 	path_buffer.set_path(Path::EMPTY_ABSOLUTE);
-				// } else {
 				path_buffer.set_path(base_iri.path().parent_or_empty());
-				path_buffer.path_mut().normalize();
-				// }
-
-				path_buffer.path_mut().append(self.path().segments());
+				path_buffer
+					.path_mut()
+					.normalize()
+					.append(self.path().segments());
 
 				self.set_path(path_buffer.path());
 			}

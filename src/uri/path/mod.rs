@@ -8,7 +8,24 @@ const CURRENT_SEGMENT: &[u8] = b".";
 
 const PARENT_SEGMENT: &[u8] = b"..";
 
-/// URI path.
+/// URI path component.
+///
+/// A path is a sequence of segments separated by `/`. A path can be absolute
+/// (starting with `/`) or relative.
+///
+/// # Example
+///
+/// ```rust
+/// use iref::uri::Path;
+///
+/// let path = Path::new("/foo/bar/baz").unwrap();
+///
+/// assert!(path.is_absolute());
+/// assert_eq!(path.segment_count(), 3);
+///
+/// let segments: Vec<_> = path.segments().map(|s| s.as_str()).collect();
+/// assert_eq!(segments, vec!["foo", "bar", "baz"]);
+/// ```
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(super::grammar::Path)]
 #[newtype(ord([u8], &[u8], Vec<u8>, str, &str, String), owned(PathBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))]
@@ -22,12 +39,22 @@ impl Default for &Path {
 }
 
 impl Path {
+	/// The empty relative path.
 	pub const EMPTY: &'static Self = unsafe { Self::new_unchecked("") };
 
 	/// The empty absolute path `/`.
 	pub const EMPTY_ABSOLUTE: &'static Self = unsafe { Self::new_unchecked("/") };
 
-	/// Returns the byte lenght of the path.
+	/// Returns the byte length of the path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert_eq!(Path::new("/foo/bar").unwrap().len(), 8);
+	/// assert_eq!(Path::EMPTY.len(), 0);
+	/// ```
 	pub fn len(&self) -> usize {
 		self.as_bytes().len()
 	}
@@ -36,6 +63,16 @@ impl Path {
 	///
 	/// Returns `true` if the path has no segments.
 	/// The absolute path `/` is empty.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert!(Path::EMPTY.is_empty());
+	/// assert!(Path::EMPTY_ABSOLUTE.is_empty());
+	/// assert!(!Path::new("/foo").unwrap().is_empty());
+	/// ```
 	#[inline(always)]
 	pub fn is_empty(&self) -> bool {
 		self.as_bytes().is_empty() || self.as_bytes() == *b"/"
@@ -44,6 +81,15 @@ impl Path {
 	/// Checks if the path is absolute.
 	///
 	/// A path is absolute if it starts with a `/`.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert!(Path::new("/foo/bar").unwrap().is_absolute());
+	/// assert!(!Path::new("foo/bar").unwrap().is_absolute());
+	/// ```
 	#[inline(always)]
 	pub fn is_absolute(&self) -> bool {
 		self.as_bytes().starts_with(b"/")
@@ -52,6 +98,15 @@ impl Path {
 	/// Checks if the path is relative.
 	///
 	/// A path is relative if it does not start with a `/`.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert!(Path::new("foo/bar").unwrap().is_relative());
+	/// assert!(!Path::new("/foo/bar").unwrap().is_relative());
+	/// ```
 	#[inline(always)]
 	pub fn is_relative(&self) -> bool {
 		!self.is_absolute()
@@ -61,6 +116,16 @@ impl Path {
 	///
 	/// This computes in linear time w.r.t the number of segments. It is
 	/// equivalent to `path.segments().count()`.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert_eq!(Path::new("/foo/bar/baz").unwrap().segment_count(), 3);
+	/// assert_eq!(Path::EMPTY.segment_count(), 0);
+	/// assert_eq!(Path::EMPTY_ABSOLUTE.segment_count(), 0);
+	/// ```
 	#[inline]
 	pub fn segment_count(&self) -> usize {
 		self.segments().count()
@@ -70,6 +135,16 @@ impl Path {
 		if self.is_absolute() { 1 } else { 0 }
 	}
 
+	/// Returns the first segment of the path, if any.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert_eq!(Path::new("/foo/bar").unwrap().first().unwrap(), "foo");
+	/// assert!(Path::EMPTY.first().is_none());
+	/// ```
 	pub fn first(&self) -> Option<&Segment> {
 		if self.is_empty() {
 			None
@@ -78,6 +153,16 @@ impl Path {
 		}
 	}
 
+	/// Returns the last segment of the path, if any.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert_eq!(Path::new("/foo/bar").unwrap().last().unwrap(), "bar");
+	/// assert!(Path::EMPTY.last().is_none());
+	/// ```
 	pub fn last(&self) -> Option<&Segment> {
 		if self.is_empty() {
 			None
@@ -165,6 +250,16 @@ impl Path {
 	/// No normalization occurs with `.` and `..` segments. See the
 	/// [`Self::normalized_segments`] to iterate over the normalized segments
 	/// of a path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// let path = Path::new("/foo/bar/baz").unwrap();
+	/// let segments: Vec<_> = path.segments().map(|s| s.as_str()).collect();
+	/// assert_eq!(segments, vec!["foo", "bar", "baz"]);
+	/// ```
 	#[inline]
 	pub fn segments(&self) -> Segments<'_> {
 		if self.is_empty() {
@@ -183,11 +278,33 @@ impl Path {
 	/// Remove the special dot segments `..` and `.` from the iteration using
 	/// the usual path semantics for dot segments. This may be expensive for
 	/// large paths since it will need to internally normalize the path first.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// let path = Path::new("/foo/bar/../baz").unwrap();
+	/// let segments: Vec<_> = path.normalized_segments().map(|s| s.as_str()).collect();
+	/// assert_eq!(segments, vec!["foo", "baz"]);
+	/// ```
 	#[inline]
 	pub fn normalized_segments(&self) -> NormalizedSegments<'_> {
 		NormalizedSegments::new(self)
 	}
 
+	/// Returns a normalized copy of the path.
+	///
+	/// Resolves `.` and `..` segments using the usual path semantics.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// let path = Path::new("/foo/bar/../baz/./qux").unwrap();
+	/// assert_eq!(path.normalized(), "/foo/baz/qux");
+	/// ```
 	#[inline]
 	pub fn normalized(&self) -> PathBuf {
 		let mut result: PathBuf = if self.is_absolute() {
@@ -213,6 +330,15 @@ impl Path {
 	///
 	/// This does not consider the normalized version of the path, dot segments
 	/// are preserved.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert_eq!(Path::new("/foo/bar").unwrap().file_name().unwrap(), "bar");
+	/// assert!(Path::new("/foo/bar/").unwrap().file_name().is_none());
+	/// ```
 	#[inline]
 	pub fn file_name(&self) -> Option<&Segment> {
 		self.segments().next_back().filter(|s| !s.is_empty())
@@ -360,7 +486,16 @@ impl Path {
 	/// Checks if this path looks like a scheme.
 	///
 	/// Returns `true` if it is of the form `prefix:suffix` where `prefix` is a
-	/// valid scheme, of `false` otherwise.
+	/// valid scheme, or `false` otherwise.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Path;
+	///
+	/// assert!(Path::new("http:foo").unwrap().looks_like_scheme());
+	/// assert!(!Path::new("foo/bar").unwrap().looks_like_scheme());
+	/// ```
 	pub fn looks_like_scheme(&self) -> bool {
 		crate::common::parse::looks_like_scheme(self.as_bytes())
 	}
@@ -566,49 +701,125 @@ impl PathBuf {
 		unsafe { self.0.as_mut_vec() }
 	}
 
+	/// Returns a mutable path reference.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.as_path_mut().clear();
+	/// assert_eq!(path, "/");
+	/// ```
 	pub fn as_path_mut(&mut self) -> PathMut<'_> {
 		PathMut::from_path(self)
 	}
 
+	/// Pushes a segment to the path without `.` and `..` semantics.
+	///
+	/// Simply appends the segment without resolving special segments.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{PathBuf, Segment};
+	///
+	/// let mut path = PathBuf::new("/foo".to_string()).unwrap();
+	/// path.lazy_push(Segment::new("..").unwrap());
+	/// assert_eq!(path, "/foo/..");
+	///
+	/// // It is possible to push empty segments.
+	/// path.lazy_push(Segment::new("").unwrap());
+	/// assert_eq!(path, "/foo/../");
+	/// path.lazy_push(Segment::new("").unwrap());
+	/// assert_eq!(path, "/foo/..//");
+	/// ```
 	pub fn lazy_push(&mut self, segment: &Segment) -> &mut Self {
 		self.as_path_mut().lazy_push(segment);
 		self
 	}
 
-	/// Pop the last non-`..` segment of the path.
+	/// Adds a segment at the end of the path.
 	///
-	/// If the path is empty or ends in `..`, then a `..` segment
-	/// will be added instead.
-	pub fn try_pop(&mut self) -> Result<&mut Self, EmptyPath> {
-		self.as_path_mut().try_pop()?;
+	/// Same as [`Self::lazy_push`] but accepts a `&str` instead of a
+	/// [`&Segment`](super::Segment). Returns an error if the input
+	/// string is not a valid path segment.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo".to_string()).unwrap();
+	/// path.try_lazy_push("bar").unwrap();
+	/// assert_eq!(path, "/foo/bar");
+	/// ```
+	pub fn try_lazy_push<'s>(
+		&mut self,
+		segment: &'s str,
+	) -> Result<&mut Self, InvalidSegment<&'s str>> {
+		self.as_path_mut().try_lazy_push(segment)?;
 		Ok(self)
 	}
 
-	/// Pop the last non-`..` segment of the path.
-	///
-	/// If the path is empty or ends in `..`, then a `..` segment
-	/// will be added instead.
-	pub fn pop(&mut self) -> bool {
-		self.as_path_mut().try_pop().is_ok()
-	}
-
-	pub fn clear(&mut self) -> &mut Self {
-		self.as_path_mut().clear();
-		self
-	}
-
 	/// Push the given segment to this path using the `.` and `..` segments semantics.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{PathBuf, Segment};
+	///
+	/// let mut path = PathBuf::new("/foo".to_string()).unwrap();
+	/// path.push(Segment::new("bar").unwrap());
+	/// assert_eq!(path, "/foo/bar");
+	///
+	/// path.push(Segment::new("..").unwrap());
+	/// assert_eq!(path, "/foo/");
+	/// ```
 	#[inline]
-	pub fn symbolic_push(&mut self, segment: &Segment) -> &mut Self {
+	pub fn push(&mut self, segment: &Segment) -> &mut Self {
 		self.as_path_mut().push(segment);
 		self
+	}
+
+	/// Pushes the given segment to this path using the `.` and `..` segments
+	/// semantics.
+	///
+	/// Same as [`Self::push`] but accepts a `&str` instead of
+	/// a [`&Segment`](super::Segment). Returns an error if the input
+	/// string is not a valid path segment.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.try_push("..").unwrap();
+	/// assert_eq!(path, "/foo/");
+	/// ```
+	#[inline]
+	pub fn try_push<'s>(&mut self, segment: &'s str) -> Result<&mut Self, InvalidSegment<&'s str>> {
+		self.as_path_mut().try_push(segment)?;
+		Ok(self)
 	}
 
 	/// Append the given path to this path using the `.` and `..` segments semantics.
 	///
 	/// Note that this does not normalize the segments already in the path.
-	/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
+	/// For instance `'/a/b/.'.append('../')` will return `/a/b/` and not
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{Path, PathBuf};
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.append(Path::new("../baz").unwrap());
+	/// assert_eq!(path, "/foo/baz");
+	/// ```
 	#[inline]
 	pub fn append<'s, P: IntoIterator<Item = &'s Segment>>(&mut self, path: P) -> &mut Self {
 		self.as_path_mut().append(path);
@@ -618,8 +829,18 @@ impl PathBuf {
 	/// Append the given path to this path using the `.` and `..` segments semantics.
 	///
 	/// Note that this does not normalize the segments already in the path.
-	/// For instance `'/a/b/.'.symbolc_append('../')` will return `/a/b/` and not
+	/// For instance `'/a/b/.'.try_append('../')` will return `/a/b/` and not
 	/// `a/` because the semantics of `..` is applied on the last `.` in the path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.try_append(["baz", "qux"]).unwrap();
+	/// assert_eq!(path, "/foo/bar/baz/qux");
+	/// ```
 	#[inline]
 	pub fn try_append<'s, P: IntoIterator<Item = &'s str>>(
 		&mut self,
@@ -629,6 +850,169 @@ impl PathBuf {
 		Ok(self)
 	}
 
+	/// Joins this path to the given path.
+	///
+	/// If the input path is absolute, this is equivalent to
+	/// [`Self::replace`]. If the input path is relative, this is
+	/// equivalent to [`Self::append`].
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{Path, PathBuf};
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.as_path_mut().join(Path::new("baz/qux").unwrap());
+	/// assert_eq!(path, "/foo/bar/baz/qux");
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.as_path_mut().join(Path::new("/baz").unwrap());
+	/// assert_eq!(path, "/baz");
+	/// ```
+	pub fn join(&mut self, path: &Path) -> &mut Self {
+		self.as_path_mut().join(path);
+		self
+	}
+
+	/// Joins this path to the given path.
+	///
+	/// Same as [`Self::join`] but accepts a `&str` instead of a
+	/// [`&Path`](Path). Returns an error if the input string is not
+	/// a valid path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.try_join("baz/qux").unwrap();
+	/// assert_eq!(path, "/foo/bar/baz/qux");
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.try_join("/baz").unwrap();
+	/// assert_eq!(path, "/baz");
+	/// ```
+	pub fn try_join<'s>(&mut self, path: &'s str) -> Result<&mut Self, InvalidPath<&'s str>> {
+		self.as_path_mut().try_join(path)?;
+		Ok(self)
+	}
+
+	/// Pop the last non-`..` segment of the path.
+	///
+	/// If the path is empty or ends in `..`, then a `..` segment
+	/// will be added instead. Returns `true` if a segment was popped.
+	///
+	/// Has no effect if the path is empty and absolute.
+	/// Use [`Self::try_pop`] if you need to know if the path has been modified.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.pop();
+	/// assert_eq!(path, "/foo");
+	///
+	/// let mut path = PathBuf::new("foo/bar".to_string()).unwrap();
+	/// path.pop().pop().pop();
+	/// assert_eq!(path, "..");
+	/// ```
+	pub fn pop(&mut self) -> &mut Self {
+		self.as_path_mut().try_pop();
+		self
+	}
+
+	/// Pop the last non-`..` segment of the path.
+	///
+	/// If the path is empty or ends in `..`, then a `..` segment
+	/// will be added instead.
+	///
+	/// Returns `true` if the path has been modified, or `false` otherwise.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.try_pop();
+	/// assert_eq!(path, "/foo");
+	/// ```
+	pub fn try_pop(&mut self) -> bool {
+		self.as_path_mut().try_pop()
+	}
+
+	/// Clears the path, removing all segments.
+	///
+	/// Keeps the path absolute if it was absolute.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.clear();
+	/// assert_eq!(path, "/");
+	/// ```
+	pub fn clear(&mut self) -> &mut Self {
+		self.as_path_mut().clear();
+		self
+	}
+
+	/// Replaces this path with the given path.
+	///
+	/// Handles ambiguities that may arise during replacement.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{Path, PathBuf};
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.replace(Path::new("/baz/qux").unwrap());
+	/// assert_eq!(path, "/baz/qux");
+	/// ```
+	pub fn replace(&mut self, path: &Path) -> &mut Self {
+		self.as_path_mut().replace(path);
+		self
+	}
+
+	/// Replaces this path with the given path.
+	///
+	/// Same as [`Self::replace`] but accepts a `&str` instead of a
+	/// [`&Path`](Path). Returns an error if the input string is not
+	/// a valid path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar".to_string()).unwrap();
+	/// path.try_replace("/baz/qux").unwrap();
+	/// assert_eq!(path, "/baz/qux");
+	/// ```
+	pub fn try_replace<'p>(&mut self, path: &'p str) -> Result<&mut Self, InvalidPath<&'p str>> {
+		self.as_path_mut().try_replace(path)?;
+		Ok(self)
+	}
+
+	/// Normalizes the path in place.
+	///
+	/// Resolves `.` and `..` segments using the usual path semantics.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo/bar/../baz".to_string()).unwrap();
+	/// path.normalize();
+	/// assert_eq!(path, "/foo/baz");
+	/// ```
 	#[inline]
 	pub fn normalize(&mut self) -> &mut Self {
 		self.as_path_mut().normalize();

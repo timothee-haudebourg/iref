@@ -658,15 +658,7 @@ impl UriBuf {
 						self.set_and_normalize_path(parts.path);
 					} else {
 						self.set_query(parts.query);
-
-						// if self.authority().is_some() && self.path().is_empty() {
-						// 	self.set_path(Path::EMPTY_ABSOLUTE);
-						// } else {
-						let mut path = self.path_mut();
-						path.normalize();
-						path.pop();
-						path.append(parts.path);
-						// }
+						self.path_mut().normalize().pop().append(parts.path);
 					}
 
 					self.set_fragment(parts.fragment);
