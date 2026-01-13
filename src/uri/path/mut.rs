@@ -38,6 +38,18 @@ impl<'a> Deref for PathMut<'a> {
 
 impl<'a> PathMut<'a> {
 	/// Creates a new mutable path reference.
+	pub fn new(
+		buffer: &'a mut Vec<u8>,
+		range: Range<usize>,
+	) -> Result<Self, InvalidPath<&'a [u8]>> {
+		if Path::validate_bytes(&buffer[range.clone()]) {
+			Ok(unsafe { Self::new_unchecked(buffer, range) })
+		} else {
+			Err(InvalidPath(buffer))
+		}
+	}
+
+	/// Creates a new mutable path reference.
 	///
 	/// # Safety
 	///

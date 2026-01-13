@@ -17,8 +17,7 @@ default = []
 serde = ["dep:serde"]
 
 [dependencies]
-# str-newtype = "1.0"
-str-newtype.path = "/home/work/Documents/Community/Utils/parsing/str-newtype"
+str-newtype = "1.0.2"
 static-automata = "1.0"
 serde = { version = "1.0", optional = true }
 smallvec = "1.14.0"

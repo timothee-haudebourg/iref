@@ -5,7 +5,10 @@ use super::{
 	UserInfo,
 };
 
-/// Mutable authority reference.
+/// Mutable reference to an authority component within a buffer.
+///
+/// This type allows in-place modification of an authority's components
+/// (userinfo, host, port) without reallocating the entire URI.
 pub struct AuthorityMut<'a> {
 	/// Arbitrary byte buffer containing the authority.
 	data: &'a mut Vec<u8>,
@@ -15,7 +18,9 @@ pub struct AuthorityMut<'a> {
 }
 
 impl<'a> AuthorityMut<'a> {
-	/// Creates a new mutable authority part.
+	/// Creates a new mutable authority reference.
+	///
+	/// Returns an error if the bytes in the given range are not a valid authority.
 	#[inline]
 	pub fn new(
 		data: &'a mut Vec<u8>,
@@ -28,7 +33,7 @@ impl<'a> AuthorityMut<'a> {
 		}
 	}
 
-	/// Creates a new mutable authority part.
+	/// Creates a new mutable authority reference without validation.
 	///
 	/// # Safety
 	///
@@ -47,17 +52,30 @@ impl<'a> AuthorityMut<'a> {
 		crate::utils::allocate_range(self.data, range, len)
 	}
 
+	/// Returns an immutable reference to the authority.
 	#[inline]
 	pub fn as_authority(&self) -> &Authority {
 		unsafe { Authority::new_unchecked_from_bytes(&self.data[self.range.clone()]) }
 	}
 
+	/// Consumes self and returns an immutable reference to the authority.
 	#[inline]
 	pub fn into_authority(self) -> &'a Authority {
 		unsafe { Authority::new_unchecked_from_bytes(&self.data[self.range.clone()]) }
 	}
 
-	/// Replaces the value.
+	/// Replaces the entire authority value.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{Authority, AuthorityBuf};
+	///
+	/// let mut authority = AuthorityBuf::new("example.org".to_string()).unwrap();
+	/// authority.replace(Authority::new("other.com:8080").unwrap());
+	///
+	/// assert_eq!(authority, "other.com:8080");
+	/// ```
 	#[inline]
 	pub fn replace(&mut self, other: &Authority) -> &mut Self {
 		self.replace_bytes(self.range.clone(), other.as_bytes());
@@ -65,6 +83,21 @@ impl<'a> AuthorityMut<'a> {
 		self
 	}
 
+	/// Tries to replace the entire authority value from a string.
+	///
+	/// Returns an error if the string is not a valid authority.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::AuthorityBuf;
+	///
+	/// let mut authority = AuthorityBuf::new("example.org".to_string()).unwrap();
+	/// assert!(authority.try_replace("other.com:8080").is_ok());
+	/// assert_eq!(authority, "other.com:8080");
+	///
+	/// assert!(authority.try_replace("not valid\0").is_err());
+	/// ```
 	#[inline]
 	pub fn try_replace<'s>(
 		&mut self,
@@ -74,6 +107,18 @@ impl<'a> AuthorityMut<'a> {
 		Ok(self)
 	}
 
+	/// Sets the user info component.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{AuthorityBuf, UserInfo};
+	///
+	/// let mut authority = AuthorityBuf::new("example.org".to_string()).unwrap();
+	/// authority.set_user_info(Some(UserInfo::new("user:pass").unwrap()));
+	///
+	/// assert_eq!(authority, "user:pass@example.org");
+	/// ```
 	#[inline]
 	pub fn set_user_info(&mut self, user_info: Option<&UserInfo>) -> &mut Self {
 		let bytes = &self.data[..self.range.end];
@@ -107,6 +152,21 @@ impl<'a> AuthorityMut<'a> {
 		self
 	}
 
+	/// Tries to set the user info from a string.
+	///
+	/// Returns an error if the string is not valid user info.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::AuthorityBuf;
+	///
+	/// let mut authority = AuthorityBuf::new("example.org".to_string()).unwrap();
+	/// assert!(authority.try_set_user_info(Some("user:pass")).is_ok());
+	/// assert_eq!(authority, "user:pass@example.org");
+	///
+	/// assert!(authority.try_set_user_info(Some("invalid@user")).is_err());
+	/// ```
 	#[inline]
 	pub fn try_set_user_info<'s>(
 		&mut self,
@@ -115,6 +175,18 @@ impl<'a> AuthorityMut<'a> {
 		Ok(self.set_user_info(user_info.map(TryInto::try_into).transpose()?))
 	}
 
+	/// Sets the host component.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{AuthorityBuf, Host};
+	///
+	/// let mut authority = AuthorityBuf::new("example.org:8080".to_string()).unwrap();
+	/// authority.set_host(Host::new("other.com").unwrap());
+	///
+	/// assert_eq!(authority, "other.com:8080");
+	/// ```
 	#[inline]
 	pub fn set_host(&mut self, host: &Host) -> &mut Self {
 		let bytes = &self.data[..self.range.end];
@@ -131,11 +203,38 @@ impl<'a> AuthorityMut<'a> {
 		self
 	}
 
+	/// Tries to set the host from a string.
+	///
+	/// Returns an error if the string is not a valid host.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::AuthorityBuf;
+	///
+	/// let mut authority = AuthorityBuf::new("example.org:8080".to_string()).unwrap();
+	/// assert!(authority.try_set_host("other.com").is_ok());
+	/// assert_eq!(authority, "other.com:8080");
+	///
+	/// assert!(authority.try_set_host("invalid/host").is_err());
+	/// ```
 	#[inline]
 	pub fn try_set_host<'s>(&mut self, host: &'s str) -> Result<&mut Self, InvalidHost<&'s str>> {
 		Ok(self.set_host(host.try_into()?))
 	}
 
+	/// Sets the port component.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{AuthorityBuf, Port};
+	///
+	/// let mut authority = AuthorityBuf::new("example.org".to_string()).unwrap();
+	/// authority.set_port(Some(Port::new(b"443").unwrap()));
+	///
+	/// assert_eq!(authority, "example.org:443");
+	/// ```
 	#[inline]
 	pub fn set_port(&mut self, port: Option<&Port>) -> &mut Self {
 		let bytes = &self.data[..self.range.end];
@@ -162,12 +261,39 @@ impl<'a> AuthorityMut<'a> {
 		self
 	}
 
+	/// Sets the port from a `u32` value.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::AuthorityBuf;
+	///
+	/// let mut authority = AuthorityBuf::new("example.org".to_string()).unwrap();
+	/// authority.set_port_u32(Some(8080));
+	///
+	/// assert_eq!(authority, "example.org:8080");
+	/// ```
 	#[inline]
 	pub fn set_port_u32(&mut self, port: Option<u32>) -> &mut Self {
 		let port: Option<PortBuf> = port.map(Into::into);
 		self.set_port(port.as_deref())
 	}
 
+	/// Tries to set the port from a string.
+	///
+	/// Returns an error if the string is not a valid port.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::AuthorityBuf;
+	///
+	/// let mut authority = AuthorityBuf::new("example.org".to_string()).unwrap();
+	/// assert!(authority.try_set_port(Some("8080")).is_ok());
+	/// assert_eq!(authority, "example.org:8080");
+	///
+	/// assert!(authority.try_set_port(Some("not_a_port")).is_err());
+	/// ```
 	#[inline]
 	pub fn try_set_port<'s>(
 		&mut self,

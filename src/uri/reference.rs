@@ -334,7 +334,7 @@ impl UriRef {
 	/// use iref::UriRef;
 	///
 	/// let uri = UriRef::new("https://example.org/foo/bar/baz?query").unwrap();
-	/// let prefix = UriRef::new("https://example.org/foo/").unwrap();
+	/// let prefix = UriRef::new("https://example.org/foo").unwrap();
 	///
 	/// let (suffix, query, fragment) = uri.suffix(prefix).unwrap();
 	/// assert_eq!(suffix, "bar/baz");

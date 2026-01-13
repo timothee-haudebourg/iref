@@ -11,7 +11,7 @@ const PARENT_SEGMENT: &[u8] = b"..";
 /// URI path.
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(super::grammar::Path)]
-#[newtype(ord([u8], &[u8], Vec<u8>, str, &str, String), owned(PathBuf, derive(Default)))]
+#[newtype(ord([u8], &[u8], Vec<u8>, str, &str, String), owned(PathBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Path(str);
 
@@ -906,16 +906,17 @@ mod tests {
 
 	#[test]
 	fn suffix() {
-		let vectors: [(&[u8], &[u8], Option<&[u8]>); 3] = [
-			(b"/foo/bar/baz", b"/foo/bar", Some(b"baz")),
-			(b"//foo", b"/", Some(b".//foo")),
-			(b"/a/b/baz", b"/foo/bar", None),
+		let vectors: [(&str, &str, Option<&str>); _] = [
+			("/foo/bar/baz", "/foo/bar", Some("baz")),
+			("//foo", "/", Some(".//foo")),
+			("/a/b/baz", "/foo/bar", None),
+			("/foo/bar/baz", "/foo", Some("bar/baz")),
 		];
 
 		for (path, prefix, expected_suffix) in vectors {
 			let path = Path::new(path).unwrap();
 			let suffix = path.suffix(Path::new(prefix).unwrap());
-			assert_eq!(suffix.as_deref().map(Path::as_bytes), expected_suffix)
+			assert_eq!(suffix.as_deref().map(Path::as_str), expected_suffix)
 		}
 	}
 }
