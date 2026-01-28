@@ -209,6 +209,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod common;
+#[rustfmt::skip]
 pub mod iri;
 pub mod uri;
 mod uri_iri;
