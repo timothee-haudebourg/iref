@@ -191,18 +191,20 @@ impl<'a> PathMut<'a> {
 		if absolutize {
 			if disambiguate {
 				// Make the path absolute, and disambiguate.
+				let start = self.range.start;
 				let len = 3 + segment.len();
-				crate::utils::allocate_range(self.buffer, 0..0, len);
+				crate::utils::allocate_range(self.buffer, start..start, len);
 				self.range.end += len;
-				self.buffer[0..3].copy_from_slice(b"/./");
-				self.buffer[3..self.range.end].copy_from_slice(segment.as_bytes());
+				self.buffer[start..(start + 3)].copy_from_slice(b"/./");
+				self.buffer[(start + 3)..self.range.end].copy_from_slice(segment.as_bytes());
 			} else {
 				// Make the path absolute.
+				let start = self.range.start;
 				let len = 1 + segment.len();
-				crate::utils::allocate_range(self.buffer, 0..0, len);
+				crate::utils::allocate_range(self.buffer, start..start, len);
 				self.range.end += len;
-				self.buffer[0..1].copy_from_slice(b"/");
-				self.buffer[1..self.range.end].copy_from_slice(segment.as_bytes());
+				self.buffer[start..(start + 1)].copy_from_slice(b"/");
+				self.buffer[(start + 1)..self.range.end].copy_from_slice(segment.as_bytes());
 			}
 		} else if disambiguate {
 			// Add `./` before the segment (to disambiguate).
