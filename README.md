@@ -43,17 +43,15 @@ It features:
   - path normalization;
   - comparison modulo normalization;
   - URI/IRI-reference resolution;
-  - static URI/IRI parsing with the [`static-iref`] crate and its `iri`
-    macro; and
+  - static URI/IRI parsing using the [`uri!`]/[`iri!`] macros.
   - `serde` support (by enabling the `serde` feature).
-
-[`static-iref`]: https://crates.io/crates/static-iref
+  - `no_std` support (by disabling the default `std` feature).
 
 ### Basic usage
 
-You can parse IRI strings by wrapping an `Iri` instance around a `str` slice.
-Note that no memory allocation occurs using `Iri`, it only borrows the input data.
-Access to each component is done in constant time.
+You can parse an IRI string slice by simply calling [`Iri::new`].
+No memory allocation occurs using this function, it only borrows the input
+data, and validates it. Access to each component is done in linear time.
 
 ```rust
 use iref::Iri;
@@ -68,8 +66,8 @@ println!("fragment: {}", iri.fragment().unwrap());
 ```
 
 IRIs can be created and modified using the `IriBuf` type.
-With this type, the IRI is held in a single buffer,
-modified in-place to reduce memory allocation and optimize memory accesses.
+With this type, the IRI is held in a single buffer, modified in-place to
+reduce memory allocations and optimize memory accesses.
 This also allows the conversion from `IriBuf` into `Iri`.
 
 ```rust
@@ -86,14 +84,17 @@ iri.set_fragment(Some("fragment".try_into()?));
 assert_eq!(iri, "https://www.rust-lang.org:40/foo/bar?query#fragment");
 ```
 
-The `try_into` method is used to ensure that each string is syntactically correct with regard to its corresponding component (for instance, it is not possible to replace `"query"` with `"query?"` since `?` is not a valid query character).
+The `try_into` method is used to ensure that each string is syntactically
+correct (for instance, it is not possible to replace `"query"` with
+`"query?"` since `?` is not a valid query character).
 
 ### Detailed Usage
 
 #### Path manipulation
 
 The IRI path is accessed through the `path` or `path_mut` methods.
-It is possible to access the segments of a path using the iterator returned by the `segments` method.
+It is possible to access the segments of a path using the iterator returned
+by the `segments` method.
 
 ```rust
 for segment in iri.path().segments() {
@@ -188,6 +189,7 @@ This means that for instance, the IRI `http:a/b/../../../` is equivalent to
 
 Thanks to the [`pct-str` crate](https://crates.io/crates/pct-str),
 percent encoded characters are correctly handled.
-The two IRIs `http://example.org` and `http://exa%6dple.org` **are** equivalent.
+The two IRIs `http://example.org` and `http://exa%6dple.org` **are**
+equivalent.
 
 <!-- cargo-rdme end -->
