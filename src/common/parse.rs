@@ -199,7 +199,7 @@ pub enum UserInfoOrHost {
 pub fn user_info_or_host(bytes: &[u8], mut i: usize) -> (UserInfoOrHost, usize) {
 	while i < bytes.len() {
 		match bytes[i] {
-			b'[' => return (UserInfoOrHost::Host, bytes.len()),
+			b'[' => return (UserInfoOrHost::Host, host(bytes, i)),
 			b'@' => return (UserInfoOrHost::UserInfo, i),
 			b':' => {
 				// end of the host, or still in the user-info.
@@ -242,6 +242,7 @@ pub fn host(bytes: &[u8], mut i: usize) -> usize {
 	if !bytes.is_empty() && bytes[0] == b'[' {
 		// IP-literal.
 		i += 1;
+
 		while i < bytes.len() && bytes[i] != b']' {
 			i += 1
 		}
@@ -254,6 +255,9 @@ pub fn host(bytes: &[u8], mut i: usize) -> usize {
 	i
 }
 
+/// Find the host part of an authority.
+///
+/// `bytes` must end and the end of the authority.
 pub fn find_host(bytes: &[u8], i: usize) -> Range<usize> {
 	match user_info_or_host(bytes, i) {
 		(UserInfoOrHost::UserInfo, i) => {
@@ -570,6 +574,7 @@ mod tests {
 			("example.org:12", (UserInfoOrHost::Host, 11)),
 			(":12", (UserInfoOrHost::Host, 0)),
 			("[::]", (UserInfoOrHost::Host, 4)),
+			("[::]:12", (UserInfoOrHost::Host, 4)),
 		];
 
 		for (input, expected) in vectors {
@@ -583,6 +588,7 @@ mod tests {
 		let vectors = [
 			("example.org:12", None),
 			("user@example.org:12", Some("user")),
+			("[::]", None),
 		];
 
 		for (input, expected) in vectors {

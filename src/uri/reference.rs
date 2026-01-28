@@ -1166,9 +1166,10 @@ mod tests {
 			Option<&[u8]>,
 			Option<&[u8]>,
 		),
-	); 36] = [
+	); 38] = [
 		// 0 components.
 		(b"", (None, None, b"", None, None)),
+		(b"a/:", (None, None, b"a/:", None, None)),
 		// 1 component.
 		(b"scheme:", (Some(b"scheme"), None, b"", None, None)),
 		(b"//authority", (None, Some(b"authority"), b"", None, None)),
@@ -1182,6 +1183,7 @@ mod tests {
 			b"scheme:?query",
 			(Some(b"scheme"), None, b"", Some(b"query"), None),
 		),
+		(b"//[::]", (None, Some(b"[::]"), b"", None, None)),
 		// 2 components.
 		(
 			b"scheme://authority",
@@ -1359,6 +1361,20 @@ mod tests {
 			let input = UriRef::new(input).unwrap();
 			// eprintln!("{input}: {expected:?}");
 			assert_eq!(input.authority().map(Authority::as_bytes), expected.1)
+		}
+	}
+
+	#[test]
+	fn authority_port() {
+		let vectors: &[(&str, Option<&str>)] = &[("//[::]", None)];
+
+		for (input, expected) in vectors {
+			let uri = UriRef::new(input).unwrap();
+			assert_eq!(
+				uri.authority().and_then(|a| a.port()).map(|p| p.as_str()),
+				*expected,
+				"input: {input}"
+			);
 		}
 	}
 

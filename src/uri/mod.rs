@@ -795,3 +795,311 @@ impl PartialOrd<UriRefBuf> for UriBuf {
 		self.as_uri_ref().partial_cmp(other.as_uri_ref())
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn scheme() {
+		let vectors: &[(&str, &str)] = &[
+			("http:", "http"),
+			("https://example.org", "https"),
+			("ftp://ftp.example.org/file", "ftp"),
+			("mailto:user@example.org", "mailto"),
+			("urn:isbn:0451450523", "urn"),
+			("file:///path/to/file", "file"),
+			("custom-scheme://host", "custom-scheme"),
+			("a://b", "a"),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(uri.scheme().as_str(), *expected, "input: {input}");
+		}
+	}
+
+	#[test]
+	fn authority() {
+		let vectors: &[(&str, Option<&str>)] = &[
+			("http://example.org", Some("example.org")),
+			("http://example.org:8080", Some("example.org:8080")),
+			("http://user@example.org", Some("user@example.org")),
+			(
+				"http://user:pass@example.org:8080",
+				Some("user:pass@example.org:8080"),
+			),
+			("http://[::1]", Some("[::1]")),
+			("http://[::1]:8080", Some("[::1]:8080")),
+			("mailto:user@example.org", None),
+			("urn:isbn:0451450523", None),
+			("file:///path/to/file", Some("")),
+			("http://", Some("")),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(
+				uri.authority().map(|a| a.as_str()),
+				*expected,
+				"input: {input}"
+			);
+		}
+	}
+
+	#[test]
+	fn authority_host() {
+		let vectors: &[(&str, Option<&str>)] = &[
+			("http://example.org", Some("example.org")),
+			("http://example.org:8080", Some("example.org")),
+			("http://user@example.org", Some("example.org")),
+			("http://user:pass@example.org:8080", Some("example.org")),
+			("http://[::1]", Some("[::1]")),
+			("http://[::1]:8080", Some("[::1]")),
+			("http://192.168.1.1", Some("192.168.1.1")),
+			("mailto:user@example.org", None),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(
+				uri.authority().map(|a| a.host().as_str()),
+				*expected,
+				"input: {input}"
+			);
+		}
+	}
+
+	#[test]
+	fn authority_port() {
+		let vectors: &[(&str, Option<&str>)] = &[
+			("http://example.org", None),
+			("http://example.org:8080", Some("8080")),
+			("http://example.org:", Some("")),
+			("http://user@example.org:443", Some("443")),
+			("http://[::1]:8080", Some("8080")),
+			("mailto:user@example.org", None),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(
+				uri.authority().and_then(|a| a.port()).map(|p| p.as_str()),
+				*expected,
+				"input: {input}"
+			);
+		}
+	}
+
+	#[test]
+	fn authority_user_info() {
+		let vectors: &[(&str, Option<&str>)] = &[
+			("http://example.org", None),
+			("http://user@example.org", Some("user")),
+			("http://user:pass@example.org", Some("user:pass")),
+			("http://user:@example.org", Some("user:")),
+			("http://:pass@example.org", Some(":pass")),
+			("http://@example.org", Some("")),
+			("mailto:user@example.org", None),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(
+				uri.authority()
+					.and_then(|a| a.user_info())
+					.map(|u| u.as_str()),
+				*expected,
+				"input: {input}"
+			);
+		}
+	}
+
+	#[test]
+	fn path() {
+		let vectors: &[(&str, &str)] = &[
+			("http://example.org", ""),
+			("http://example.org/", "/"),
+			("http://example.org/path", "/path"),
+			("http://example.org/path/to/resource", "/path/to/resource"),
+			("http://example.org/path?query", "/path"),
+			("http://example.org/path#fragment", "/path"),
+			("mailto:user@example.org", "user@example.org"),
+			("urn:isbn:0451450523", "isbn:0451450523"),
+			("file:///path/to/file", "/path/to/file"),
+			("http://example.org/a/b/../c", "/a/b/../c"),
+			("http://example.org/path/", "/path/"),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(uri.path().as_str(), *expected, "input: {input}");
+		}
+	}
+
+	#[test]
+	fn query() {
+		let vectors: &[(&str, Option<&str>)] = &[
+			("http://example.org", None),
+			("http://example.org?", Some("")),
+			("http://example.org?query", Some("query")),
+			("http://example.org?key=value", Some("key=value")),
+			(
+				"http://example.org?key=value&other=123",
+				Some("key=value&other=123"),
+			),
+			("http://example.org/path?query", Some("query")),
+			("http://example.org?query#fragment", Some("query")),
+			("http://example.org#fragment", None),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(uri.query().map(|q| q.as_str()), *expected, "input: {input}");
+		}
+	}
+
+	#[test]
+	fn fragment() {
+		let vectors: &[(&str, Option<&str>)] = &[
+			("http://example.org", None),
+			("http://example.org#", Some("")),
+			("http://example.org#fragment", Some("fragment")),
+			("http://example.org#section-1", Some("section-1")),
+			("http://example.org/path#fragment", Some("fragment")),
+			("http://example.org?query#fragment", Some("fragment")),
+			("http://example.org?query", None),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(
+				uri.fragment().map(|f| f.as_str()),
+				*expected,
+				"input: {input}"
+			);
+		}
+	}
+
+	#[test]
+	fn parts() {
+		let vectors: &[(&str, &str, Option<&str>, &str, Option<&str>, Option<&str>)] = &[
+			// (uri, scheme, authority, path, query, fragment)
+			(
+				"http://example.org",
+				"http",
+				Some("example.org"),
+				"",
+				None,
+				None,
+			),
+			(
+				"https://user:pass@example.org:8080/path?query#fragment",
+				"https",
+				Some("user:pass@example.org:8080"),
+				"/path",
+				Some("query"),
+				Some("fragment"),
+			),
+			(
+				"mailto:user@example.org",
+				"mailto",
+				None,
+				"user@example.org",
+				None,
+				None,
+			),
+			(
+				"urn:isbn:0451450523",
+				"urn",
+				None,
+				"isbn:0451450523",
+				None,
+				None,
+			),
+			(
+				"file:///etc/passwd",
+				"file",
+				Some(""),
+				"/etc/passwd",
+				None,
+				None,
+			),
+			(
+				"http://[::1]:8080/",
+				"http",
+				Some("[::1]:8080"),
+				"/",
+				None,
+				None,
+			),
+			(
+				"http://example.org?",
+				"http",
+				Some("example.org"),
+				"",
+				Some(""),
+				None,
+			),
+			(
+				"http://example.org#",
+				"http",
+				Some("example.org"),
+				"",
+				None,
+				Some(""),
+			),
+			(
+				"http://example.org/?#",
+				"http",
+				Some("example.org"),
+				"/",
+				Some(""),
+				Some(""),
+			),
+		];
+
+		for (input, scheme, authority, path, query, fragment) in vectors {
+			let uri = Uri::new(input).unwrap();
+			let parts = uri.parts();
+
+			assert_eq!(
+				parts.scheme.as_str(),
+				*scheme,
+				"scheme mismatch for {input}"
+			);
+			assert_eq!(
+				parts.authority.map(|a| a.as_str()),
+				*authority,
+				"authority mismatch for {input}"
+			);
+			assert_eq!(parts.path.as_str(), *path, "path mismatch for {input}");
+			assert_eq!(
+				parts.query.map(|q| q.as_str()),
+				*query,
+				"query mismatch for {input}"
+			);
+			assert_eq!(
+				parts.fragment.map(|f| f.as_str()),
+				*fragment,
+				"fragment mismatch for {input}"
+			);
+		}
+	}
+
+	#[test]
+	fn base() {
+		let vectors: &[(&str, &str)] = &[
+			("http://example.org/a/b/c", "http://example.org/a/b/"),
+			("http://example.org/a/b/c/", "http://example.org/a/b/c/"),
+			("http://example.org/a", "http://example.org/"),
+			("http://example.org/", "http://example.org/"),
+			("http://example.org", "http://example.org"),
+		];
+
+		for (input, expected) in vectors {
+			let uri = Uri::new(input).unwrap();
+			assert_eq!(uri.base().as_str(), *expected, "input: {input}");
+		}
+	}
+}
