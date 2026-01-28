@@ -1,7 +1,14 @@
+use core::{
+	cmp::Ordering,
+	hash::{Hash, Hasher},
+};
+
 mod segment;
 pub use segment::*;
 
+#[cfg(feature = "std")]
 mod r#mut;
+#[cfg(feature = "std")]
 pub use r#mut::*;
 
 const CURRENT_SEGMENT: &[u8] = b".";
@@ -28,7 +35,11 @@ const PARENT_SEGMENT: &[u8] = b"..";
 /// ```
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(super::grammar::Path)]
-#[newtype(ord([u8], &[u8], Vec<u8>, str, &str, String), owned(PathBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[newtype(ord([u8], &[u8], str, &str))]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String), owned(PathBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))
+)]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Path(str);
 
@@ -306,6 +317,7 @@ impl Path {
 	/// assert_eq!(path.normalized(), "/foo/baz/qux");
 	/// ```
 	#[inline]
+	#[cfg(feature = "std")]
 	pub fn normalized(&self) -> PathBuf {
 		let mut result: PathBuf = if self.is_absolute() {
 			Self::EMPTY_ABSOLUTE.to_owned()
@@ -459,6 +471,7 @@ impl Path {
 	/// assert_eq!(suffix.as_str(), "baz");
 	/// ```
 	#[inline]
+	#[cfg(feature = "std")]
 	pub fn suffix(&self, prefix: &Self) -> Option<PathBuf> {
 		if self.is_absolute() != prefix.is_absolute() {
 			return None;
@@ -529,15 +542,14 @@ impl Eq for Path {}
 
 impl PartialOrd for Path {
 	#[inline]
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl Ord for Path {
 	#[inline]
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		use std::cmp::Ordering;
+	fn cmp(&self, other: &Self) -> Ordering {
 		if self.is_absolute() == other.is_absolute() {
 			let mut self_segments = self.normalized_segments();
 			let mut other_segments = other.normalized_segments();
@@ -562,9 +574,9 @@ impl Ord for Path {
 	}
 }
 
-impl std::hash::Hash for Path {
+impl Hash for Path {
 	#[inline]
-	fn hash<H: std::hash::Hasher>(&self, hasher: &mut H) {
+	fn hash<H: Hasher>(&self, hasher: &mut H) {
 		self.is_absolute().hash(hasher);
 		self.normalized_segments().for_each(move |s| s.hash(hasher))
 	}
@@ -687,6 +699,7 @@ impl<'a> DoubleEndedIterator for NormalizedSegments<'a> {
 
 impl<'a> ExactSizeIterator for NormalizedSegments<'a> {}
 
+#[cfg(feature = "std")]
 impl PathBuf {
 	/// Returns a mutable reference to the interior bytes.
 	///

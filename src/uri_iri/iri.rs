@@ -1,6 +1,7 @@
-use crate::{
-	InvalidUri, Iri, IriBuf, IriRef, IriRefBuf, Uri, UriBuf, UriRef, UriRefBuf, uri::InvalidUriRef,
-};
+use crate::{InvalidUri, Iri, IriRef, Uri, UriRef, uri::InvalidUriRef};
+
+#[cfg(feature = "std")]
+use crate::{IriBuf, IriRefBuf, UriBuf, UriRefBuf};
 
 impl Iri {
 	/// Converts this IRI into an URI, if possible.
@@ -30,6 +31,7 @@ impl<'a> TryFrom<&'a Iri> for &'a UriRef {
 	}
 }
 
+#[cfg(feature = "std")]
 impl IriBuf {
 	/// Converts this IRI into an URI, if possible.
 	pub fn try_into_uri(self) -> Result<UriBuf, InvalidUri<IriBuf>> {
@@ -46,6 +48,7 @@ impl IriBuf {
 	}
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<IriBuf> for UriBuf {
 	type Error = InvalidUri<IriBuf>;
 
@@ -54,6 +57,7 @@ impl TryFrom<IriBuf> for UriBuf {
 	}
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<IriBuf> for UriRefBuf {
 	type Error = InvalidUriRef<IriBuf>;
 
@@ -90,6 +94,7 @@ impl<'a> TryFrom<&'a IriRef> for &'a UriRef {
 	}
 }
 
+#[cfg(feature = "std")]
 impl IriRefBuf {
 	/// Converts this IRI reference into an URI, if possible.
 	pub fn try_into_uri(self) -> Result<UriBuf, InvalidUri<Self>> {

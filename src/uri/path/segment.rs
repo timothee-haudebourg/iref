@@ -1,15 +1,15 @@
-use std::ops::Deref;
+use core::ops::Deref;
 
 /// URI path segment.
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(super::super::grammar::Segment)]
 #[newtype(
 	no_deref,
-	ord([u8], &[u8], Vec<u8>, str, &str, String, pct_str::PctStr, &pct_str::PctStr, pct_str::PctString),
-	owned(
-		SegmentBuf,
-		derive(PartialEq, Eq, PartialOrd, Ord, Hash)
-	)
+	ord([u8], &[u8], str, &str, pct_str::PctStr, &pct_str::PctStr)
+)]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(SegmentBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Segment(str);

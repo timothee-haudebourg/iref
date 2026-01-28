@@ -1,4 +1,4 @@
-use std::ops::Range;
+use core::ops::Range;
 
 fn is_scheme_char(b: u8) -> bool {
 	// ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )

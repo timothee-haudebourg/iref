@@ -1,4 +1,4 @@
-use std::{
+use core::{
 	hash::{Hash, Hasher},
 	ops::Deref,
 };
@@ -8,11 +8,11 @@ use std::{
 #[automaton(super::super::grammar::UserInfo)]
 #[newtype(
 	no_deref,
-	ord([u8], &[u8], Vec<u8>, str, &str, String, pct_str::PctStr, &pct_str::PctStr, pct_str::PctString),
-	owned(
-		UserInfoBuf,
-		derive(PartialEq, Eq, PartialOrd, Ord, Hash)
-	)
+	ord([u8], &[u8], str, &str, pct_str::PctStr, &pct_str::PctStr)
+)]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(UserInfoBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct UserInfo(str);
@@ -63,6 +63,7 @@ impl Hash for UserInfo {
 	}
 }
 
+#[cfg(feature = "std")]
 impl UserInfoBuf {
 	pub fn into_pct_string(self) -> pct_str::PctString {
 		unsafe { pct_str::PctString::new_unchecked(self.0) }

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use super::{
 	InvalidAuthority, InvalidFragment, InvalidHost, InvalidPath, InvalidPort, InvalidQuery,
 	InvalidScheme, InvalidSegment, InvalidUri, InvalidUriRef, InvalidUserInfo,
@@ -16,27 +14,31 @@ macro_rules! uri_error {
 		}
 
 		$(
-			impl<'a> From<$ident<String>> for UriError<Cow<'a, str>> {
+		    #[cfg(feature = "std")]
+			impl<'a> From<$ident<String>> for UriError<std::borrow::Cow<'a, str>> {
 				fn from($ident(value): $ident<String>) -> Self {
-					Self::$variant($ident(Cow::Owned(value)))
+					Self::$variant($ident(std::borrow::Cow::Owned(value)))
 				}
 			}
 
-			impl<'a> From<$ident<&'a str>> for UriError<Cow<'a, str>> {
+			#[cfg(feature = "std")]
+			impl<'a> From<$ident<&'a str>> for UriError<std::borrow::Cow<'a, str>> {
 				fn from($ident(value): $ident<&'a str>) -> Self {
-					Self::$variant($ident(Cow::Borrowed(value)))
+					Self::$variant($ident(std::borrow::Cow::Borrowed(value)))
 				}
 			}
 
-			impl<'a> From<$ident<Vec<u8>>> for UriError<Cow<'a, [u8]>> {
+			#[cfg(feature = "std")]
+			impl<'a> From<$ident<Vec<u8>>> for UriError<std::borrow::Cow<'a, [u8]>> {
 				fn from($ident(value): $ident<Vec<u8>>) -> Self {
-					Self::$variant($ident(Cow::Owned(value)))
+					Self::$variant($ident(std::borrow::Cow::Owned(value)))
 				}
 			}
 
-			impl<'a> From<$ident<&'a [u8]>> for UriError<Cow<'a, [u8]>> {
+			#[cfg(feature = "std")]
+			impl<'a> From<$ident<&'a [u8]>> for UriError<std::borrow::Cow<'a, [u8]>> {
 				fn from($ident(value): $ident<&'a [u8]>) -> Self {
-					Self::$variant($ident(Cow::Borrowed(value)))
+					Self::$variant($ident(std::borrow::Cow::Borrowed(value)))
 				}
 			}
 		)*

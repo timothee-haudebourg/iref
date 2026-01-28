@@ -36,6 +36,7 @@
 //!   - URI/IRI-reference resolution;
 //!   - static URI/IRI parsing using the [`uri!`]/[`iri!`] macros.
 //!   - `serde` support (by enabling the `serde` feature).
+//!   - `no_std` support (by disabling the default `std` feature).
 //!
 //! ## Basic usage
 //!
@@ -205,13 +206,23 @@
 //! percent encoded characters are correctly handled.
 //! The two IRIs `http://example.org` and `http://exa%6dple.org` **are**
 //! equivalent.
+#![cfg_attr(not(feature = "std"), no_std)]
+
 mod common;
 pub mod iri;
 pub mod uri;
 mod uri_iri;
+
+#[cfg(feature = "std")]
 pub(crate) mod utils;
 
 pub use common::*;
 
-pub use iri::{InvalidIri, Iri, IriBuf, IriError, IriRef, IriRefBuf};
-pub use uri::{InvalidUri, Uri, UriBuf, UriError, UriRef, UriRefBuf};
+pub use iri::{InvalidIri, Iri, IriError, IriRef};
+pub use uri::{InvalidUri, Uri, UriError, UriRef};
+
+#[cfg(feature = "std")]
+pub use iri::{IriBuf, IriRefBuf};
+
+#[cfg(feature = "std")]
+pub use uri::{UriBuf, UriRefBuf};

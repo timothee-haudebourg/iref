@@ -1,10 +1,14 @@
-pub use crate::{InvalidPort, Port, PortBuf};
+#[cfg(feature = "std")]
+pub use crate::PortBuf;
+pub use crate::{InvalidPort, Port};
 
 mod host;
+#[cfg(feature = "std")]
 mod r#mut;
 mod userinfo;
 
 pub use host::*;
+#[cfg(feature = "std")]
 pub use r#mut::*;
 pub use userinfo::*;
 
@@ -26,7 +30,11 @@ pub use userinfo::*;
 /// ```
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(crate::uri::grammar::Authority)]
-#[newtype(ord([u8], &[u8], Vec<u8>, str, &str, String), owned(AuthorityBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[newtype(ord([u8], &[u8], str, &str))]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String), owned(AuthorityBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
+)]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Authority(str);
 
@@ -169,6 +177,7 @@ pub struct AuthorityParts<'a> {
 	pub port: Option<&'a Port>,
 }
 
+#[cfg(feature = "std")]
 impl AuthorityBuf {
 	/// Returns a mutable reference to this authority.
 	pub fn as_authority_mut(&mut self) -> AuthorityMut<'_> {

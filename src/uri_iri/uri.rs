@@ -1,8 +1,7 @@
-use std::borrow::Borrow;
+use crate::{InvalidIri, InvalidUri, Iri, IriRef, Uri, UriRef};
 
-use crate::{
-	InvalidIri, InvalidUri, Iri, IriBuf, IriRef, IriRefBuf, Uri, UriBuf, UriRef, UriRefBuf,
-};
+#[cfg(feature = "std")]
+use crate::{IriBuf, IriRefBuf, UriBuf, UriRefBuf};
 
 impl Uri {
 	pub fn as_iri(&self) -> &Iri {
@@ -14,6 +13,7 @@ impl Uri {
 	}
 }
 
+#[cfg(feature = "std")]
 impl UriBuf {
 	pub fn into_iri(self) -> IriBuf {
 		unsafe { IriBuf::new_unchecked(self.into_bytes()) }
@@ -24,25 +24,29 @@ impl UriBuf {
 	}
 }
 
+#[cfg(feature = "std")]
 impl AsRef<Iri> for UriBuf {
 	fn as_ref(&self) -> &Iri {
 		self.as_iri()
 	}
 }
 
+#[cfg(feature = "std")]
 impl AsRef<IriRef> for UriBuf {
 	fn as_ref(&self) -> &IriRef {
 		self.as_iri_ref()
 	}
 }
 
-impl Borrow<Iri> for UriBuf {
+#[cfg(feature = "std")]
+impl std::borrow::Borrow<Iri> for UriBuf {
 	fn borrow(&self) -> &Iri {
 		self.as_iri()
 	}
 }
 
-impl Borrow<IriRef> for UriBuf {
+#[cfg(feature = "std")]
+impl std::borrow::Borrow<IriRef> for UriBuf {
 	fn borrow(&self) -> &IriRef {
 		self.as_iri_ref()
 	}
@@ -92,6 +96,7 @@ impl<'a> TryFrom<&'a UriRef> for &'a Iri {
 	}
 }
 
+#[cfg(feature = "std")]
 impl UriRefBuf {
 	pub fn into_iri_ref(self) -> IriRefBuf {
 		unsafe { IriRefBuf::new_unchecked(self) }
@@ -106,18 +111,21 @@ impl UriRefBuf {
 	}
 }
 
+#[cfg(feature = "std")]
 impl AsRef<IriRef> for UriRefBuf {
 	fn as_ref(&self) -> &IriRef {
 		self.as_iri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl From<UriRefBuf> for IriRefBuf {
 	fn from(value: UriRefBuf) -> Self {
 		value.into_iri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<UriRefBuf> for IriBuf {
 	type Error = InvalidIri<UriRefBuf>;
 

@@ -1,11 +1,14 @@
-use static_automata::grammar;
-use std::{
-	borrow::Borrow,
+use core::{
+	cmp::Ordering,
 	hash::{self, Hash},
 	ops::Deref,
 };
+use static_automata::grammar;
 
-pub use crate::{InvalidScheme, Scheme, SchemeBuf};
+pub use crate::{InvalidScheme, Scheme};
+
+#[cfg(feature = "std")]
+pub use crate::SchemeBuf;
 
 mod authority;
 mod error;
@@ -46,7 +49,11 @@ pub(crate) mod grammar {}
 /// # }
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(grammar::Uri)]
-#[newtype(name = "URI", no_deref, ord([u8], &[u8], Vec<u8>, str, &str, String), owned(UriBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[newtype(name = "URI", no_deref, ord([u8], &[u8], str, &str))]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String), owned(UriBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
+)]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Uri(str);
 
@@ -144,6 +151,7 @@ impl Uri {
 	///
 	/// assert_eq!(base.joined(reference), "https://example.org/baz");
 	/// ```
+	#[cfg(feature = "std")]
 	pub fn joined(&self, input: impl AsRef<UriRef>) -> UriBuf {
 		let mut result = self.to_owned();
 		result.join(input);
@@ -165,6 +173,7 @@ impl Uri {
 	/// assert_eq!(base.try_joined("../baz").unwrap(), "https://example.org/baz");
 	/// assert!(base.try_joined("not a valid uri ref\0").is_err());
 	/// ```
+	#[cfg(feature = "std")]
 	pub fn try_joined<'r>(&self, input: &'r str) -> Result<UriBuf, InvalidUriRef<&'r str>> {
 		UriRef::new(input).map(|r| self.joined(r))
 	}
@@ -200,19 +209,19 @@ impl<'a> PartialEq<&'a Uri> for Uri {
 impl Eq for Uri {}
 
 impl PartialOrd for Uri {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl<'a> PartialOrd<&'a Uri> for Uri {
-	fn partial_cmp(&self, other: &&'a Self) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &&'a Self) -> Option<Ordering> {
 		self.partial_cmp(*other)
 	}
 }
 
 impl Ord for Uri {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+	fn cmp(&self, other: &Self) -> Ordering {
 		self.parts().cmp(&other.parts())
 	}
 }
@@ -250,6 +259,7 @@ pub struct UriParts<'a> {
 	pub fragment: Option<&'a Fragment>,
 }
 
+#[cfg(feature = "std")]
 impl UriBuf {
 	#[inline]
 	unsafe fn replace(&mut self, range: core::ops::Range<usize>, content: &[u8]) {
@@ -702,6 +712,7 @@ macro_rules! uri {
 	};
 }
 
+#[cfg(feature = "std")]
 impl UriBuf {
 	/// Converts this URI into a URI reference.
 	///
@@ -722,56 +733,65 @@ impl UriBuf {
 	}
 }
 
+#[cfg(feature = "std")]
 impl AsRef<UriRef> for UriBuf {
 	fn as_ref(&self) -> &UriRef {
 		self.as_uri_ref()
 	}
 }
 
-impl Borrow<UriRef> for UriBuf {
+#[cfg(feature = "std")]
+impl std::borrow::Borrow<UriRef> for UriBuf {
 	fn borrow(&self) -> &UriRef {
 		self.as_uri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl From<UriBuf> for UriRefBuf {
 	fn from(value: UriBuf) -> Self {
 		value.into_uri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialEq<UriRef> for UriBuf {
 	fn eq(&self, other: &UriRef) -> bool {
 		*self.as_uri_ref() == *other
 	}
 }
 
+#[cfg(feature = "std")]
 impl<'a> PartialEq<&'a UriRef> for UriBuf {
 	fn eq(&self, other: &&'a UriRef) -> bool {
 		*self.as_uri_ref() == **other
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialEq<UriRefBuf> for UriBuf {
 	fn eq(&self, other: &UriRefBuf) -> bool {
 		*self.as_uri_ref() == *other.as_uri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialOrd<UriRef> for UriBuf {
-	fn partial_cmp(&self, other: &UriRef) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &UriRef) -> Option<Ordering> {
 		self.as_uri_ref().partial_cmp(other)
 	}
 }
 
+#[cfg(feature = "std")]
 impl<'a> PartialOrd<&'a UriRef> for UriBuf {
-	fn partial_cmp(&self, other: &&'a UriRef) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &&'a UriRef) -> Option<Ordering> {
 		self.as_uri_ref().partial_cmp(*other)
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialOrd<UriRefBuf> for UriBuf {
-	fn partial_cmp(&self, other: &UriRefBuf) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &UriRefBuf) -> Option<Ordering> {
 		self.as_uri_ref().partial_cmp(other.as_uri_ref())
 	}
 }

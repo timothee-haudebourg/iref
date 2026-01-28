@@ -1,18 +1,21 @@
-use std::{
+use core::{
 	cmp::Ordering,
 	hash::{Hash, Hasher},
 	ops::Deref,
 };
 
-use pct_str::{PctStr, PctString};
+use pct_str::PctStr;
 
 /// URI authority host.
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(crate::uri::grammar::Host)]
 #[newtype(
 	no_deref,
-	ord([u8], &[u8], Vec<u8>, str, &str, String, pct_str::PctStr, &pct_str::PctStr, pct_str::PctString),
-	owned(HostBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash))
+	ord([u8], &[u8], str, &str, pct_str::PctStr, &pct_str::PctStr)
+)]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(HostBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Host(str);
@@ -63,9 +66,10 @@ impl Hash for Host {
 	}
 }
 
+#[cfg(feature = "std")]
 impl HostBuf {
-	pub fn into_pct_string(self) -> PctString {
-		unsafe { PctString::new_unchecked(self.0) }
+	pub fn into_pct_string(self) -> pct_str::PctString {
+		unsafe { pct_str::PctString::new_unchecked(self.0) }
 	}
 }
 

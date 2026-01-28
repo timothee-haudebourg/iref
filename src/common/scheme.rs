@@ -1,16 +1,19 @@
+use core::{
+	cmp::Ordering,
+	hash::{Hash, Hasher},
+};
 use static_automata::Validate;
-use std::hash::Hash;
 use str_newtype::StrNewType;
 
 /// URI or IRI scheme.
 #[derive(Validate, StrNewType)]
 #[automaton(super::grammar::Scheme)]
 #[newtype(
-	ord([u8], &[u8], Vec<u8>, str, &str, String),
-	owned(
-		SchemeBuf,
-		derive(PartialEq, Eq, PartialOrd, Ord, Hash)
-	)
+	ord([u8], &[u8], str, &str),
+)]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String), owned(SchemeBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Scheme(str);
@@ -35,13 +38,13 @@ impl PartialEq for Scheme {
 impl Eq for Scheme {}
 
 impl PartialOrd for Scheme {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl Ord for Scheme {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+	fn cmp(&self, other: &Self) -> Ordering {
 		self.chars()
 			.map(|c| c.to_ascii_lowercase())
 			.cmp(other.chars().map(|c| c.to_ascii_lowercase()))
@@ -49,7 +52,7 @@ impl Ord for Scheme {
 }
 
 impl Hash for Scheme {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+	fn hash<H: Hasher>(&self, state: &mut H) {
 		for c in self.chars().map(|c| c.to_ascii_lowercase()) {
 			state.write_u32(c as u32);
 		}

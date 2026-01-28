@@ -1,17 +1,29 @@
-use std::hash::{self, Hash};
-
-use crate::{InvalidUri, Uri, UriBuf};
-
-use super::{
-	Authority, AuthorityMut, Fragment, Host, InvalidAuthority, InvalidFragment, InvalidPath,
-	InvalidQuery, Path, PathBuf, PathMut, Query, Scheme, Segment, UserInfo,
+use core::{
+	cmp::Ordering,
+	hash::{Hash, Hasher},
 };
-use crate::Port;
+
+use crate::{Port, Uri};
+
+#[cfg(feature = "std")]
+use crate::{InvalidUri, UriBuf};
+
+use super::{Authority, Fragment, Host, Path, Query, Scheme, UserInfo};
+
+#[cfg(feature = "std")]
+use super::{
+	AuthorityMut, InvalidAuthority, InvalidFragment, InvalidPath, InvalidQuery, PathBuf, PathMut,
+	Segment,
+};
 
 /// URI reference.
 #[derive(static_automata::Validate, str_newtype::StrNewType)]
 #[automaton(super::grammar::UriRef)]
-#[newtype(name = "URI reference", ord([u8], &[u8], Vec<u8>, str, &str, String), owned(UriRefBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))]
+#[newtype(name = "URI reference", ord([u8], &[u8], str, &str))]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String), owned(UriRefBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))
+)]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct UriRef(str);
 
@@ -126,6 +138,7 @@ impl UriRef {
 	///
 	/// assert_eq!(uri, "https://example.org/path");
 	/// ```
+	#[cfg(feature = "std")]
 	pub fn with_scheme(&self, scheme: &Scheme) -> UriBuf {
 		self.to_owned().into_with_scheme(scheme)
 	}
@@ -256,6 +269,7 @@ impl UriRef {
 	/// let other = UriRef::new("https://example.org/other").unwrap();
 	/// assert_eq!(other.relative_to(base), "../other");
 	/// ```
+	#[cfg(feature = "std")]
 	#[inline]
 	pub fn relative_to(&self, other: &Self) -> UriRefBuf {
 		let mut result = <UriRefBuf>::default();
@@ -341,6 +355,7 @@ impl UriRef {
 	/// assert_eq!(query.unwrap(), "query");
 	/// assert!(fragment.is_none());
 	/// ```
+	#[cfg(feature = "std")]
 	#[inline]
 	pub fn suffix(
 		&self,
@@ -382,6 +397,7 @@ impl UriRef {
 	///
 	/// See the [`UriRefBuf::resolve`] method for more information about the
 	/// resolution process.
+	#[cfg(feature = "std")]
 	#[inline]
 	pub fn resolved(&self, base_iri: impl AsRef<Uri>) -> UriBuf {
 		let iri_ref = self.to_owned();
@@ -392,6 +408,7 @@ impl UriRef {
 	///
 	/// Same as [`Self::resolved`] but accepts a `&str` instead of an
 	/// URI. Returns an error if the input is not a valid URI.
+	#[cfg(feature = "std")]
 	pub fn try_resolved<'r>(
 		&self,
 		base_iri: &'r str,
@@ -460,6 +477,7 @@ impl<'a> PartialEq<&'a Uri> for UriRef {
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialEq<UriBuf> for UriRef {
 	fn eq(&self, other: &UriBuf) -> bool {
 		*self == *other.as_uri_ref()
@@ -469,43 +487,44 @@ impl PartialEq<UriBuf> for UriRef {
 impl Eq for UriRef {}
 
 impl PartialOrd for UriRef {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 impl<'a> PartialOrd<&'a UriRef> for UriRef {
-	fn partial_cmp(&self, other: &&'a Self) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &&'a Self) -> Option<Ordering> {
 		self.partial_cmp(*other)
 	}
 }
 
 impl PartialOrd<Uri> for UriRef {
-	fn partial_cmp(&self, other: &Uri) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Uri) -> Option<Ordering> {
 		self.partial_cmp(other.as_uri_ref())
 	}
 }
 
 impl<'a> PartialOrd<&'a Uri> for UriRef {
-	fn partial_cmp(&self, other: &&'a Uri) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &&'a Uri) -> Option<Ordering> {
 		self.partial_cmp(other.as_uri_ref())
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialOrd<UriBuf> for UriRef {
-	fn partial_cmp(&self, other: &UriBuf) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &UriBuf) -> Option<Ordering> {
 		self.partial_cmp(other.as_uri_ref())
 	}
 }
 
 impl Ord for UriRef {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+	fn cmp(&self, other: &Self) -> Ordering {
 		self.parts().cmp(&other.parts())
 	}
 }
 
 impl Hash for UriRef {
-	fn hash<H: hash::Hasher>(&self, state: &mut H) {
+	fn hash<H: Hasher>(&self, state: &mut H) {
 		self.parts().hash(state)
 	}
 }
@@ -516,6 +535,7 @@ impl<'a> From<&'a Uri> for &'a UriRef {
 	}
 }
 
+#[cfg(feature = "std")]
 impl UriRefBuf {
 	#[inline]
 	unsafe fn replace(&mut self, range: core::ops::Range<usize>, content: &[u8]) {
@@ -1082,6 +1102,7 @@ impl UriRefBuf {
 	}
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<UriRefBuf> for UriBuf {
 	type Error = InvalidUri<UriRefBuf>;
 
@@ -1090,38 +1111,44 @@ impl TryFrom<UriRefBuf> for UriBuf {
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialEq<Uri> for UriRefBuf {
 	fn eq(&self, other: &Uri) -> bool {
 		*self.as_uri_ref() == *other.as_uri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl<'a> PartialEq<&'a Uri> for UriRefBuf {
 	fn eq(&self, other: &&'a Uri) -> bool {
 		*self.as_uri_ref() == *other.as_uri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialEq<UriBuf> for UriRefBuf {
 	fn eq(&self, other: &UriBuf) -> bool {
 		*self.as_uri_ref() == *other.as_uri_ref()
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialOrd<Uri> for UriRefBuf {
-	fn partial_cmp(&self, other: &Uri) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Uri) -> Option<Ordering> {
 		self.as_uri_ref().partial_cmp(other.as_uri_ref())
 	}
 }
 
+#[cfg(feature = "std")]
 impl<'a> PartialOrd<&'a Uri> for UriRefBuf {
-	fn partial_cmp(&self, other: &&'a Uri) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &&'a Uri) -> Option<Ordering> {
 		self.as_uri_ref().partial_cmp(other.as_uri_ref())
 	}
 }
 
+#[cfg(feature = "std")]
 impl PartialOrd<UriBuf> for UriRefBuf {
-	fn partial_cmp(&self, other: &UriBuf) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &UriBuf) -> Option<Ordering> {
 		self.as_uri_ref().partial_cmp(other.as_uri_ref())
 	}
 }

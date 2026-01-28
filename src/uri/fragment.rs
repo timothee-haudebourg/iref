@@ -3,8 +3,11 @@
 #[automaton(super::grammar::Fragment)]
 #[newtype(
 	no_deref,
-	ord([u8], &[u8], Vec<u8>, str, &str, String, pct_str::PctStr, &pct_str::PctStr, pct_str::PctString),
-	owned(FragmentBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash))
+	ord([u8], &[u8], str, &str, pct_str::PctStr, &pct_str::PctStr)
+)]
+#[cfg_attr(
+	feature = "std",
+	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(FragmentBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Fragment(str);
@@ -55,6 +58,7 @@ impl core::hash::Hash for Fragment {
 	}
 }
 
+#[cfg(feature = "std")]
 impl FragmentBuf {
 	pub fn into_pct_string(self) -> pct_str::PctString {
 		unsafe { pct_str::PctString::new_unchecked(self.0) }
