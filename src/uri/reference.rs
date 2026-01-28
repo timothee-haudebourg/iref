@@ -1402,10 +1402,7 @@ mod tests {
 	}
 
 	fn test_resolution(base_uri: &Uri, uri_ref: &UriRef, expected: &Uri) {
-		eprintln!("base = {base_uri}");
-		eprintln!("ref = {uri_ref}");
 		assert_eq!(uri_ref.resolved(base_uri), expected);
-		eprintln!("::resolved ok");
 		assert_eq!(base_uri.joined(uri_ref), expected);
 	}
 
