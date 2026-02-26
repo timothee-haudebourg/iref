@@ -1053,6 +1053,17 @@ impl PathBuf {
 	}
 }
 
+#[cfg(feature = "std")]
+impl<'a> FromIterator<&'a Segment> for PathBuf {
+	fn from_iter<I: IntoIterator<Item = &'a Segment>>(iter: I) -> Self {
+		let mut path = PathBuf::default();
+		for segment in iter {
+			path.push(segment);
+		}
+		path
+	}
+}
+
 /// Parses a URI [`Path`] at compile time.
 #[macro_export]
 macro_rules! path {
