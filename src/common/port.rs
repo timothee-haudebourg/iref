@@ -22,6 +22,48 @@ macro_rules! port {
 	};
 }
 
+macro_rules! port_as_int {
+	($(($method:ident, $ty:ident)),*) => {
+		impl Port {
+			$(
+				/// Tries to parse the port as a
+				#[doc = "`"]
+				#[doc = stringify!($ty)]
+				#[doc = "`"]
+				/// numeric value.
+				///
+				/// Returns `None` if the port number is out of range.
+				pub fn $method(&self) -> Option<$ty> {
+					self.as_str().parse().ok()
+				}
+			)*
+		}
+
+		$(
+			impl TryFrom<&Port> for $ty {
+				type Error = core::num::ParseIntError;
+
+				fn try_from(port: &Port) -> Result<Self, Self::Error> {
+					port.as_str().parse()
+				}
+			}
+		)*
+	};
+}
+
+port_as_int!(
+	(as_u8, u8),
+	(as_u16, u16),
+	(as_u32, u32),
+	(as_u64, u64),
+	(as_u128, u128),
+	(as_i8, i8),
+	(as_i16, i16),
+	(as_i32, i32),
+	(as_i64, i64),
+	(as_i128, i128)
+);
+
 impl Port {
 	pub const HTTP: &Self = port!("80");
 	pub const HTTPS: &Self = port!("443");
@@ -30,17 +72,16 @@ impl Port {
 #[cfg(feature = "std")]
 mod port_buf {
 	macro_rules! port_from_uint {
-		($ty:ident) => {
-			impl From<$ty> for super::PortBuf {
-				fn from(value: $ty) -> Self {
-					unsafe { Self::new_unchecked(value.to_string()) }
+		($($ty:ident),*) => {
+			$(
+				impl From<$ty> for super::PortBuf {
+					fn from(value: $ty) -> Self {
+						unsafe { Self::new_unchecked(value.to_string()) }
+					}
 				}
-			}
+			)*
 		};
 	}
 
-	port_from_uint!(u8);
-	port_from_uint!(u16);
-	port_from_uint!(u32);
-	port_from_uint!(u64);
+	port_from_uint!(u8, u16, u32, u64, u128);
 }
