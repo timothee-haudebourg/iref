@@ -139,7 +139,11 @@ impl Path {
 	/// ```
 	#[inline]
 	pub fn segment_count(&self) -> usize {
-		self.segments().count()
+		if self.is_empty() {
+			0
+		} else {
+			1 + self.as_bytes()[1..].iter().filter(|&&b| b == b'/').count()
+		}
 	}
 
 	fn first_segment_offset(&self) -> usize {
@@ -280,6 +284,7 @@ impl Path {
 				path: self,
 				offset: self.first_segment_offset(),
 				back_offset: self.as_bytes().len() + 1,
+				remaining: self.segment_count(),
 			}
 		}
 	}
@@ -588,6 +593,7 @@ pub enum Segments<'a> {
 		path: &'a Path,
 		offset: usize,
 		back_offset: usize,
+		remaining: usize,
 	},
 }
 
@@ -601,11 +607,48 @@ impl<'a> Iterator for Segments<'a> {
 				path,
 				offset,
 				back_offset,
+				remaining,
 			} => {
 				if offset < back_offset {
 					match unsafe { path.next_segment_from(*offset) } {
 						Some((segment, i)) => {
 							*offset = i;
+							*remaining -= 1;
+							Some(segment)
+						}
+						None => None,
+					}
+				} else {
+					None
+				}
+			}
+		}
+	}
+
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		let len = match self {
+			Self::Empty => 0,
+			Self::NonEmpty { remaining, .. } => *remaining,
+		};
+		(len, Some(len))
+	}
+}
+
+impl<'a> DoubleEndedIterator for Segments<'a> {
+	fn next_back(&mut self) -> Option<Self::Item> {
+		match self {
+			Segments::Empty => None,
+			Segments::NonEmpty {
+				path,
+				offset,
+				back_offset,
+				remaining,
+			} => {
+				if offset < back_offset {
+					match unsafe { path.previous_segment_from(*back_offset) } {
+						Some((segment, i)) => {
+							*back_offset = i;
+							*remaining -= 1;
 							Some(segment)
 						}
 						None => None,
@@ -618,30 +661,7 @@ impl<'a> Iterator for Segments<'a> {
 	}
 }
 
-impl<'a> DoubleEndedIterator for Segments<'a> {
-	fn next_back(&mut self) -> Option<Self::Item> {
-		match self {
-			Segments::Empty => None,
-			Segments::NonEmpty {
-				path,
-				offset,
-				back_offset,
-			} => {
-				if offset < back_offset {
-					match unsafe { path.previous_segment_from(*back_offset) } {
-						Some((segment, i)) => {
-							*back_offset = i;
-							Some(segment)
-						}
-						None => None,
-					}
-				} else {
-					None
-				}
-			}
-		}
-	}
-}
+impl<'a> ExactSizeIterator for Segments<'a> {}
 
 /// Stack size (in number of `&Segment`) allocated for [`NormalizedSegments`] to
 /// normalize a `Path`. If it needs more space, it will allocate memory on the
