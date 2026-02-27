@@ -29,6 +29,16 @@ macro_rules! scheme {
 	};
 }
 
+impl Scheme {
+	pub const HTTP: &Self = scheme!("http");
+	pub const HTTPS: &Self = scheme!("https");
+	pub const FILE: &Self = scheme!("file");
+	pub const FTP: &Self = scheme!("ftp");
+	pub const URN: &Self = scheme!("urn");
+	pub const DATA: &Self = scheme!("data");
+	pub const MAILTO: &Self = scheme!("mailto");
+}
+
 impl PartialEq for Scheme {
 	fn eq(&self, other: &Self) -> bool {
 		self.as_str().eq_ignore_ascii_case(other.as_str())
