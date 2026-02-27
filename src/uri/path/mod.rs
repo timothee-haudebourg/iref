@@ -721,6 +721,49 @@ impl<'a> ExactSizeIterator for NormalizedSegments<'a> {}
 
 #[cfg(feature = "std")]
 impl PathBuf {
+	/// Builds a path from the given segments.
+	///
+	/// If `absolute` is `true`, the path will start with `/`.
+	/// Each segment is appended using [`push`](Self::push), which
+	/// interprets `.` and `..` segments.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{PathBuf, Segment};
+	///
+	/// let abs = PathBuf::from_segments(true, [
+	///     Segment::new("a").unwrap(),
+	///     Segment::new("b").unwrap(),
+	///     Segment::new("c").unwrap(),
+	/// ]);
+	/// assert_eq!(abs, "/a/b/c");
+	///
+	/// let rel = PathBuf::from_segments(false, [
+	///     Segment::new("a").unwrap(),
+	///     Segment::new("b").unwrap(),
+	///     Segment::new("c").unwrap(),
+	/// ]);
+	/// assert_eq!(rel, "a/b/c");
+	/// ```
+	pub fn from_segments<'a>(
+		absolute: bool,
+		segments: impl IntoIterator<Item = &'a Segment>,
+	) -> Self {
+		let mut path = if absolute {
+			Path::EMPTY_ABSOLUTE
+		} else {
+			Path::EMPTY
+		}
+		.to_owned();
+
+		for segment in segments {
+			path.push(segment);
+		}
+
+		path
+	}
+
 	/// Returns a mutable reference to the interior bytes.
 	///
 	/// # Safety
