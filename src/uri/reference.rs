@@ -143,6 +143,78 @@ impl UriRef {
 		self.to_owned().into_with_scheme(scheme)
 	}
 
+	/// Returns a copy of this URI reference with the given authority.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriRef, uri::Authority};
+	///
+	/// let uri_ref = UriRef::new("https://example.org/path").unwrap();
+	/// let new = uri_ref.with_authority(Some(Authority::new("other.com").unwrap()));
+	/// assert_eq!(new, "https://other.com/path");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_authority(&self, authority: Option<&Authority>) -> UriRefBuf {
+		let mut buf = self.to_owned();
+		buf.set_authority(authority);
+		buf
+	}
+
+	/// Returns a copy of this URI reference with the given path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriRef, uri::Path};
+	///
+	/// let uri_ref = UriRef::new("https://example.org/old").unwrap();
+	/// let new = uri_ref.with_path(Path::new("/new").unwrap());
+	/// assert_eq!(new, "https://example.org/new");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_path(&self, path: &Path) -> UriRefBuf {
+		let mut buf = self.to_owned();
+		buf.set_path(path);
+		buf
+	}
+
+	/// Returns a copy of this URI reference with the given query.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriRef, uri::Query};
+	///
+	/// let uri_ref = UriRef::new("https://example.org/path").unwrap();
+	/// let new = uri_ref.with_query(Some(Query::new("key=value").unwrap()));
+	/// assert_eq!(new, "https://example.org/path?key=value");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_query(&self, query: Option<&Query>) -> UriRefBuf {
+		let mut buf = self.to_owned();
+		buf.set_query(query);
+		buf
+	}
+
+	/// Returns a copy of this URI reference with the given fragment.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{UriRef, uri::Fragment};
+	///
+	/// let uri_ref = UriRef::new("https://example.org/path").unwrap();
+	/// let new = uri_ref.with_fragment(Some(Fragment::new("section").unwrap()));
+	/// assert_eq!(new, "https://example.org/path#section");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_fragment(&self, fragment: Option<&Fragment>) -> UriRefBuf {
+		let mut buf = self.to_owned();
+		buf.set_fragment(fragment);
+		buf
+	}
+
 	/// Returns the authority part of the URI reference, if any.
 	///
 	/// # Example

@@ -184,6 +184,96 @@ impl Uri {
 	pub fn as_uri_ref(&self) -> &UriRef {
 		unsafe { UriRef::new_unchecked(&self.0) }
 	}
+
+	/// Returns a copy of this URI with the given scheme.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{Uri, Scheme};
+	///
+	/// let uri = Uri::new("http://example.org/path").unwrap();
+	/// let new = uri.with_scheme(Scheme::new(b"https").unwrap());
+	/// assert_eq!(new, "https://example.org/path");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_scheme(&self, scheme: &Scheme) -> UriBuf {
+		let mut buf = self.to_owned();
+		buf.set_scheme(scheme);
+		buf
+	}
+
+	/// Returns a copy of this URI with the given authority.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{Uri, uri::Authority};
+	///
+	/// let uri = Uri::new("https://example.org/path").unwrap();
+	/// let new = uri.with_authority(Some(Authority::new("other.com").unwrap()));
+	/// assert_eq!(new, "https://other.com/path");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_authority(&self, authority: Option<&Authority>) -> UriBuf {
+		let mut buf = self.to_owned();
+		buf.set_authority(authority);
+		buf
+	}
+
+	/// Returns a copy of this URI with the given path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{Uri, uri::Path};
+	///
+	/// let uri = Uri::new("https://example.org/old").unwrap();
+	/// let new = uri.with_path(Path::new("/new").unwrap());
+	/// assert_eq!(new, "https://example.org/new");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_path(&self, path: &Path) -> UriBuf {
+		let mut buf = self.to_owned();
+		buf.set_path(path);
+		buf
+	}
+
+	/// Returns a copy of this URI with the given query.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{Uri, uri::Query};
+	///
+	/// let uri = Uri::new("https://example.org/path").unwrap();
+	/// let new = uri.with_query(Some(Query::new("key=value").unwrap()));
+	/// assert_eq!(new, "https://example.org/path?key=value");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_query(&self, query: Option<&Query>) -> UriBuf {
+		let mut buf = self.to_owned();
+		buf.set_query(query);
+		buf
+	}
+
+	/// Returns a copy of this URI with the given fragment.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::{Uri, uri::Fragment};
+	///
+	/// let uri = Uri::new("https://example.org/path").unwrap();
+	/// let new = uri.with_fragment(Some(Fragment::new("section").unwrap()));
+	/// assert_eq!(new, "https://example.org/path#section");
+	/// ```
+	#[cfg(feature = "std")]
+	pub fn with_fragment(&self, fragment: Option<&Fragment>) -> UriBuf {
+		let mut buf = self.to_owned();
+		buf.set_fragment(fragment);
+		buf
+	}
 }
 
 impl Deref for Uri {
