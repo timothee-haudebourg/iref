@@ -251,6 +251,62 @@ impl UriRef {
 			.map(|range| unsafe { Fragment::new_unchecked_from_bytes(&bytes[range]) })
 	}
 
+	/// Returns this URI reference without the fragment component.
+	///
+	/// If the URI reference has a fragment (e.g. `#section`), it is removed
+	/// along with the `#` delimiter. If there is no fragment, the original
+	/// URI reference is returned unchanged.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri_ref = UriRef::new("https://example.org/path?query#frag").unwrap();
+	/// assert_eq!(uri_ref.without_fragment(), "https://example.org/path?query");
+	///
+	/// let no_frag = UriRef::new("https://example.org/path").unwrap();
+	/// assert_eq!(no_frag.without_fragment(), "https://example.org/path");
+	/// ```
+	pub fn without_fragment(&self) -> &Self {
+		let bytes = self.as_bytes();
+		match crate::common::parse::find_fragment(bytes, 0) {
+			Ok(range) => unsafe { Self::new_unchecked_from_bytes(&bytes[..range.start - 1]) },
+			Err(_) => self,
+		}
+	}
+
+	/// Returns this URI reference without the query and fragment components.
+	///
+	/// If the URI reference has a query (e.g. `?key=value`) or fragment
+	/// (e.g. `#section`), they are removed along with their delimiters.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::UriRef;
+	///
+	/// let uri_ref = UriRef::new("https://example.org/path?query#frag").unwrap();
+	/// assert_eq!(
+	///     uri_ref.without_query_and_fragment(),
+	///     "https://example.org/path"
+	/// );
+	///
+	/// let no_query = UriRef::new("https://example.org/path#frag").unwrap();
+	/// assert_eq!(
+	///     no_query.without_query_and_fragment(),
+	///     "https://example.org/path"
+	/// );
+	/// ```
+	pub fn without_query_and_fragment(&self) -> &Self {
+		let bytes = self.as_bytes();
+		let end = match crate::common::parse::find_query(bytes, 0) {
+			Ok(range) => range.start - 1,
+			Err(i) => i,
+		};
+		unsafe { Self::new_unchecked_from_bytes(&bytes[..end]) }
+	}
+
 	/// Returns this URI reference relative to the given base.
 	///
 	/// Computes a relative URI reference that, when resolved against `other`,
