@@ -232,6 +232,32 @@ impl Hash for Uri {
 	}
 }
 
+impl PartialEq<UriRef> for Uri {
+	fn eq(&self, other: &UriRef) -> bool {
+		*self.as_uri_ref() == *other
+	}
+}
+
+impl PartialOrd<UriRef> for Uri {
+	fn partial_cmp(&self, other: &UriRef) -> Option<Ordering> {
+		self.as_uri_ref().partial_cmp(other)
+	}
+}
+
+#[cfg(feature = "std")]
+impl PartialEq<UriRefBuf> for Uri {
+	fn eq(&self, other: &UriRefBuf) -> bool {
+		*self.as_uri_ref() == *other.as_uri_ref()
+	}
+}
+
+#[cfg(feature = "std")]
+impl PartialOrd<UriRefBuf> for Uri {
+	fn partial_cmp(&self, other: &UriRefBuf) -> Option<Ordering> {
+		self.as_uri_ref().partial_cmp(other.as_uri_ref())
+	}
+}
+
 /// Individual components of a URI.
 ///
 /// Contains references to each component of a URI as defined
