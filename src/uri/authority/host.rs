@@ -26,6 +26,43 @@ impl Host {
 	pub fn as_pct_str(&self) -> &PctStr {
 		unsafe { PctStr::new_unchecked(self.as_str()) }
 	}
+
+	/// Returns `true` if this host is an IP-literal (IPv6 address or
+	/// IPvFuture).
+	///
+	/// IP-literals are enclosed in brackets (`[...]`) as defined in
+	/// RFC 3986.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Host;
+	///
+	/// assert!(Host::new("[::1]").unwrap().is_ip_literal());
+	/// assert!(!Host::new("example.org").unwrap().is_ip_literal());
+	/// ```
+	pub fn is_ip_literal(&self) -> bool {
+		self.as_bytes().first() == Some(&b'[')
+	}
+
+	/// Returns `true` if this host is an IPv4 address.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Host;
+	///
+	/// assert!(Host::new("127.0.0.1").unwrap().is_ipv4());
+	/// assert!(!Host::new("[::1]").unwrap().is_ipv4());
+	/// assert!(!Host::new("example.org").unwrap().is_ipv4());
+	/// ```
+	pub fn is_ipv4(&self) -> bool {
+		let bytes = self.as_bytes();
+		!bytes.is_empty()
+			&& bytes[0].is_ascii_digit()
+			&& bytes.iter().all(|&b| b.is_ascii_digit() || b == b'.')
+			&& bytes.iter().filter(|&&b| b == b'.').count() == 3
+	}
 }
 
 impl Deref for Host {
