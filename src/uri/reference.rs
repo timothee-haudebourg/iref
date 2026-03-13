@@ -6,7 +6,7 @@ use core::{
 use crate::{Port, Uri};
 
 #[cfg(feature = "std")]
-use crate::{InvalidUri, UriBuf};
+use crate::{InvalidUri, PathContext, UriBuf};
 
 use super::{Authority, Fragment, Host, Path, Query, Scheme, UserInfo};
 
@@ -1134,16 +1134,25 @@ impl UriRefBuf {
 			} else {
 				self.set_authority(base_iri.authority());
 
-				let mut path_buffer = <UriBuf>::from_scheme(base_iri.scheme().to_owned()); // we set the scheme to avoid path disambiguation.
-				path_buffer.set_authority(base_iri.authority()); // we set the authority to avoid path disambiguation.
+				let base_path = base_iri.path();
+				let mut path = if base_path.is_empty() && base_iri.authority().is_some() {
+					Path::EMPTY_ABSOLUTE.to_owned()
+				} else {
+					base_path.parent_or_empty().to_owned()
+				};
 
-				path_buffer.set_path(base_iri.path().parent_or_empty());
-				path_buffer
-					.path_mut()
-					.normalize()
-					.append(self.path().segments());
+				PathMut::from_path_with_context(
+					&mut path,
+					PathContext {
+						// Set the context manually to prevent disambiguation logic.
+						has_scheme: false,
+						has_authority: false,
+					},
+				)
+				.normalize()
+				.append(self.path().segments());
 
-				self.set_path(path_buffer.path());
+				self.set_path(&path);
 			}
 		}
 	}
@@ -1572,184 +1581,161 @@ mod tests {
 		assert_eq!(uri_ref.as_str(), "/.//path")
 	}
 
-	fn test_resolution(base_uri: &Uri, uri_ref: &UriRef, expected: &Uri) {
-		assert_eq!(uri_ref.resolved(base_uri), expected);
-		assert_eq!(base_uri.joined(uri_ref), expected);
-	}
+	fn test_resolution<'a>(base: &str, vectors: impl IntoIterator<Item = (&'a str, &'a str)>) {
+		let base_uri = Uri::new(base).unwrap();
+		for (reference, expected) in vectors {
+			let uri_ref = UriRef::new(reference).unwrap();
+			let expected_uri = Uri::new(expected).unwrap();
 
-	#[test]
-	fn unambiguous_resolution() {
-		let base_uri = Uri::new("http:/a/b").unwrap();
-		let tests = [("../..//", "http:/")];
-
-		for (uri_ref, expected) in tests {
-			test_resolution(
-				base_uri,
-				UriRef::new(uri_ref).unwrap(),
-				Uri::new(expected).unwrap(),
+			assert_eq!(
+				uri_ref.resolved(base_uri),
+				expected_uri,
+				"resolved({reference:?}, {base:?})",
+			);
+			assert_eq!(
+				base_uri.joined(uri_ref),
+				expected_uri,
+				"joined({base:?}, {reference:?})",
 			);
 		}
 	}
 
+	/// RFC 3986 Section 5.4 — Normal examples.
+	/// https://www.w3.org/2004/04/uri-rel-test.html
 	#[test]
 	fn resolution_normal() {
-		// https://www.w3.org/2004/04/uri-rel-test.html
-		let base_uri = Uri::new("http://a/b/c/d;p?q").unwrap();
-
-		let tests = [
-			("g:h", "g:h"),
-			("g", "http://a/b/c/g"),
-			("./g", "http://a/b/c/g"),
-			("g/", "http://a/b/c/g/"),
-			("/g", "http://a/g"),
-			("//g", "http://g"),
-			("?y", "http://a/b/c/d;p?y"),
-			("g?y", "http://a/b/c/g?y"),
-			("#s", "http://a/b/c/d;p?q#s"),
-			("g#s", "http://a/b/c/g#s"),
-			("g?y#s", "http://a/b/c/g?y#s"),
-			(";x", "http://a/b/c/;x"),
-			("g;x", "http://a/b/c/g;x"),
-			("g;x?y#s", "http://a/b/c/g;x?y#s"),
-			("", "http://a/b/c/d;p?q"),
-			(".", "http://a/b/c/"),
-			("./", "http://a/b/c/"),
-			("..", "http://a/b/"),
-			("../", "http://a/b/"),
-			("../g", "http://a/b/g"),
-			("../..", "http://a/"),
-			("../../", "http://a/"),
-			("../../g", "http://a/g"),
-		];
-
-		for (uri_ref, expected) in tests {
-			test_resolution(
-				base_uri,
-				UriRef::new(uri_ref).unwrap(),
-				Uri::new(expected).unwrap(),
-			);
-		}
+		test_resolution(
+			"http://a/b/c/d;p?q",
+			[
+				("g:h", "g:h"),
+				("g", "http://a/b/c/g"),
+				("./g", "http://a/b/c/g"),
+				("g/", "http://a/b/c/g/"),
+				("/g", "http://a/g"),
+				("//g", "http://g"),
+				("?y", "http://a/b/c/d;p?y"),
+				("g?y", "http://a/b/c/g?y"),
+				("#s", "http://a/b/c/d;p?q#s"),
+				("g#s", "http://a/b/c/g#s"),
+				("g?y#s", "http://a/b/c/g?y#s"),
+				(";x", "http://a/b/c/;x"),
+				("g;x", "http://a/b/c/g;x"),
+				("g;x?y#s", "http://a/b/c/g;x?y#s"),
+				("", "http://a/b/c/d;p?q"),
+				(".", "http://a/b/c/"),
+				("./", "http://a/b/c/"),
+				("..", "http://a/b/"),
+				("../", "http://a/b/"),
+				("../g", "http://a/b/g"),
+				("../..", "http://a/"),
+				("../../", "http://a/"),
+				("../../g", "http://a/g"),
+			],
+		);
 	}
 
+	/// RFC 3986 Section 5.4 — Abnormal examples.
+	/// NOTE we implement [Errata 4547](https://www.rfc-editor.org/errata/eid4547).
 	#[test]
 	fn resolution_abnormal() {
-		// https://www.w3.org/2004/04/uri-rel-test.html
-		// NOTE we implement [Errata 4547](https://www.rfc-editor.org/errata/eid4547)
-		let base_uri = Uri::new("http://a/b/c/d;p?q").unwrap();
-
-		let tests = [
-			("../../../g", "http://a/g"),
-			("../../../../g", "http://a/g"),
-			("/./g", "http://a/g"),
-			("/../g", "http://a/g"),
-			("g.", "http://a/b/c/g."),
-			(".g", "http://a/b/c/.g"),
-			("g..", "http://a/b/c/g.."),
-			("..g", "http://a/b/c/..g"),
-			("./../g", "http://a/b/g"),
-			("./g/.", "http://a/b/c/g/"),
-			("g/./h", "http://a/b/c/g/h"),
-			("g/../h", "http://a/b/c/h"),
-			("g;x=1/./y", "http://a/b/c/g;x=1/y"),
-			("g;x=1/../y", "http://a/b/c/y"),
-			("g?y/./x", "http://a/b/c/g?y/./x"),
-			("g?y/../x", "http://a/b/c/g?y/../x"),
-			("g#s/./x", "http://a/b/c/g#s/./x"),
-			("g#s/../x", "http://a/b/c/g#s/../x"),
-			("http:g", "http:g"),
-		];
-
-		for (uri_ref, expected) in tests {
-			test_resolution(
-				base_uri,
-				UriRef::new(uri_ref).unwrap(),
-				Uri::new(expected).unwrap(),
-			);
-		}
+		test_resolution(
+			"http://a/b/c/d;p?q",
+			[
+				("../../../g", "http://a/g"),
+				("../../../../g", "http://a/g"),
+				("/./g", "http://a/g"),
+				("/../g", "http://a/g"),
+				("g.", "http://a/b/c/g."),
+				(".g", "http://a/b/c/.g"),
+				("g..", "http://a/b/c/g.."),
+				("..g", "http://a/b/c/..g"),
+				("./../g", "http://a/b/g"),
+				("./g/.", "http://a/b/c/g/"),
+				("g/./h", "http://a/b/c/g/h"),
+				("g/../h", "http://a/b/c/h"),
+				("g;x=1/./y", "http://a/b/c/g;x=1/y"),
+				("g;x=1/../y", "http://a/b/c/y"),
+				("g?y/./x", "http://a/b/c/g?y/./x"),
+				("g?y/../x", "http://a/b/c/g?y/../x"),
+				("g#s/./x", "http://a/b/c/g#s/./x"),
+				("g#s/../x", "http://a/b/c/g#s/../x"),
+				("http:g", "http:g"),
+			],
+		);
 	}
 
 	#[test]
-	fn more_resolutions1() {
-		let base_uri = Uri::new("http://a/bb/ccc/d;p?q").unwrap();
-
-		let tests = [
-			("#s", "http://a/bb/ccc/d;p?q#s"),
-			("", "http://a/bb/ccc/d;p?q"),
-		];
-
-		for (uri_ref, expected) in tests {
-			test_resolution(
-				base_uri,
-				UriRef::new(uri_ref).unwrap(),
-				Uri::new(expected).unwrap(),
-			);
-		}
+	fn resolution_ambiguous_double_slash() {
+		test_resolution("http:/a/b", [("../..//", "http:/")]);
 	}
 
 	#[test]
-	fn more_resolutions2() {
-		let base_uri = Uri::new("http://a/bb/ccc/./d;p?q").unwrap();
-
-		let tests = [
-			("..", "http://a/bb/"),
-			("../", "http://a/bb/"),
-			("../g", "http://a/bb/g"),
-			("../..", "http://a/"),
-			("../../", "http://a/"),
-			("../../g", "http://a/g"),
-		];
-
-		for (uri_ref, expected) in tests {
-			test_resolution(
-				base_uri,
-				UriRef::new(uri_ref).unwrap(),
-				Uri::new(expected).unwrap(),
-			);
-		}
+	fn resolution_longer_segments() {
+		test_resolution(
+			"http://a/bb/ccc/d;p?q",
+			[
+				("#s", "http://a/bb/ccc/d;p?q#s"),
+				("", "http://a/bb/ccc/d;p?q"),
+			],
+		);
 	}
 
 	#[test]
-	fn more_resolutions3() {
-		let base_uri = Uri::new("http://ab//de//ghi").unwrap();
-
-		let tests = [
-			("xyz", "http://ab//de//xyz"),
-			("./xyz", "http://ab//de//xyz"),
-			("../xyz", "http://ab//de/xyz"),
-		];
-
-		for (uri_ref, expected) in tests {
-			test_resolution(
-				base_uri,
-				UriRef::new(uri_ref).unwrap(),
-				Uri::new(expected).unwrap(),
-			);
-		}
+	fn resolution_dot_segments_in_base() {
+		test_resolution(
+			"http://a/bb/ccc/./d;p?q",
+			[
+				("..", "http://a/bb/"),
+				("../", "http://a/bb/"),
+				("../g", "http://a/bb/g"),
+				("../..", "http://a/"),
+				("../../", "http://a/"),
+				("../../g", "http://a/g"),
+			],
+		);
 	}
 
 	#[test]
-	fn more_resolutions4() {
-		let base_uri = Uri::new("http://a/bb/ccc/../d;p?q").unwrap();
-
-		let tests = [("../../", "http://a/")];
-
-		for (uri_ref, expected) in tests {
-			test_resolution(
-				base_uri,
-				UriRef::new(uri_ref).unwrap(),
-				Uri::new(expected).unwrap(),
-			);
-		}
+	fn resolution_double_slashes_in_base() {
+		test_resolution(
+			"http://ab//de//ghi",
+			[
+				("xyz", "http://ab//de//xyz"),
+				("./xyz", "http://ab//de//xyz"),
+				("../xyz", "http://ab//de/xyz"),
+			],
+		);
 	}
 
-	// https://github.com/timothee-haudebourg/iref/issues/14
 	#[test]
-	fn reference_resolution_with_scheme_no_disambiguation() {
-		let base = Uri::new("scheme:a:b/").unwrap();
-		let mut iri = UriRefBuf::new("Foo".to_string()).unwrap();
-		iri.resolve(base);
+	fn resolution_parent_segments_in_base() {
+		test_resolution("http://a/bb/ccc/../d;p?q", [("../../", "http://a/")]);
+	}
 
-		assert_eq!(iri.to_string(), "scheme:a:b/Foo")
+	/// https://github.com/timothee-haudebourg/iref/issues/14
+	#[test]
+	fn resolution_scheme_no_authority() {
+		test_resolution("scheme:a:b/", [("Foo", "scheme:a:b/Foo")]);
+	}
+
+	/// RFC 3986 Section 5.2.3: base URI with authority and empty path.
+	#[test]
+	fn resolution_empty_base_path() {
+		test_resolution(
+			"http://a",
+			[
+				(".", "http://a/"),
+				("./", "http://a/"),
+				("..", "http://a/"),
+				("../", "http://a/"),
+				("../g", "http://a/g"),
+				("g", "http://a/g"),
+				("g/", "http://a/g/"),
+				("g/h", "http://a/g/h"),
+				("?q", "http://a?q"),
+				("#f", "http://a#f"),
+			],
+		);
 	}
 
 	#[test]

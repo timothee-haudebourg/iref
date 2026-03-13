@@ -110,7 +110,7 @@ impl<'a> PathMut<'a> {
 	}
 
 	pub fn from_path_with_context(path: &'a mut PathBuf, context: PathContext) -> Self {
-		assert!(path.is_absolute() || path.is_empty());
+		assert!(!context.has_authority || path.is_absolute() || path.is_empty());
 
 		let buffer = unsafe {
 			// Safe because `PathMut` preserves well formed paths.
@@ -553,13 +553,12 @@ impl<'a> PathMut<'a> {
 			b""
 		};
 
-		let range = self.range.start..self.range.end;
-		let start = range.start;
-		let total_len = prefix.len() + path.len();
-		crate::utils::allocate_range(self.buffer, range, total_len);
-		self.buffer[start..(start + prefix.len())].copy_from_slice(prefix);
-		self.buffer[(start + prefix.len())..(start + total_len)].copy_from_slice(path.as_bytes());
-		self.range.end = self.range.start + total_len;
+		let i = self.range.start;
+		let len = prefix.len() + path.len();
+		crate::utils::allocate_range(self.buffer, self.range.start..self.range.end, len);
+		self.buffer[i..(i + prefix.len())].copy_from_slice(prefix);
+		self.buffer[(i + prefix.len())..(i + len)].copy_from_slice(path.as_bytes());
+		self.range.end = self.range.start + len;
 
 		self
 	}

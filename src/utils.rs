@@ -5,25 +5,17 @@ pub fn allocate_range(buffer: &mut Vec<u8>, range: Range<usize>, len: usize) {
 
 	// move the content around.
 	if range_len != len {
-		let tail_len = buffer.len() - range.end; // the length of the content in the buffer after [range].
 		let new_end = range.start + len;
 
 		if range_len > len {
 			// shrink
-			for i in 0..tail_len {
-				buffer[new_end + i] = buffer[range.end + i];
-			}
-
-			buffer.resize(new_end + tail_len, 0);
+			buffer.copy_within(range.end.., new_end);
+			buffer.truncate(new_end + (buffer.len() - range.end));
 		} else {
 			// grow
-			let tail_len = buffer.len() - range.end;
-
-			buffer.resize(new_end + tail_len, 0);
-
-			for i in 0..tail_len {
-				buffer[new_end + tail_len - i - 1] = buffer[range.end + tail_len - i - 1];
-			}
+			let old_len = buffer.len();
+			buffer.resize(old_len + (len - range_len), 0);
+			buffer.copy_within(range.end..old_len, new_end);
 		}
 	}
 }
