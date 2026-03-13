@@ -239,7 +239,7 @@ pub fn find_user_info(bytes: &[u8], mut i: usize) -> Option<Range<usize>> {
 }
 
 pub fn host(bytes: &[u8], mut i: usize) -> usize {
-	if !bytes.is_empty() && bytes[0] == b'[' {
+	if i < bytes.len() && bytes[i] == b'[' {
 		// IP-literal.
 		i += 1;
 
