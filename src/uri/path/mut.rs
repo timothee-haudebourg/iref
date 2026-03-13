@@ -1,6 +1,8 @@
 use core::fmt;
 use std::ops::{Deref, Range};
 
+use crate::PathContext;
+
 use super::{InvalidPath, InvalidSegment, Path, PathBuf, Segment};
 
 const CURRENT_SEGMENT: &[u8] = b".";
@@ -32,9 +34,7 @@ pub struct PathMut<'a> {
 	/// Path range.
 	range: Range<usize>,
 
-	/// Determines if the path follows an authority part,
-	/// in which case some disambiguation rules applies.
-	follows_authority: bool,
+	context: PathContext,
 }
 
 impl<'a> Deref for PathMut<'a> {
@@ -75,13 +75,12 @@ impl<'a> PathMut<'a> {
 	/// The buffer content between in the range `start..end` must be a valid
 	/// IRI path.
 	pub unsafe fn new_unchecked(buffer: &'a mut Vec<u8>, range: Range<usize>) -> Self {
-		let follows_authority =
-			crate::common::parse::find_authority(&buffer[..range.start], 0).is_ok();
+		let context = PathContext::from_bytes(&buffer[..range.start]);
 
 		Self {
 			buffer,
 			range,
-			follows_authority,
+			context,
 		}
 	}
 
@@ -106,20 +105,11 @@ impl<'a> PathMut<'a> {
 		Self {
 			buffer,
 			range: 0..end,
-			follows_authority: false,
+			context: PathContext::default(),
 		}
 	}
 
-	/// Creates a mutable path reference from a path buffer, assuming it
-	/// follows an authority.
-	///
-	/// This is mostly for testing.
-	///
-	/// # Panic
-	///
-	/// This function will panic if the path is relative and non-empty, since
-	/// such path cannot follow an authority.
-	pub fn from_path_following_authority(path: &'a mut PathBuf) -> Self {
+	pub fn from_path_with_context(path: &'a mut PathBuf, context: PathContext) -> Self {
 		assert!(path.is_absolute() || path.is_empty());
 
 		let buffer = unsafe {
@@ -131,7 +121,7 @@ impl<'a> PathMut<'a> {
 		Self {
 			buffer,
 			range: 0..end,
-			follows_authority: true,
+			context,
 		}
 	}
 
@@ -179,68 +169,27 @@ impl<'a> PathMut<'a> {
 	/// assert_eq!(path, "/foo/bar//");
 	/// ```
 	pub fn lazy_push(&mut self, segment: &super::Segment) -> &mut Self {
-		let absolutize = self.follows_authority && self.is_empty() && self.is_relative();
+		let prepend_slash = !self.is_empty() || (self.context.has_authority && self.is_relative());
+		let prepend_dot = self.is_empty()
+			&& ((!self.context.has_scheme
+				&& !self.context.has_authority
+				&& segment.looks_like_scheme())
+				|| segment.is_empty());
 
-		// Disambiguate if the path is empty and one of the following is true:
-		// - `segment` looks like a scheme and path is a the start.
-		// - `segment` is empty, path is absolute and following an authority.
-		// - `segment` is empty, path is relative.
-		let disambiguate = self.is_empty()
-			&& ((self.range.start == 0 && segment.looks_like_scheme()) || segment.is_empty());
+		let prefix: &[u8] = match (prepend_slash, prepend_dot) {
+			(true, true) => b"/./",
+			(true, false) => b"/",
+			(false, true) => b"./",
+			(false, false) => b"",
+		};
 
-		if absolutize {
-			if disambiguate {
-				// Make the path absolute, and disambiguate.
-				let start = self.range.start;
-				let len = 3 + segment.len();
-				crate::utils::allocate_range(self.buffer, start..start, len);
-				self.range.end += len;
-				self.buffer[start..(start + 3)].copy_from_slice(b"/./");
-				self.buffer[(start + 3)..self.range.end].copy_from_slice(segment.as_bytes());
-			} else {
-				// Make the path absolute.
-				let start = self.range.start;
-				let len = 1 + segment.len();
-				crate::utils::allocate_range(self.buffer, start..start, len);
-				self.range.end += len;
-				self.buffer[start..(start + 1)].copy_from_slice(b"/");
-				self.buffer[(start + 1)..self.range.end].copy_from_slice(segment.as_bytes());
-			}
-		} else if disambiguate {
-			// Add `./` before the segment (to disambiguate).
-			let start = self.first_segment_offset();
-			let len = 2 + segment.len();
-			crate::utils::allocate_range(self.buffer, start..start, len);
-			self.range.end += len;
-			let offset = start + 2;
-			self.buffer[start..offset].copy_from_slice(b"./");
-			self.buffer[offset..self.range.end].copy_from_slice(segment.as_bytes());
-		} else if self.is_empty() {
-			// Simply replace.
-			crate::utils::replace(
-				self.buffer,
-				self.range.end..self.range.end,
-				segment.as_bytes(),
-			);
-			self.range.end += segment.len();
-		} else {
-			// Append.
-			let bytes = self.as_bytes();
-			let mut start_offset = 0usize;
-			if (self.follows_authority || bytes.len() > 3) && bytes.ends_with(b"/./") {
-				// we can remove the `./` here.
-				start_offset = 2;
-			};
+		let i = self.range.end;
+		let len = prefix.len() + segment.len();
+		self.range.end += len;
 
-			let start = self.range.end - start_offset;
-			let len = 1 + segment.len();
-			crate::utils::allocate_range(self.buffer, start..self.range.end, len);
-
-			self.buffer[start] = b'/';
-			self.range.end += len - start_offset;
-			let segment_offset = start + 1;
-			self.buffer[segment_offset..self.range.end].copy_from_slice(segment.as_bytes());
-		}
+		crate::utils::allocate_range(self.buffer, i..i, len);
+		self.buffer[i..(i + prefix.len())].copy_from_slice(prefix);
+		self.buffer[(i + prefix.len())..self.range.end].copy_from_slice(segment.as_bytes());
 
 		self
 	}
@@ -585,43 +534,32 @@ impl<'a> PathMut<'a> {
 	/// assert_eq!(path, "/baz/qux");
 	/// ```
 	pub fn replace(&mut self, path: &Path) -> &mut Self {
-		let range = self.range.start..self.range.end;
-
-		let has_authority = self.follows_authority;
-		if !has_authority && path.as_bytes().starts_with(b"//") {
-			// AMBIGUITY: The URI `http:old/path` would become
-			//            `http://new_path`, but `//new_path` is not the
-			//            authority.
-			// SOLUTION:  We change `//new_path` to `/.//new_path`.
-			let start = range.start;
-			let actual_start = start + 2;
-			crate::utils::allocate_range(self.buffer, range, path.len() + 2);
-			self.buffer[start..actual_start].copy_from_slice(b"/.");
-			self.buffer[actual_start..(actual_start + path.len())].copy_from_slice(path.as_bytes());
-			self.range.end = self.range.start + path.len() + 2;
-		} else if has_authority && !path.is_empty() && path.is_relative() {
-			// VALIDITY: When an authority is present, the path must be
-			//           absolute, unless it is empty.
-			let start = range.start;
-			let actual_start = start + 1;
-			crate::utils::allocate_range(self.buffer, range, path.len() + 1);
-			self.buffer[start] = b'/';
-			self.buffer[actual_start..(actual_start + path.len())].copy_from_slice(path.as_bytes());
-			self.range.end = self.range.start + path.len() + 1;
-		} else if range.start == 0 && path.looks_like_scheme() {
-			// AMBIGUITY: The URI `old/path` would become `new:path`, but `new`
-			//            is not the scheme.
-			// SOLUTION:  We change `new:path` to `./new:path`.
-			let start = range.start;
-			let actual_start = start + 2;
-			crate::utils::allocate_range(self.buffer, range, path.len() + 2);
-			self.buffer[start..actual_start].copy_from_slice(b"./");
-			self.buffer[actual_start..(actual_start + path.len())].copy_from_slice(path.as_bytes());
-			self.range.end = self.range.start + path.len() + 2;
+		// Determine disambiguation prefix.
+		let prefix: &[u8] = if !self.context.has_authority && path.as_bytes().starts_with(b"//") {
+			// AMBIGUITY: `http:old/path` → `http://new_path` would make
+			//            `//new_path` look like an authority.
+			b"/."
+		} else if self.context.has_authority && !path.is_empty() && path.is_relative() {
+			// VALIDITY: path must be absolute when an authority is present.
+			b"/"
+		} else if !self.context.has_scheme
+			&& !self.context.has_authority
+			&& path.looks_like_scheme()
+		{
+			// AMBIGUITY: `old/path` → `new:path` would make `new` look
+			//            like a scheme.
+			b"./"
 		} else {
-			crate::utils::replace(self.buffer, range, path.as_bytes());
-			self.range.end = self.range.start + path.len();
-		}
+			b""
+		};
+
+		let range = self.range.start..self.range.end;
+		let start = range.start;
+		let total_len = prefix.len() + path.len();
+		crate::utils::allocate_range(self.buffer, range, total_len);
+		self.buffer[start..(start + prefix.len())].copy_from_slice(prefix);
+		self.buffer[(start + prefix.len())..(start + total_len)].copy_from_slice(path.as_bytes());
+		self.range.end = self.range.start + total_len;
 
 		self
 	}
@@ -729,7 +667,13 @@ mod tests {
 
 		for (path, segment, expected) in vectors {
 			let mut path = PathBuf::new(path.to_vec()).unwrap();
-			let mut path_mut = PathMut::from_path_following_authority(&mut path);
+			let mut path_mut = PathMut::from_path_with_context(
+				&mut path,
+				PathContext {
+					has_scheme: false,
+					has_authority: true,
+				},
+			);
 			let segment = Segment::new(&segment).unwrap();
 			path_mut.lazy_push(segment);
 			assert_eq!(path_mut.as_bytes(), expected)
@@ -788,9 +732,15 @@ mod tests {
 
 		for (a, b, expected) in vectors {
 			let mut path = PathBuf::new(a.to_owned()).unwrap();
-			PathMut::from_path_following_authority(&mut path)
-				.try_replace(b)
-				.unwrap();
+			PathMut::from_path_with_context(
+				&mut path,
+				PathContext {
+					has_scheme: false,
+					has_authority: true,
+				},
+			)
+			.try_replace(b)
+			.unwrap();
 			assert_eq!(path.as_str(), expected)
 		}
 	}
@@ -820,7 +770,13 @@ mod tests {
 
 		for (path, expected) in vectors {
 			let mut path = PathBuf::new(path.to_vec()).unwrap();
-			let mut path_mut = PathMut::from_path_following_authority(&mut path);
+			let mut path_mut = PathMut::from_path_with_context(
+				&mut path,
+				PathContext {
+					has_scheme: false,
+					has_authority: true,
+				},
+			);
 			path_mut.pop();
 			assert_eq!(path_mut.as_bytes(), expected)
 		}
