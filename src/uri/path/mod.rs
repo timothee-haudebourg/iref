@@ -1,4 +1,5 @@
 use core::{
+	cell::Cell,
 	cmp::Ordering,
 	hash::{Hash, Hasher},
 };
@@ -284,7 +285,8 @@ impl Path {
 				path: self,
 				offset: self.first_segment_offset(),
 				back_offset: self.as_bytes().len() + 1,
-				remaining: self.segment_count(),
+				consumed: 0,
+				total: Cell::new(None),
 			}
 		}
 	}
@@ -593,7 +595,8 @@ pub enum Segments<'a> {
 		path: &'a Path,
 		offset: usize,
 		back_offset: usize,
-		remaining: usize,
+		consumed: usize,
+		total: Cell<Option<usize>>,
 	},
 }
 
@@ -607,13 +610,14 @@ impl<'a> Iterator for Segments<'a> {
 				path,
 				offset,
 				back_offset,
-				remaining,
+				consumed,
+				..
 			} => {
 				if offset < back_offset {
 					match unsafe { path.next_segment_from(*offset) } {
 						Some((segment, i)) => {
 							*offset = i;
-							*remaining -= 1;
+							*consumed += 1;
 							Some(segment)
 						}
 						None => None,
@@ -628,7 +632,22 @@ impl<'a> Iterator for Segments<'a> {
 	fn size_hint(&self) -> (usize, Option<usize>) {
 		let len = match self {
 			Self::Empty => 0,
-			Self::NonEmpty { remaining, .. } => *remaining,
+			Self::NonEmpty {
+				path,
+				consumed,
+				total,
+				..
+			} => {
+				let t = match total.get() {
+					Some(t) => t,
+					None => {
+						let t = path.segment_count();
+						total.set(Some(t));
+						t
+					}
+				};
+				t - *consumed
+			}
 		};
 		(len, Some(len))
 	}
@@ -642,13 +661,14 @@ impl<'a> DoubleEndedIterator for Segments<'a> {
 				path,
 				offset,
 				back_offset,
-				remaining,
+				consumed,
+				..
 			} => {
 				if offset < back_offset {
 					match unsafe { path.previous_segment_from(*back_offset) } {
 						Some((segment, i)) => {
 							*back_offset = i;
-							*remaining -= 1;
+							*consumed += 1;
 							Some(segment)
 						}
 						None => None,
