@@ -1,5 +1,6 @@
 use core::{
 	cmp::Ordering,
+	fmt::Write,
 	hash::{Hash, Hasher},
 	ops::Deref,
 };
@@ -208,6 +209,97 @@ impl HostBuf {
 	pub fn into_pct_string(self) -> pct_str::PctString {
 		unsafe { pct_str::PctString::new_unchecked(self.0) }
 	}
+
+	/// Creates a [`HostBuf`] from an IPv4 address represented as a `u32`.
+	///
+	/// The octets are extracted from the most significant byte first
+	/// (e.g., `0x7f000001` becomes `"127.0.0.1"`).
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::HostBuf;
+	///
+	/// assert_eq!(HostBuf::from_ipv4(0x7f000001).as_str(), "127.0.0.1");
+	/// assert_eq!(HostBuf::from_ipv4(0).as_str(), "0.0.0.0");
+	/// ```
+	pub fn from_ipv4(addr: u32) -> Self {
+		let s = format!(
+			"{}.{}.{}.{}",
+			(addr >> 24) & 0xff,
+			(addr >> 16) & 0xff,
+			(addr >> 8) & 0xff,
+			addr & 0xff
+		);
+		unsafe { Self::new_unchecked(s) }
+	}
+
+	/// Creates a [`HostBuf`] from an IPv6 address represented as a `u128`.
+	///
+	/// The address is formatted with `::` compression for the longest run
+	/// of consecutive zero groups, enclosed in brackets as required by
+	/// RFC 3986.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::HostBuf;
+	///
+	/// assert_eq!(HostBuf::from_ipv6(1).as_str(), "[::1]");
+	/// assert_eq!(HostBuf::from_ipv6(0).as_str(), "[::]");
+	/// ```
+	pub fn from_ipv6(addr: u128) -> Self {
+		let s = format!("[{}]", format_ipv6(addr));
+		unsafe { Self::new_unchecked(s) }
+	}
+}
+
+/// Formats an IPv6 address as a string with `::` compression for the
+/// longest run of consecutive zero groups.
+#[cfg(feature = "std")]
+fn format_ipv6(addr: u128) -> String {
+	let groups: [u16; 8] = core::array::from_fn(|i| (addr >> (112 - i * 16)) as u16);
+
+	// Find the longest run of consecutive zero groups.
+	let mut best_start = 0;
+	let mut best_len = 0;
+	let mut cur_start = 0;
+	let mut cur_len = 0;
+	for (i, &g) in groups.iter().enumerate() {
+		if g == 0 {
+			if cur_len == 0 {
+				cur_start = i;
+			}
+			cur_len += 1;
+			if cur_len > best_len {
+				best_start = cur_start;
+				best_len = cur_len;
+			}
+		} else {
+			cur_len = 0;
+		}
+	}
+
+	let mut s = String::new();
+
+	let write_groups = |s: &mut String, groups: &[u16]| {
+		for (i, g) in groups.iter().enumerate() {
+			if i > 0 {
+				s.push(':');
+			}
+			write!(s, "{:x}", g).unwrap();
+		}
+	};
+
+	if best_len >= 2 {
+		write_groups(&mut s, &groups[..best_start]);
+		s.push_str("::");
+		write_groups(&mut s, &groups[best_start + best_len..]);
+	} else {
+		write_groups(&mut s, &groups);
+	}
+
+	s
 }
 
 /// Parses a URI authority [`Host`] at compile time.
@@ -275,6 +367,47 @@ mod tests {
 		for (input, expected) in vectors {
 			let host = Host::new(input).unwrap();
 			assert_eq!(host.to_ipv6(), expected, "to_ipv6({input})");
+		}
+	}
+
+	#[test]
+	fn from_ipv4_round_trip() {
+		let vectors: [(u32, &str); _] = [
+			(0, "0.0.0.0"),
+			(0xFFFFFFFF, "255.255.255.255"),
+			(0x7F000001, "127.0.0.1"),
+			(0xC0A80101, "192.168.1.1"),
+			(0x0A000001, "10.0.0.1"),
+		];
+
+		for (addr, expected_str) in vectors {
+			let host = HostBuf::from_ipv4(addr);
+			assert_eq!(host.as_str(), expected_str, "from_ipv4(0x{addr:08x})");
+			assert!(host.is_ipv4());
+			assert_eq!(host.to_ipv4(), Some(addr));
+		}
+	}
+
+	#[test]
+	fn from_ipv6_round_trip() {
+		let vectors: [(u128, &str); _] = [
+			(0, "[::]"),
+			(1, "[::1]"),
+			(u128::MAX, "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]"),
+			(0x20010db8_00000000_00000000_00000001, "[2001:db8::1]"),
+			// No compression for a single zero group
+			(0x00010000000300040005000600070008, "[1:0:3:4:5:6:7:8]"),
+			// Compression picks the longest run
+			(0x00010002000000000000000000070008, "[1:2::7:8]"),
+			// Compression picks the first longest run on tie
+			(0x00010000000000040005000000000008, "[1::4:5:0:0:8]"),
+		];
+
+		for (addr, expected_str) in vectors {
+			let host = HostBuf::from_ipv6(addr);
+			assert_eq!(host.as_str(), expected_str, "from_ipv6(0x{addr:032x})");
+			assert!(host.is_ipv6());
+			assert_eq!(host.to_ipv6(), Some(addr));
 		}
 	}
 }
