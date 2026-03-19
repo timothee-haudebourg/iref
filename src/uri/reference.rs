@@ -1869,6 +1869,41 @@ mod tests {
 	}
 
 	#[test]
+	fn resolve_relative_to_round_trip() {
+		let bases = [
+			"http://a/b/c/d",
+			"http://a/b/c/",
+			"http://a/",
+			"http://a",
+		];
+
+		let targets = [
+			"http://a/",
+			"http://a/g",
+			"http://a/b/g",
+			"http://a/b/c/g",
+			"http://a/b/c/g/",
+			"http://a/b/c/?q",
+			"http://a/b/c/#f",
+			"http://a/b/c/g?q#f",
+		];
+
+		for base in bases {
+			let base_uri = Uri::new(base).unwrap();
+			for target in targets {
+				let target_uri = UriRef::new(target).unwrap();
+				let rel = target_uri.relative_to(base_uri.as_uri_ref());
+				let resolved = rel.resolved(base_uri);
+				assert_eq!(
+					resolved.as_str(),
+					target,
+					"round-trip failed: ({target}).relative_to({base}).resolved({base}) = {resolved}",
+				);
+			}
+		}
+	}
+
+	#[test]
 	fn valid_relative() {
 		let vectors = [
 			"",            // empty is valid
