@@ -109,6 +109,60 @@ impl Host {
 
 		Some(result)
 	}
+
+	/// Parses this host as an IPv6 address and returns it as a `u128`.
+	///
+	/// Returns `None` if the host is not an IPv6 address.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Host;
+	///
+	/// assert_eq!(Host::new("[::1]").unwrap().to_ipv6(), Some(1));
+	/// assert_eq!(
+	///     Host::new("[2001:db8::1]").unwrap().to_ipv6(),
+	///     Some(0x20010db8_00000000_00000000_00000001)
+	/// );
+	/// assert_eq!(Host::new("[::0]").unwrap().to_ipv6(), Some(0));
+	/// assert_eq!(Host::new("127.0.0.1").unwrap().to_ipv6(), None);
+	/// ```
+	pub fn to_ipv6(&self) -> Option<u128> {
+		if !self.is_ipv6() {
+			return None;
+		}
+
+		let inner = &self.as_str()[1..self.as_str().len() - 1];
+
+		let (left, right) = match inner.split_once("::") {
+			Some((l, r)) => (l, Some(r)),
+			None => (inner, None),
+		};
+
+		let mut result: u128 = 0;
+		let mut count: u32 = 0;
+
+		if !left.is_empty() {
+			for g in left.split(':') {
+				result = result << 16 | u16::from_str_radix(g, 16).unwrap() as u128;
+				count += 1;
+			}
+		}
+
+		if let Some(right) = right {
+			let mut right_result: u128 = 0;
+
+			if !right.is_empty() {
+				for g in right.split(':') {
+					right_result = right_result << 16 | u16::from_str_radix(g, 16).unwrap() as u128;
+				}
+			}
+
+			result = result.checked_shl((8 - count) * 16).unwrap_or(0) | right_result;
+		}
+
+		Some(result)
+	}
 }
 
 fn parse_ipv4_octet(bytes: &[u8]) -> Option<u8> {
