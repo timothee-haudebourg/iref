@@ -1848,4 +1848,39 @@ mod tests {
 			],
 		);
 	}
+
+	#[test]
+	fn invalid() {
+		let vectors: [&[u8]; _] = [
+			b"http://host name",      // space in host
+			b"http://host\0name",     // null byte
+			b"http://[::1",           // unclosed bracket
+			b"http://ho st/path",     // space in authority
+			b"htt p://host",          // space in scheme
+			b"http://host/pa th",     // space in path
+			b"http://host?qu ery",    // space in query
+			b"http://host#fra gment", // space in fragment
+			b"\xff://host",           // invalid byte in scheme
+		];
+
+		for input in vectors {
+			assert!(UriRef::new(input).is_err(), "should reject: {input:?}");
+		}
+	}
+
+	#[test]
+	fn valid_relative() {
+		let vectors = [
+			"",            // empty is valid
+			"/path",       // absolute path
+			"../..",       // relative reference
+			"?query",      // query only
+			"#fragment",   // fragment only
+			"//authority", // authority without scheme
+		];
+
+		for input in vectors {
+			assert!(UriRef::new(input).is_ok(), "should accept: {input:?}");
+		}
+	}
 }

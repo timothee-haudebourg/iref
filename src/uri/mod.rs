@@ -1228,4 +1228,27 @@ mod tests {
 			assert_eq!(uri.base().as_str(), *expected, "input: {input}");
 		}
 	}
+
+	#[test]
+	fn invalid() {
+		let vectors: [&[u8]; _] = [
+			b"",                      // empty
+			b"://host",               // missing scheme
+			b"/path",                 // no scheme (relative)
+			b"../..",                 // relative reference
+			b"http://host name",      // space in host
+			b"http://host\0name",     // null byte
+			b"http://[::1",           // unclosed bracket
+			b"http://ho st/path",     // space in authority
+			b"htt p://host",          // space in scheme
+			b"http://host/pa th",     // space in path
+			b"http://host?qu ery",    // space in query
+			b"http://host#fra gment", // space in fragment
+			b"\xff://host",           // invalid byte in scheme
+		];
+
+		for input in vectors {
+			assert!(Uri::new(input).is_err(), "should reject: {input:?}");
+		}
+	}
 }
