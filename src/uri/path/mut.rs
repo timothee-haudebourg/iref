@@ -324,6 +324,56 @@ impl<'a> PathMut<'a> {
 		Ok(self.push(segment.try_into()?))
 	}
 
+	/// Appends all segments to this path without interpreting `.` and `..`.
+	///
+	/// Same as [`Self::append`] but does not interpret the `.` and `..`
+	/// segments. They will be added literally to the path.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::{Path, PathBuf};
+	///
+	/// let mut path = PathBuf::new("/foo".to_string()).unwrap();
+	/// path.as_path_mut().lazy_append(Path::new("bar/baz").unwrap());
+	/// assert_eq!(path, "/foo/bar/baz");
+	/// ```
+	#[inline]
+	pub fn lazy_append<'s, S: IntoIterator<Item = &'s Segment>>(&mut self, path: S) -> &mut Self {
+		for s in path {
+			self.lazy_push(s);
+		}
+
+		self
+	}
+
+	/// Appends all segments to this path without interpreting `.` and `..`.
+	///
+	/// Same as [`Self::lazy_append`], but accepts `&str` instead of
+	/// [`&Segment`](super::Segment). Returns an error if one item is
+	/// not a valid segment.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::PathBuf;
+	///
+	/// let mut path = PathBuf::new("/foo".to_string()).unwrap();
+	/// path.as_path_mut().try_lazy_append(["bar", "baz"]).unwrap();
+	/// assert_eq!(path, "/foo/bar/baz");
+	/// ```
+	#[inline]
+	pub fn try_lazy_append<'s, S: IntoIterator<Item = &'s str>>(
+		&mut self,
+		path: S,
+	) -> Result<&mut Self, InvalidSegment<&'s str>> {
+		for segment in path {
+			self.try_lazy_push(segment)?;
+		}
+
+		Ok(self)
+	}
+
 	/// Append the given path to this path using the `.` and `..` segments semantics.
 	///
 	/// Note that this does not normalize the segments already in the path.
@@ -601,6 +651,10 @@ impl<'a> PathMut<'a> {
 		let mut buffer: smallvec::SmallVec<[u8; NORMALIZE_IN_PLACE_BUFFER_LEN]> =
 			smallvec::SmallVec::new();
 
+		if self.is_absolute() {
+			buffer.push(b'/')
+		}
+
 		for (i, segment) in self.normalized_segments().enumerate() {
 			if i > 0 {
 				buffer.push(b'/')
@@ -609,10 +663,7 @@ impl<'a> PathMut<'a> {
 			buffer.extend_from_slice(segment.as_bytes())
 		}
 
-		let start = self.first_segment_offset();
-		crate::utils::replace(self.buffer, start..self.range.end, &buffer);
-		self.range.end = start + buffer.len();
-		self
+		self.replace(unsafe { Path::new_unchecked_from_bytes(buffer.as_slice()) })
 	}
 }
 
@@ -783,23 +834,23 @@ mod tests {
 
 	#[test]
 	fn normalized() {
-		let vectors: [(&[u8], &[u8]); 9] = [
-			(b"", b""),
-			(b"a/b/c", b"a/b/c"),
-			(b"a/..", b""),
-			(b"a/b/..", b"a"),
-			(b"a/b/../", b"a/"),
-			(b"a/b/c/..", b"a/b"),
-			(b"a/b/c/.", b"a/b/c"),
-			(b"a/../..", b".."),
-			(b"/a/../..", b"/"),
+		let vectors: [(&str, &str); _] = [
+			("", ""),
+			("a/b/c", "a/b/c"),
+			("a/..", ""),
+			("a/b/..", "a/"),
+			("a/b/../", "a/"),
+			("a/b/c/..", "a/b/"),
+			("a/b/c/.", "a/b/c/"),
+			("a/../..", "../"),
+			("/a/../..", "/"),
 		];
 
 		for (input, expected) in vectors {
-			let mut path = PathBuf::new(input.to_vec()).unwrap();
+			let mut path = PathBuf::new(input.to_owned()).unwrap();
 			let mut path_mut = PathMut::from_path(&mut path);
 			path_mut.normalize();
-			assert_eq!(path_mut.as_bytes(), expected);
+			assert_eq!(path_mut.as_str(), expected);
 		}
 	}
 }

@@ -1144,16 +1144,20 @@ impl UriRefBuf {
 					base_path.parent_or_empty().to_owned()
 				};
 
-				PathMut::from_path_with_context(
+				let mut path_mut = PathMut::from_path_with_context(
 					&mut path,
 					PathContext {
 						// Set the context manually to prevent disambiguation logic.
 						has_scheme: false,
 						has_authority: false,
 					},
-				)
-				.normalize()
-				.append(self.path().segments());
+				);
+
+				for s in self.path().segments() {
+					path_mut.lazy_push(s);
+				}
+
+				path_mut.normalize();
 
 				self.set_path(&path);
 			}
@@ -1593,12 +1597,12 @@ mod tests {
 			assert_eq!(
 				uri_ref.resolved(base_uri),
 				expected_uri,
-				"resolved({reference:?}, {base:?})",
+				"({uri_ref}).resolved({base_uri})",
 			);
 			assert_eq!(
 				base_uri.joined(uri_ref),
 				expected_uri,
-				"joined({base:?}, {reference:?})",
+				"({base_uri}).joined({uri_ref})",
 			);
 		}
 	}
@@ -1669,7 +1673,7 @@ mod tests {
 
 	#[test]
 	fn resolution_ambiguous_double_slash() {
-		test_resolution("http:/a/b", [("../..//", "http:/")]);
+		test_resolution("http:/a/b", [("../..//", "http:/.//")]);
 	}
 
 	#[test]

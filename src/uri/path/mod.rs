@@ -695,9 +695,10 @@ impl<'a> NormalizedSegments<'a> {
 		let relative = path.is_relative();
 		let mut stack = smallvec::SmallVec::<[&'a Segment; NORMALIZE_STACK_SIZE]>::new();
 
+		let mut open = false;
 		for segment in path.segments() {
-			match segment.as_bytes() {
-				CURRENT_SEGMENT => (),
+			open = match segment.as_bytes() {
+				CURRENT_SEGMENT => true,
 				PARENT_SEGMENT => {
 					if stack
 						.last()
@@ -707,10 +708,19 @@ impl<'a> NormalizedSegments<'a> {
 						stack.push(segment)
 					} else {
 						stack.pop();
-					}
+					};
+
+					true
 				}
-				_ => stack.push(segment),
-			}
+				_ => {
+					stack.push(segment);
+					false
+				}
+			};
+		}
+
+		if open && !stack.is_empty() {
+			stack.push(Segment::EMPTY);
 		}
 
 		NormalizedSegments(stack.into_iter())
@@ -1324,18 +1334,18 @@ mod tests {
 
 	#[test]
 	fn eq() {
-		let vectors: [(&[u8], &[u8]); 11] = [
-			(b"a/b/c", b"a/b/c"),
-			(b"a/b/c", b"a/b/c/."),
-			(b"a/b/c/", b"a/b/c/./"),
-			(b"a/b/c", b"a/b/../b/c"),
-			(b"a/b/c/..", b"a/b"),
-			(b"a/..", b""),
-			(b"/a/..", b"/"),
-			(b"a/../..", b".."),
-			(b"/a/../..", b"/.."),
-			(b"a/b/c/./", b"a/b/c/"),
-			(b"a/b/c/../", b"a/b/"),
+		let vectors: [(&str, &str); _] = [
+			("a/b/c", "a/b/c"),
+			("a/b/c/", "a/b/c/."),
+			("a/b/c/", "a/b/c/./"),
+			("a/b/c", "a/b/../b/c"),
+			("a/b/c/..", "a/b/"),
+			("a/..", ""),
+			("/a/..", "/"),
+			("a/../../", "../"),
+			("/a/../../", "/../"),
+			("a/b/c/./", "a/b/c/"),
+			("a/b/c/../", "a/b/"),
 		];
 
 		for (a, b) in vectors {
@@ -1347,10 +1357,10 @@ mod tests {
 
 	#[test]
 	fn ne() {
-		let vectors: [(&[u8], &[u8]); 3] = [
-			(b"a/b/c", b"a/b/c/"),
-			(b"a/b/c/", b"a/b/c/."),
-			(b"a/b/c/../", b"a/b"),
+		let vectors: [(&str, &str); _] = [
+			("a/b/c", "a/b/c/"),
+			("a/b/c", "a/b/c/."),
+			("a/b/c/../", "a/b"),
 		];
 
 		for (a, b) in vectors {
