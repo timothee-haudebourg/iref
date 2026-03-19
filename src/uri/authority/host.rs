@@ -220,3 +220,61 @@ macro_rules! host {
 		}
 	};
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn to_ipv4() {
+		let vectors: [(&str, Option<u32>); _] = [
+			("0.0.0.0", Some(0)),
+			("255.255.255.255", Some(0xFFFFFFFF)),
+			("127.0.0.1", Some(0x7F000001)),
+			("192.168.1.1", Some(0xC0A80101)),
+			("10.0.0.1", Some(0x0A000001)),
+			("1.2.3.4", Some(0x01020304)),
+			// Not IPv4
+			("[::1]", None),
+			("example.org", None),
+		];
+
+		for (input, expected) in vectors {
+			let host = Host::new(input).unwrap();
+			assert_eq!(host.to_ipv4(), expected, "to_ipv4({input})");
+		}
+	}
+
+	#[test]
+	fn to_ipv6() {
+		let vectors: [(&str, Option<u128>); _] = [
+			// All zeros
+			("[::]", Some(0)),
+			// All ones
+			("[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]", Some(u128::MAX)),
+			// Loopback
+			("[::1]", Some(1)),
+			// Full address, no compression
+			(
+				"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]",
+				Some(0x20010db885a3000000008a2e03707334),
+			),
+			// Compression in the middle
+			("[2001:db8::1]", Some(0x20010db8_00000000_00000000_00000001)),
+			// Right-only expansion
+			("[1:2:3::]", Some(0x00010002000300000000000000000000)),
+			// Left-only expansion
+			("[::1:2:3]", Some(0x00000000000000000000000100020003)),
+			// Single group
+			("[::ffff]", Some(0xffff)),
+			// Not IPv6
+			("127.0.0.1", None),
+			("example.org", None),
+		];
+
+		for (input, expected) in vectors {
+			let host = Host::new(input).unwrap();
+			assert_eq!(host.to_ipv6(), expected, "to_ipv6({input})");
+		}
+	}
+}
