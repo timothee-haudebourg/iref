@@ -104,7 +104,7 @@ impl Host {
 
 		let mut result: u32 = 0;
 		for octet_str in self.as_str().split('.') {
-			result = result << 8 | parse_ipv4_octet(octet_str.as_bytes())? as u32;
+			result = result << 8 | octet_str.parse::<u8>().unwrap() as u32;
 		}
 
 		Some(result)
@@ -163,19 +163,6 @@ impl Host {
 
 		Some(result)
 	}
-}
-
-fn parse_ipv4_octet(bytes: &[u8]) -> Option<u8> {
-	if bytes.is_empty() {
-		return None;
-	}
-
-	let mut value: u16 = 0;
-	for &b in bytes {
-		value = value * 10 + (b - b'0') as u16;
-	}
-
-	u8::try_from(value).ok()
 }
 
 impl Deref for Host {
