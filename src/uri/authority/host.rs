@@ -59,10 +59,18 @@ impl Host {
 	/// ```
 	pub fn is_ipv4(&self) -> bool {
 		let bytes = self.as_bytes();
-		!bytes.is_empty()
-			&& bytes[0].is_ascii_digit()
-			&& bytes.iter().all(|&b| b.is_ascii_digit() || b == b'.')
-			&& bytes.iter().filter(|&&b| b == b'.').count() == 3
+
+		let Some(i) = parse_dec_octet(bytes, 0) else { return false };
+		if bytes.get(i) != Some(&b'.') { return false }
+
+		let Some(j) = parse_dec_octet(bytes, i + 1) else { return false };
+		if bytes.get(j) != Some(&b'.') { return false }
+
+		let Some(k) = parse_dec_octet(bytes, j + 1) else { return false };
+		if bytes.get(k) != Some(&b'.') { return false }
+
+		let Some(l) = parse_dec_octet(bytes, k + 1) else { return false };
+		l == bytes.len()
 	}
 
 	/// Returns `true` if this host is an IPv6 address.
@@ -163,6 +171,54 @@ impl Host {
 		}
 
 		Some(result)
+	}
+}
+
+/// Parses a `dec-octet` (RFC 3986) starting at position `i` in `bytes`.
+///
+/// ```text
+/// dec-octet = DIGIT               ; 0-9
+///           / %x31-39 DIGIT       ; 10-99
+///           / "1" 2DIGIT          ; 100-199
+///           / "2" %x30-34 DIGIT   ; 200-249
+///           / "25" %x30-35        ; 250-255
+/// ```
+///
+/// Returns `Some(end)` where `end` is the index past the last byte of the
+/// octet, or `None` if no valid dec-octet starts at `i`.
+fn parse_dec_octet(bytes: &[u8], i: usize) -> Option<usize> {
+	let d0 = *bytes.get(i)?;
+	if !d0.is_ascii_digit() {
+		return None;
+	}
+
+	if d0 == b'0' {
+		return Some(i + 1);
+	}
+
+	// d0 is 1-9
+	let Some(&d1) = bytes.get(i + 1) else {
+		return Some(i + 1);
+	};
+	if !d1.is_ascii_digit() {
+		return Some(i + 1);
+	}
+
+	// d0 is 1-9, d1 is 0-9
+	let Some(&d2) = bytes.get(i + 2) else {
+		return Some(i + 2);
+	};
+	if !d2.is_ascii_digit() {
+		return Some(i + 2);
+	}
+
+	// d0 d1 d2, all digits. Valid only if <= 255.
+	if d0 == b'1'
+		|| (d0 == b'2' && (d1 <= b'4' || (d1 == b'5' && d2 <= b'5')))
+	{
+		Some(i + 3)
+	} else {
+		None
 	}
 }
 
@@ -316,6 +372,20 @@ macro_rules! host {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn is_ipv4_valid() {
+		for input in ["0.0.0.0", "255.255.255.255", "127.0.0.1", "1.2.3.4", "249.249.249.249"] {
+			assert!(Host::new(input).unwrap().is_ipv4(), "is_ipv4({input}) should be true");
+		}
+	}
+
+	#[test]
+	fn is_ipv4_invalid() {
+		for input in ["example.org", "[::1]", "1.2.3", "1.2.3.4.5", "999.0.0.1", "256.0.0.1"] {
+			assert!(!Host::new(input).unwrap().is_ipv4(), "is_ipv4({input}) should be false");
+		}
+	}
 
 	#[test]
 	fn to_ipv4() {
