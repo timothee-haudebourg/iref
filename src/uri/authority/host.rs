@@ -63,6 +63,26 @@ impl Host {
 			&& bytes.iter().all(|&b| b.is_ascii_digit() || b == b'.')
 			&& bytes.iter().filter(|&&b| b == b'.').count() == 3
 	}
+
+	/// Returns `true` if this host is an IPv6 address.
+	///
+	/// IPv6 addresses are enclosed in brackets (`[...]`) and do not start
+	/// with `[v` (which denotes IPvFuture).
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Host;
+	///
+	/// assert!(Host::new("[::1]").unwrap().is_ipv6());
+	/// assert!(Host::new("[2001:db8::1]").unwrap().is_ipv6());
+	/// assert!(!Host::new("127.0.0.1").unwrap().is_ipv6());
+	/// assert!(!Host::new("example.org").unwrap().is_ipv6());
+	/// ```
+	pub fn is_ipv6(&self) -> bool {
+		let bytes = self.as_bytes();
+		bytes.len() >= 4 && bytes[0] == b'[' && bytes[1] != b'v'
+	}
 }
 
 impl Deref for Host {
