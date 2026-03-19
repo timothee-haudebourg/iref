@@ -1870,12 +1870,7 @@ mod tests {
 
 	#[test]
 	fn resolve_relative_to_round_trip() {
-		let bases = [
-			"http://a/b/c/d",
-			"http://a/b/c/",
-			"http://a/",
-			"http://a",
-		];
+		let bases = ["http://a/b/c/d", "http://a/b/c/", "http://a/", "http://a"];
 
 		let targets = [
 			"http://a/",

@@ -1451,6 +1451,70 @@ mod tests {
 	}
 
 	#[test]
+	fn segments_double_ended() {
+		let vectors: [(&str, &[&str]); _] = [
+			("/a/b/c/d", &["a", "b", "c", "d"]),
+			("a/b", &["a", "b"]),
+			("/", &[]),
+			("", &[]),
+			("/a", &["a"]),
+			("a", &["a"]),
+			("/a/b/c/", &["a", "b", "c", ""]),
+			("a//b", &["a", "", "b"]),
+		];
+
+		for (input, expected) in vectors {
+			let path = Path::new(input).unwrap();
+
+			// Forward matches expected
+			let fwd: Vec<&str> = path.segments().map(|s| s.as_str()).collect();
+			assert_eq!(fwd, expected, "forward segments of {input:?}");
+
+			// Reverse matches expected reversed
+			let rev: Vec<&str> = path.segments().rev().map(|s| s.as_str()).collect();
+			let mut expected_rev: Vec<&str> = expected.to_vec();
+			expected_rev.reverse();
+			assert_eq!(rev, expected_rev, "reverse segments of {input:?}");
+		}
+	}
+
+	#[test]
+	fn segments_interleaved() {
+		let path = Path::new("/a/b/c/d").unwrap();
+		let mut it = path.segments();
+		assert_eq!(it.next().unwrap().as_str(), "a");
+		assert_eq!(it.next_back().unwrap().as_str(), "d");
+		assert_eq!(it.next().unwrap().as_str(), "b");
+		assert_eq!(it.next_back().unwrap().as_str(), "c");
+		assert!(it.next().is_none());
+		assert!(it.next_back().is_none());
+	}
+
+	#[test]
+	fn segments_exact_size() {
+		let vectors: [(&str, usize); _] = [
+			("/a/b/c", 3),
+			("", 0),
+			("/", 0),
+			("a", 1),
+			("/a/b/", 3),
+			("a//b", 3),
+		];
+
+		for (input, expected_len) in vectors {
+			let path = Path::new(input).unwrap();
+			let mut it = path.segments();
+			assert_eq!(it.len(), expected_len, "len() of segments({input:?})");
+
+			// len() decreases as we consume
+			if expected_len > 0 {
+				it.next();
+				assert_eq!(it.len(), expected_len - 1);
+			}
+		}
+	}
+
+	#[test]
 	fn suffix() {
 		let vectors: [(&str, &str, Option<&str>); _] = [
 			("/foo/bar/baz", "/foo/bar", Some("baz")),
