@@ -1356,6 +1356,51 @@ mod tests {
 	}
 
 	#[test]
+	fn eq_percent_encoding() {
+		let vectors: [(&str, &str); _] = [
+			// Case-insensitive hex digits
+			("/%2a", "/%2A"),
+			("/a/%2b/c", "/a/%2B/c"),
+			// Unreserved characters (RFC 3986 Section 2.3) decoded
+			("/%2D", "/-"),
+			("/%5F", "/_"),
+			("/%7E", "/~"),
+			("/a%2Db", "/a-b"),
+			// Encoded letters
+			("/%61", "/a"),
+			("/%7A", "/z"),
+			("/%41", "/A"),
+			("/%5A", "/Z"),
+			// Encoded digits
+			("/%30", "/0"),
+			("/%39", "/9"),
+		];
+
+		for (a, b) in vectors {
+			let a = Path::new(a).unwrap();
+			let b = Path::new(b).unwrap();
+			assert_eq!(a, b, "{:?} should equal {:?}", a.as_str(), b.as_str());
+		}
+	}
+
+	#[test]
+	fn ne_percent_encoding() {
+		let vectors: [(&str, &str); _] = [
+			// %2E is not equivalent to . (dot segment has special semantics)
+			("/%2E", "/."),
+			("/%2E%2E", "/.."),
+			// %2F is a literal slash inside a segment, not a separator
+			("/%2F", "//"),
+		];
+
+		for (a, b) in vectors {
+			let a = Path::new(a).unwrap();
+			let b = Path::new(b).unwrap();
+			assert_ne!(a, b, "{:?} should not equal {:?}", a.as_str(), b.as_str());
+		}
+	}
+
+	#[test]
 	fn ne() {
 		let vectors: [(&str, &str); _] = [
 			("a/b/c", "a/b/c/"),
