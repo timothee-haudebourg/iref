@@ -422,17 +422,16 @@ impl UriRef {
 			}
 		}
 
-		let mut self_segments = self.path().normalized_segments().peekable();
-		let mut base_segments = other
-			.path()
-			.parent_or_empty()
-			.normalized_segments()
-			.peekable();
+		let self_path = self.path();
+		let base_path = other.path();
 
-		if self.path().is_absolute() == other.path().is_absolute() {
+		let mut self_segments = self_path.normalized_segments().peekable();
+		let mut base_segments = base_path.parent_or_empty().normalized_segments().peekable();
+
+		if self_path.is_absolute() == base_path.is_absolute() {
 			loop {
 				match (self_segments.peek(), base_segments.peek()) {
-					(Some(a), Some(b)) if a.as_pct_str() == b.as_pct_str() => {
+					(Some(a), Some(b)) if a == b => {
 						base_segments.next();
 						self_segments.next();
 					}
@@ -441,8 +440,12 @@ impl UriRef {
 			}
 		}
 
-		for _segment in base_segments {
+		for _ in base_segments {
 			result.path_mut().lazy_push(Segment::PARENT);
+		}
+
+		if self_path.is_absolute() && base_path == Path::EMPTY {
+			result.set_path(Path::EMPTY_ABSOLUTE);
 		}
 
 		for segment in self_segments {
@@ -1738,47 +1741,107 @@ mod tests {
 		);
 	}
 
+	fn test_relative_to<'a>(base: &str, vectors: impl IntoIterator<Item = (&'a str, &'a str)>) {
+		let base = UriRef::new(base).unwrap();
+		for (input, expected) in vectors {
+			let input = UriRef::new(input).unwrap();
+			assert_eq!(
+				input.relative_to(base),
+				expected,
+				"({input}).relative_to({base}) != {expected}",
+			);
+		}
+	}
+
 	#[test]
 	fn relative_to() {
-		let base =
-			UriRef::new("https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld").unwrap();
-		let vectors = [
-			(
-				"https://w3c.github.io/json-ld-api/tests/compact/link",
-				"link",
-			),
-			(
-				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld#fragment-works",
-				"#fragment-works",
-			),
-			(
-				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld?query=works",
-				"?query=works",
-			),
-			("https://w3c.github.io/json-ld-api/tests/", "../"),
-			("https://w3c.github.io/json-ld-api/", "../../"),
-			("https://w3c.github.io/json-ld-api/parent", "../../parent"),
-			(
-				"https://w3c.github.io/json-ld-api/parent#fragment",
-				"../../parent#fragment",
-			),
-			(
-				"https://w3c.github.io/parent-parent-eq-root",
-				"../../../parent-parent-eq-root",
-			),
-			(
-				"http://example.org/scheme-relative",
-				"http://example.org/scheme-relative",
-			),
-			(
-				"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld",
-				"0066-in.jsonld",
-			),
-		];
+		test_relative_to(
+			"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld",
+			[
+				(
+					"https://w3c.github.io/json-ld-api/tests/compact/link",
+					"link",
+				),
+				(
+					"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld#fragment-works",
+					"#fragment-works",
+				),
+				(
+					"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld?query=works",
+					"?query=works",
+				),
+				("https://w3c.github.io/json-ld-api/tests/", "../"),
+				("https://w3c.github.io/json-ld-api/", "../../"),
+				("https://w3c.github.io/json-ld-api/parent", "../../parent"),
+				(
+					"https://w3c.github.io/json-ld-api/parent#fragment",
+					"../../parent#fragment",
+				),
+				(
+					"https://w3c.github.io/parent-parent-eq-root",
+					"../../../parent-parent-eq-root",
+				),
+				(
+					"http://example.org/scheme-relative",
+					"http://example.org/scheme-relative",
+				),
+				(
+					"https://w3c.github.io/json-ld-api/tests/compact/0066-in.jsonld",
+					"0066-in.jsonld",
+				),
+			],
+		);
+	}
 
-		for (input, expected) in &vectors {
-			let input = UriRef::new(input).unwrap();
-			assert_eq!(input.relative_to(base), *expected)
-		}
+	#[test]
+	fn relative_to_empty_base_path() {
+		test_relative_to(
+			"http://a",
+			[
+				("http://a/", "/"),
+				("http://a/g", "/g"),
+				("http://a/g/h", "/g/h"),
+				("http://a?q", "?q"),
+				("http://a#f", "#f"),
+				("http://a?q#f", "?q#f"),
+			],
+		);
+	}
+
+	#[test]
+	fn relative_to_root_base_path() {
+		test_relative_to(
+			"http://a/",
+			[
+				("http://a/", ""),
+				("http://a/g", "g"),
+				("http://a/g/h", "g/h"),
+				("http://a/?q", "?q"),
+				("http://a/#f", "#f"),
+			],
+		);
+	}
+
+	#[test]
+	fn relative_to_different_authority() {
+		test_relative_to(
+			"http://a/path",
+			[
+				("http://b/path", "http://b/path"),
+				("http://b/other", "http://b/other"),
+			],
+		);
+	}
+
+	#[test]
+	fn relative_to_same_uri() {
+		test_relative_to(
+			"http://a/b/c",
+			[
+				("http://a/b/c", "c"),
+				("http://a/b/c?q", "?q"),
+				("http://a/b/c#f", "#f"),
+			],
+		);
 	}
 }
