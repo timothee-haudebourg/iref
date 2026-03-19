@@ -214,6 +214,9 @@ pub mod iri;
 pub mod uri;
 mod uri_iri;
 
+#[cfg(feature = "url")]
+mod url;
+
 #[cfg(feature = "std")]
 pub(crate) mod utils;
 
