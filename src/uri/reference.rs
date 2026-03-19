@@ -444,7 +444,7 @@ impl UriRef {
 			result.path_mut().lazy_push(Segment::PARENT);
 		}
 
-		if self_path.is_absolute() && base_path == Path::EMPTY {
+		if self_path.is_absolute() && base_path == Path::EMPTY_RELATIVE {
 			result.set_path(Path::EMPTY_ABSOLUTE);
 		}
 

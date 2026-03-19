@@ -46,13 +46,13 @@ pub struct Path(str);
 
 impl Default for &Path {
 	fn default() -> Self {
-		Path::EMPTY
+		Path::EMPTY_RELATIVE
 	}
 }
 
 impl Path {
 	/// The empty relative path.
-	pub const EMPTY: &'static Self = unsafe { Self::new_unchecked("") };
+	pub const EMPTY_RELATIVE: &'static Self = unsafe { Self::new_unchecked("") };
 
 	/// The empty absolute path `/`.
 	pub const EMPTY_ABSOLUTE: &'static Self = unsafe { Self::new_unchecked("/") };
@@ -65,7 +65,7 @@ impl Path {
 	/// use iref::uri::Path;
 	///
 	/// assert_eq!(Path::new("/foo/bar").unwrap().len(), 8);
-	/// assert_eq!(Path::EMPTY.len(), 0);
+	/// assert_eq!(Path::EMPTY_RELATIVE.len(), 0);
 	/// ```
 	pub fn len(&self) -> usize {
 		self.as_bytes().len()
@@ -81,7 +81,7 @@ impl Path {
 	/// ```rust
 	/// use iref::uri::Path;
 	///
-	/// assert!(Path::EMPTY.is_empty());
+	/// assert!(Path::EMPTY_RELATIVE.is_empty());
 	/// assert!(Path::EMPTY_ABSOLUTE.is_empty());
 	/// assert!(!Path::new("/foo").unwrap().is_empty());
 	/// ```
@@ -135,7 +135,7 @@ impl Path {
 	/// use iref::uri::Path;
 	///
 	/// assert_eq!(Path::new("/foo/bar/baz").unwrap().segment_count(), 3);
-	/// assert_eq!(Path::EMPTY.segment_count(), 0);
+	/// assert_eq!(Path::EMPTY_RELATIVE.segment_count(), 0);
 	/// assert_eq!(Path::EMPTY_ABSOLUTE.segment_count(), 0);
 	/// ```
 	#[inline]
@@ -159,7 +159,7 @@ impl Path {
 	/// use iref::uri::Path;
 	///
 	/// assert_eq!(Path::new("/foo/bar").unwrap().first().unwrap(), "foo");
-	/// assert!(Path::EMPTY.first().is_none());
+	/// assert!(Path::EMPTY_RELATIVE.first().is_none());
 	/// ```
 	pub fn first(&self) -> Option<&Segment> {
 		if self.is_empty() {
@@ -177,7 +177,7 @@ impl Path {
 	/// use iref::uri::Path;
 	///
 	/// assert_eq!(Path::new("/foo/bar").unwrap().last().unwrap(), "bar");
-	/// assert!(Path::EMPTY.last().is_none());
+	/// assert!(Path::EMPTY_RELATIVE.last().is_none());
 	/// ```
 	pub fn last(&self) -> Option<&Segment> {
 		if self.is_empty() {
@@ -329,7 +329,7 @@ impl Path {
 		let mut result: PathBuf = if self.is_absolute() {
 			Self::EMPTY_ABSOLUTE.to_owned()
 		} else {
-			Self::EMPTY.to_owned()
+			Self::EMPTY_RELATIVE.to_owned()
 		};
 
 		let mut open = false;
@@ -386,7 +386,7 @@ impl Path {
 			}
 
 			if i == 0 && bytes[i] != b'/' {
-				Self::EMPTY
+				Self::EMPTY_RELATIVE
 			} else {
 				unsafe { Self::new_unchecked_from_bytes(&bytes[..=i]) }
 			}
@@ -453,7 +453,7 @@ impl Path {
 			if self.is_absolute() {
 				Self::EMPTY_ABSOLUTE
 			} else {
-				Self::EMPTY
+				Self::EMPTY_RELATIVE
 			}
 		})
 	}
@@ -773,7 +773,7 @@ impl PathBuf {
 		let mut path = if absolute {
 			Path::EMPTY_ABSOLUTE
 		} else {
-			Path::EMPTY
+			Path::EMPTY_RELATIVE
 		}
 		.to_owned();
 
@@ -1144,7 +1144,7 @@ mod tests {
 
 	#[test]
 	fn empty() {
-		let path = Path::EMPTY;
+		let path = Path::EMPTY_RELATIVE;
 		assert!(path.is_empty());
 		assert!(!path.is_absolute());
 		assert!(path.segments().next().is_none());
