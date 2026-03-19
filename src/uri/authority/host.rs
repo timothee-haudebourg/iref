@@ -83,6 +83,45 @@ impl Host {
 		let bytes = self.as_bytes();
 		bytes.len() >= 4 && bytes[0] == b'[' && bytes[1] != b'v'
 	}
+
+	/// Parses this host as an IPv4 address and returns it as a `u32`.
+	///
+	/// Returns `None` if the host is not a valid IPv4 address.
+	///
+	/// # Example
+	///
+	/// ```rust
+	/// use iref::uri::Host;
+	///
+	/// assert_eq!(Host::new("127.0.0.1").unwrap().to_ipv4(), Some(0x7f000001));
+	/// assert_eq!(Host::new("0.0.0.0").unwrap().to_ipv4(), Some(0));
+	/// assert_eq!(Host::new("[::1]").unwrap().to_ipv4(), None);
+	/// ```
+	pub fn to_ipv4(&self) -> Option<u32> {
+		if !self.is_ipv4() {
+			return None;
+		}
+
+		let mut result: u32 = 0;
+		for octet_str in self.as_str().split('.') {
+			result = result << 8 | parse_ipv4_octet(octet_str.as_bytes())? as u32;
+		}
+
+		Some(result)
+	}
+}
+
+fn parse_ipv4_octet(bytes: &[u8]) -> Option<u8> {
+	if bytes.is_empty() {
+		return None;
+	}
+
+	let mut value: u16 = 0;
+	for &b in bytes {
+		value = value * 10 + (b - b'0') as u16;
+	}
+
+	u8::try_from(value).ok()
 }
 
 impl Deref for Host {
