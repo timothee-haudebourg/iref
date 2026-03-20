@@ -60,16 +60,30 @@ impl Host {
 	pub fn is_ipv4(&self) -> bool {
 		let bytes = self.as_bytes();
 
-		let Some(i) = parse_dec_octet(bytes, 0) else { return false };
-		if bytes.get(i) != Some(&b'.') { return false }
+		let Some(i) = parse_dec_octet(bytes, 0) else {
+			return false;
+		};
+		if bytes.get(i) != Some(&b'.') {
+			return false;
+		}
 
-		let Some(j) = parse_dec_octet(bytes, i + 1) else { return false };
-		if bytes.get(j) != Some(&b'.') { return false }
+		let Some(j) = parse_dec_octet(bytes, i + 1) else {
+			return false;
+		};
+		if bytes.get(j) != Some(&b'.') {
+			return false;
+		}
 
-		let Some(k) = parse_dec_octet(bytes, j + 1) else { return false };
-		if bytes.get(k) != Some(&b'.') { return false }
+		let Some(k) = parse_dec_octet(bytes, j + 1) else {
+			return false;
+		};
+		if bytes.get(k) != Some(&b'.') {
+			return false;
+		}
 
-		let Some(l) = parse_dec_octet(bytes, k + 1) else { return false };
+		let Some(l) = parse_dec_octet(bytes, k + 1) else {
+			return false;
+		};
 		l == bytes.len()
 	}
 
@@ -111,12 +125,7 @@ impl Host {
 			return None;
 		}
 
-		let mut result: u32 = 0;
-		for octet_str in self.as_str().split('.') {
-			result = result << 8 | octet_str.parse::<u8>().unwrap() as u32;
-		}
-
-		Some(result)
+		Some(parse_ipv4(self.as_str()))
 	}
 
 	/// Parses this host as an IPv6 address and returns it as a `u128`.
@@ -153,8 +162,14 @@ impl Host {
 
 		if !left.is_empty() {
 			for g in left.split(':') {
-				result = result << 16 | u16::from_str_radix(g, 16).unwrap() as u128;
-				count += 1;
+				if g.contains('.') {
+					let ipv4 = parse_ipv4(g);
+					result = result << 32 | ipv4 as u128;
+					count += 2;
+				} else {
+					result = result << 16 | u16::from_str_radix(g, 16).unwrap() as u128;
+					count += 1;
+				}
 			}
 		}
 
@@ -163,7 +178,14 @@ impl Host {
 
 			if !right.is_empty() {
 				for g in right.split(':') {
-					right_result = right_result << 16 | u16::from_str_radix(g, 16).unwrap() as u128;
+					if g.contains('.') {
+						// Embedded IPv4 suffix, e.g. `192.168.1.1`.
+						let ipv4 = parse_ipv4(g);
+						right_result = right_result << 32 | ipv4 as u128;
+					} else {
+						right_result =
+							right_result << 16 | u16::from_str_radix(g, 16).unwrap() as u128;
+					}
 				}
 			}
 
@@ -213,13 +235,45 @@ fn parse_dec_octet(bytes: &[u8], i: usize) -> Option<usize> {
 	}
 
 	// d0 d1 d2, all digits. Valid only if <= 255.
-	if d0 == b'1'
-		|| (d0 == b'2' && (d1 <= b'4' || (d1 == b'5' && d2 <= b'5')))
-	{
+	if d0 == b'1' || (d0 == b'2' && (d1 <= b'4' || (d1 == b'5' && d2 <= b'5'))) {
 		Some(i + 3)
 	} else {
 		None
 	}
+}
+
+/// Parses an IPv4 address string into a `u32`.
+///
+/// The input must be exactly a valid IPv4 address (4 dec-octets separated
+/// by dots, with nothing extra).
+fn parse_ipv4(s: &str) -> u32 {
+	let bytes = s.as_bytes();
+	let mut result: u32 = 0;
+
+	let i = parse_dec_octet(bytes, 0).unwrap();
+	result |= (bytes[0..i]
+		.iter()
+		.fold(0u32, |a, &b| a * 10 + (b - b'0') as u32))
+		<< 24;
+
+	let j = parse_dec_octet(bytes, i + 1).unwrap();
+	result |= (bytes[i + 1..j]
+		.iter()
+		.fold(0u32, |a, &b| a * 10 + (b - b'0') as u32))
+		<< 16;
+
+	let k = parse_dec_octet(bytes, j + 1).unwrap();
+	result |= (bytes[j + 1..k]
+		.iter()
+		.fold(0u32, |a, &b| a * 10 + (b - b'0') as u32))
+		<< 8;
+
+	let l = parse_dec_octet(bytes, k + 1).unwrap();
+	result |= bytes[k + 1..l]
+		.iter()
+		.fold(0u32, |a, &b| a * 10 + (b - b'0') as u32);
+
+	result
 }
 
 impl Deref for Host {
@@ -375,15 +429,34 @@ mod tests {
 
 	#[test]
 	fn is_ipv4_valid() {
-		for input in ["0.0.0.0", "255.255.255.255", "127.0.0.1", "1.2.3.4", "249.249.249.249"] {
-			assert!(Host::new(input).unwrap().is_ipv4(), "is_ipv4({input}) should be true");
+		for input in [
+			"0.0.0.0",
+			"255.255.255.255",
+			"127.0.0.1",
+			"1.2.3.4",
+			"249.249.249.249",
+		] {
+			assert!(
+				Host::new(input).unwrap().is_ipv4(),
+				"is_ipv4({input}) should be true"
+			);
 		}
 	}
 
 	#[test]
 	fn is_ipv4_invalid() {
-		for input in ["example.org", "[::1]", "1.2.3", "1.2.3.4.5", "999.0.0.1", "256.0.0.1"] {
-			assert!(!Host::new(input).unwrap().is_ipv4(), "is_ipv4({input}) should be false");
+		for input in [
+			"example.org",
+			"[::1]",
+			"1.2.3",
+			"1.2.3.4.5",
+			"999.0.0.1",
+			"256.0.0.1",
+		] {
+			assert!(
+				!Host::new(input).unwrap().is_ipv4(),
+				"is_ipv4({input}) should be false"
+			);
 		}
 	}
 
@@ -429,6 +502,12 @@ mod tests {
 			("[::1:2:3]", Some(0x00000000000000000000000100020003)),
 			// Single group
 			("[::ffff]", Some(0xffff)),
+			// Embedded IPv4 suffix with ::
+			("[::ffff:192.168.1.1]", Some(0x0000ffff_c0a80101)),
+			// Embedded IPv4 suffix without ::
+			("[0:0:0:0:0:ffff:192.168.1.1]", Some(0x0000ffff_c0a80101)),
+			// Embedded IPv4 loopback
+			("[::127.0.0.1]", Some(0x7f000001)),
 			// Not IPv6
 			("127.0.0.1", None),
 			("example.org", None),
