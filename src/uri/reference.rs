@@ -402,24 +402,20 @@ impl UriRef {
 	pub fn relative_to(&self, other: &Self) -> UriRefBuf {
 		let mut result = <UriRefBuf>::default();
 
+		// If self has a scheme/authority that differs from the base, the
+		// result must include it — return self as-is.
+		// If self lacks a scheme/authority, it inherits the base's through
+		// resolution, so we can continue.
 		match (self.scheme(), other.scheme()) {
 			(Some(a), Some(b)) if a == b => (),
-			(Some(_), None) => (),
-			(None, Some(_)) => (),
-			(None, None) => (),
-			_ => {
-				return unsafe { <UriRefBuf>::new_unchecked(self.as_bytes().to_vec()) };
-			}
+			(None, _) => (),
+			_ => return unsafe { <UriRefBuf>::new_unchecked(self.as_bytes().to_vec()) },
 		}
 
 		match (self.authority(), other.authority()) {
 			(Some(a), Some(b)) if a == b => (),
-			(Some(_), None) => (),
-			(None, Some(_)) => (),
 			(None, None) => (),
-			_ => {
-				return unsafe { <UriRefBuf>::new_unchecked(self.as_bytes().to_vec()) };
-			}
+			_ => return unsafe { <UriRefBuf>::new_unchecked(self.as_bytes().to_vec()) },
 		}
 
 		let self_path = self.path();
@@ -1749,11 +1745,24 @@ mod tests {
 		let base = UriRef::new(base).unwrap();
 		for (input, expected) in vectors {
 			let input = UriRef::new(input).unwrap();
+			let relative = input.relative_to(base);
 			assert_eq!(
-				input.relative_to(base),
-				expected,
+				relative, expected,
 				"({input}).relative_to({base}) != {expected}",
 			);
+
+			// Round-trip: resolving the relative reference against the base
+			// should give back the original input. Only possible when both
+			// the base and input are full URIs (have a scheme).
+			if let (Ok(base_uri), Ok(input_uri)) =
+				(Uri::new(base.as_str()), Uri::new(input.as_str()))
+			{
+				let resolved = relative.resolved(base_uri);
+				assert_eq!(
+					resolved, *input_uri,
+					"({relative}).resolved({base}) != {input}",
+				);
+			}
 		}
 	}
 
@@ -1835,6 +1844,35 @@ mod tests {
 				("http://b/other", "http://b/other"),
 			],
 		);
+	}
+
+	#[test]
+	fn relative_to_mismatched_scheme() {
+		test_relative_to(
+			"http://a/path",
+			[
+				("https://a/path", "https://a/path"),
+				("ftp://a/path", "ftp://a/path"),
+			],
+		);
+	}
+
+	#[test]
+	fn relative_to_missing_scheme() {
+		// Self has no scheme → inherits base's, so relative_to proceeds.
+		test_relative_to(
+			"http://a/path",
+			[("//a/path", "path"), ("//a/other", "other")],
+		);
+		// Self has scheme, base doesn't → return self as-is.
+		test_relative_to("//a/path", [("http://a/path", "http://a/path")]);
+	}
+
+	#[test]
+	fn relative_to_missing_authority() {
+		// Authority mismatch (present vs absent) → return self as-is.
+		test_relative_to("http://a/path", [("http:/path", "http:/path")]);
+		test_relative_to("http:/path", [("http://a/path", "http://a/path")]);
 	}
 
 	#[test]
