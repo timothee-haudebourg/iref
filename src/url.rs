@@ -40,15 +40,19 @@ impl From<UriBuf> for url::Url {
 	}
 }
 
-impl From<&Iri> for url::Url {
-	fn from(iri: &Iri) -> Self {
-		url::Url::parse(iri.as_str()).unwrap()
+impl TryFrom<&Iri> for url::Url {
+	type Error = url::ParseError;
+
+	fn try_from(iri: &Iri) -> Result<Self, Self::Error> {
+		url::Url::parse(iri.as_str())
 	}
 }
 
-impl From<IriBuf> for url::Url {
-	fn from(iri: IriBuf) -> Self {
-		url::Url::parse(iri.as_str()).unwrap()
+impl TryFrom<IriBuf> for url::Url {
+	type Error = url::ParseError;
+
+	fn try_from(iri: IriBuf) -> Result<Self, Self::Error> {
+		url::Url::parse(iri.as_str())
 	}
 }
 
@@ -94,14 +98,14 @@ mod tests {
 	#[test]
 	fn iri_to_url() {
 		let iri = Iri::new("http://example.org/path").unwrap();
-		let url: url::Url = iri.into();
+		let url: url::Url = url::Url::try_from(iri).unwrap();
 		assert_eq!(url.as_str(), "http://example.org/path");
 	}
 
 	#[test]
 	fn iri_buf_to_url() {
 		let iri = IriBuf::new("http://example.org/path".to_string()).unwrap();
-		let url: url::Url = iri.into();
+		let url: url::Url = url::Url::try_from(iri).unwrap();
 		assert_eq!(url.as_str(), "http://example.org/path");
 	}
 
