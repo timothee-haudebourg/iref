@@ -469,7 +469,7 @@ impl Path {
 	/// # Example
 	/// ```
 	/// # use std::convert::TryFrom;
-	/// use iref::iri::{Path, PathBuf};
+	/// use iref::uri::{Path, PathBuf};
 	///
 	/// let prefix = Path::new("/foo/bar").unwrap();
 	/// let path = Path::new("/foo/bar/baz").unwrap();

@@ -711,21 +711,21 @@ impl UriRefBuf {
 	/// # Example
 	///
 	/// ```
-	/// use iref::{IriRefBuf, iri::Authority};
+	/// use iref::{UriRefBuf, uri::Authority};
 	///
-	/// let mut a = IriRefBuf::new("scheme:/path".to_string()).unwrap();
+	/// let mut a = UriRefBuf::new("scheme:/path".to_string()).unwrap();
 	/// a.set_authority(Some(Authority::new("example.org").unwrap()));
 	/// assert_eq!(a, "scheme://example.org/path");
 	///
 	/// // When an authority is added before a relative path,
 	/// // the path becomes absolute.
-	/// let mut b = IriRefBuf::new("scheme:path".to_string()).unwrap();
+	/// let mut b = UriRefBuf::new("scheme:path".to_string()).unwrap();
 	/// b.set_authority(Some(Authority::new("example.org").unwrap()));
 	/// assert_eq!(b, "scheme://example.org/path");
 	///
 	/// // When an authority is removed and the path starts with `//`,
 	/// // a `/.` prefix is added to the path to avoid any ambiguity.
-	/// let mut c = IriRefBuf::new("scheme://example.org//path".to_string()).unwrap();
+	/// let mut c = UriRefBuf::new("scheme://example.org//path".to_string()).unwrap();
 	/// c.set_authority(None);
 	/// assert_eq!(c, "scheme:/.//path");
 	/// ```
@@ -846,28 +846,28 @@ impl UriRefBuf {
 	/// # Example
 	///
 	/// ```
-	/// use iref::{IriRefBuf, iri::Path};
+	/// use iref::{UriRefBuf, uri::Path};
 	///
-	/// let mut a = IriRefBuf::new("http://example.org/old/path".to_string()).unwrap();
+	/// let mut a = UriRefBuf::new("http://example.org/old/path".to_string()).unwrap();
 	/// a.set_path(Path::new("/foo/bar").unwrap());
 	/// assert_eq!(a, "http://example.org/foo/bar");
 	///
 	/// // If there is an authority and the new path is relative,
 	/// // it is turned into an absolute path.
-	/// let mut b = IriRefBuf::new("http://example.org/old/path".to_string()).unwrap();
+	/// let mut b = UriRefBuf::new("http://example.org/old/path".to_string()).unwrap();
 	/// b.set_path(Path::new("relative/path").unwrap());
 	/// assert_eq!(b, "http://example.org/relative/path");
 	///
 	/// // If there is no authority and the path starts with `//`,
 	/// // it is prefixed with `/.` to avoid being confused with an authority.
-	/// let mut c = IriRefBuf::new("http:old/path".to_string()).unwrap();
+	/// let mut c = UriRefBuf::new("http:old/path".to_string()).unwrap();
 	/// c.set_path(Path::new("//foo/bar").unwrap());
 	/// assert_eq!(c, "http:/.//foo/bar");
 	///
 	/// // If there is no authority nor scheme, and the path beginning looks
 	/// // like a scheme, it is prefixed with `./` to avoid being confused with
 	/// // a scheme.
-	/// let mut d = IriRefBuf::new("old/path".to_string()).unwrap();
+	/// let mut d = UriRefBuf::new("old/path".to_string()).unwrap();
 	/// d.set_path(Path::new("foo:bar").unwrap());
 	/// assert_eq!(d, "./foo:bar");
 	/// ```
@@ -1008,17 +1008,17 @@ impl UriRefBuf {
 	/// # Example
 	///
 	/// ```
-	/// use iref::{IriRefBuf, iri::Scheme};
+	/// use iref::{UriRefBuf, uri::Scheme};
 	///
-	/// let mut a = IriRefBuf::new("foo/bar".to_string()).unwrap();
+	/// let mut a = UriRefBuf::new("foo/bar".to_string()).unwrap();
 	/// a.set_scheme(Some(Scheme::new(b"http").unwrap()));
 	/// assert_eq!(a, "http:foo/bar");
 	///
-	/// let mut b = IriRefBuf::new("scheme://example.org/foo/bar".to_string()).unwrap();
+	/// let mut b = UriRefBuf::new("scheme://example.org/foo/bar".to_string()).unwrap();
 	/// b.set_scheme(None);
 	/// assert_eq!(b, "//example.org/foo/bar");
 	///
-	/// let mut c = IriRefBuf::new("scheme:foo:bar".to_string()).unwrap();
+	/// let mut c = UriRefBuf::new("scheme:foo:bar".to_string()).unwrap();
 	/// c.set_scheme(None);
 	/// assert_eq!(c, "./foo:bar");
 	/// ```
