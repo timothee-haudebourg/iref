@@ -24,7 +24,7 @@ easy.
 
 ### Code generation
 
-The `iri/` directory is **auto-generated** from `uri/` by `build.rs` via text
+The IRI module is **auto-generated** from `uri/` by `build.rs` via text
 replacement (`URI` → `IRI`, `Uri` → `Iri`, etc.). This keeps a single source
 of truth for the core logic: only `uri/` should be edited directly.
 
@@ -41,3 +41,8 @@ helper types like `PathMut` and `AuthorityMut`.
 Types are validated at parse time using ABNF grammars compiled to DFA state
 machines by the `static-automata` crate. Each type is annotated with
 `#[automaton(grammar::...)]` to tie it to the relevant grammar rule.
+
+The `grammar.rs` files (in `src/uri/` and `src/iri/`) are generated from the
+corresponding `grammar.abnf` files by running `cargo build-automata`. These
+files are committed to the repository and must be regenerated whenever the
+ABNF grammars change.

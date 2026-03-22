@@ -16,7 +16,7 @@ impl Scheme {
 				'+' | '-'..='.' | '0'..='9' | 'A'..='Z' | 'a'..='z' => 1u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -56,7 +56,7 @@ impl Port {
 				'0'..='9' => 0u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}

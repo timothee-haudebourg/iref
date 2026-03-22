@@ -1759,7 +1759,7 @@ impl Uri {
 				'@' => 18u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -3607,7 +3607,7 @@ impl UriRef {
 				'@' => 21u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -5279,7 +5279,7 @@ impl Authority {
 				'@' => 8u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -6591,7 +6591,7 @@ impl Host {
 				'%' => 2u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -6654,7 +6654,7 @@ impl UserInfo {
 				'0'..='9' | 'A'..='F' | 'a'..='f' => 0u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -6703,7 +6703,7 @@ impl Path {
 				'0'..='9' | 'A'..='F' | 'a'..='f' => 0u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -6752,7 +6752,7 @@ impl Segment {
 				'0'..='9' | 'A'..='F' | 'a'..='f' => 0u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -6801,7 +6801,7 @@ impl Query {
 				'0'..='9' | 'A'..='F' | 'a'..='f' => 0u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
@@ -6850,7 +6850,7 @@ impl Fragment {
 				'0'..='9' | 'A'..='F' | 'a'..='f' => 0u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}

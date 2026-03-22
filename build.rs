@@ -1,40 +1,71 @@
-use std::{fs, io, path::Path};
+use std::{env, fs, io, path::Path};
 
 fn main() {
-	export_dir("src/uri", "src/iri").unwrap()
+	let out_dir = env::var("OUT_DIR").unwrap();
+	let output = Path::new(&out_dir).join("iri.rs");
+	let content = inline_file("src/uri/mod.rs").unwrap();
+	fs::write(output, add_header(replace(content))).unwrap();
 }
 
-fn export_dir(input: impl AsRef<Path>, output: impl AsRef<Path>) -> Result<(), io::Error> {
-	let dir = fs::read_dir(input)?;
+/// Read a file and return its content with all `mod foo;`
+/// declarations replaced by `mod foo { <contents> }`.
+fn inline_file(path: impl AsRef<Path>) -> Result<String, io::Error> {
+	let path = path.as_ref();
+	let content = fs::read_to_string(path)?;
+	println!("cargo::rerun-if-changed={}", path.display());
+	let dir = path.parent().unwrap();
+	inline_mod_declarations(dir, content)
+}
 
-	for entry in dir {
-		let entry = entry?;
-		let file_type = entry.file_type()?;
+fn inline_mod_declarations(dir: &Path, content: String) -> Result<String, io::Error> {
+	let mut result = String::with_capacity(content.len());
+	let mut skip_until_grammar = false;
 
-		if file_type.is_file() {
-			let output_file = output.as_ref().join(entry.file_name());
-			if output_file.extension().is_some_and(|ext| ext == "rs") {
-				export_file(entry.path(), output_file)?;
+	for line in content.lines() {
+		// Skip the `#[grammar(...)] pub(crate) mod grammar {}` block,
+		// which is defined statically in `src/iri/mod.rs`.
+		if line.trim().starts_with("#[grammar(") {
+			skip_until_grammar = true;
+			continue;
+		}
+		if skip_until_grammar {
+			if line.trim().starts_with("pub(crate) mod grammar") {
+				skip_until_grammar = false;
 			}
+			continue;
+		}
+
+		if let Some(name) = parse_mod_declaration(line) {
+			let inlined = resolve_and_inline(dir, name)?;
+			result.push_str("mod ");
+			result.push_str(name);
+			result.push_str(" {\n");
+			result.push_str(&inlined);
+			result.push_str("}\n");
 		} else {
-			let output = output.as_ref().join(entry.file_name());
-			export_dir(entry.path(), output)?;
+			result.push_str(line);
+			result.push('\n');
 		}
 	}
 
-	Ok(())
+	Ok(result)
 }
 
-fn export_file(input: impl AsRef<Path>, output: impl AsRef<Path>) -> Result<(), io::Error> {
-	println!("cargo::rerun-if-changed={}", input.as_ref().display());
+/// Parse `mod foo;` or `mod r#foo;`, returning the module name.
+fn parse_mod_declaration(line: &str) -> Option<&str> {
+	let name = line.trim().strip_prefix("mod ")?.strip_suffix(';')?;
+	Some(name)
+}
 
-	let content = fs::read_to_string(input)?;
-
-	if let Some(parent) = output.as_ref().parent() {
-		fs::create_dir_all(parent)?;
+/// Resolve a module name to a file or directory and inline it.
+fn resolve_and_inline(dir: &Path, name: &str) -> Result<String, io::Error> {
+	let file_name = name.strip_prefix("r#").unwrap_or(name);
+	let subdir = dir.join(file_name);
+	if subdir.is_dir() {
+		inline_file(subdir.join("mod.rs"))
+	} else {
+		inline_file(dir.join(format!("{file_name}.rs")))
 	}
-
-	fs::write(output, add_header(replace(content)))
 }
 
 fn replace(s: impl AsRef<str>) -> String {
@@ -42,10 +73,6 @@ fn replace(s: impl AsRef<str>) -> String {
 		.replace("URI", "IRI")
 		.replace("Uri", "Iri")
 		.replace("uri", "iri")
-		.replace(
-			r#""authority", "host", "userinfo" as UserInfo, "path", "segment", "query", "fragment""#,
-			r#""iauthority", "ihost", "iuserinfo" as UserInfo, "ipath", "isegment", "iquery", "ifragment""#,
-		)
 		.replace("macro_rules! ", "macro_rules! i")
 		.replace("macro_rules! iiri", "macro_rules! iri")
 }
