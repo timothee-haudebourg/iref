@@ -198,7 +198,7 @@ impl<'a> AuthorityMut<'a> {
 		if host_len > host.len() {
 			self.range.end -= host_len - host.len()
 		} else {
-			self.range.end -= host.len() - host_len
+			self.range.end += host.len() - host_len
 		}
 
 		self.replace_bytes(range, host);
@@ -384,6 +384,18 @@ mod tests {
 				7..33,
 				"%6Eew.org",
 				b"http://user:pass@%6Eew.org:8080/path",
+			),
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				"new_long_host.org",
+				b"http://user:pass@new_long_host.org:8080/path",
+			),
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				"%6Eew_long_host.org",
+				b"http://user:pass@%6Eew_long_host.org:8080/path",
 			),
 			(
 				b"http://user:pass@%65xample.com:8080/path",
