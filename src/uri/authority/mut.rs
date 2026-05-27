@@ -130,10 +130,11 @@ impl<'a> AuthorityMut<'a> {
 						self.replace_bytes(userinfo_range, new_userinfo.as_bytes())
 					}
 					None => {
+						let new_userinfo = new_userinfo.as_bytes();
 						let added_len = new_userinfo.len() + 1;
 						self.allocate_bytes(self.range.start..self.range.start, added_len);
 						self.data[self.range.start..(self.range.start + new_userinfo.len())]
-							.copy_from_slice(new_userinfo.as_bytes());
+							.copy_from_slice(new_userinfo);
 						self.data[self.range.start + new_userinfo.len()] = b'@';
 						self.range.end += added_len
 					}
@@ -192,6 +193,7 @@ impl<'a> AuthorityMut<'a> {
 		let bytes = &self.data[..self.range.end];
 		let range = crate::common::parse::find_host(bytes, self.range.start);
 		let host_len = range.end - range.start;
+		let host = host.as_bytes();
 
 		if host_len > host.len() {
 			self.range.end -= host_len - host.len()
@@ -199,7 +201,7 @@ impl<'a> AuthorityMut<'a> {
 			self.range.end -= host.len() - host_len
 		}
 
-		self.replace_bytes(range, host.as_bytes());
+		self.replace_bytes(range, host);
 		self
 	}
 
@@ -331,34 +333,74 @@ mod tests {
 
 	#[test]
 	fn set_user_info() {
-		let mut data = b"http://user:pass@example.com:8080/path".to_vec();
-		let mut authority_mut = AuthorityMut::new(&mut data, 7..33).unwrap();
+		let vectors: &[(&[u8], Range<usize>, Option<&str>, &[u8])] = &[
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				Some("user"),
+				b"http://user@example.com:8080/path",
+			),
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				Some("user:pass"),
+				b"http://user:pass@example.com:8080/path",
+			),
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				None,
+				b"http://example.com:8080/path",
+			),
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				Some("%75ser:pass"),
+				b"http://%75ser:pass@example.com:8080/path",
+			),
+		];
 
-		let new_user_info = UserInfo::new("new_user:new_pass").unwrap();
-		authority_mut.set_user_info(Some(&new_user_info));
-		assert_eq!(
-			authority_mut.as_authority().user_info().unwrap(),
-			"new_user:new_pass"
-		);
-
-		authority_mut.set_user_info(None);
-		assert!(authority_mut.as_authority().user_info().is_none());
-
-		authority_mut.set_user_info(Some(&new_user_info));
-		assert_eq!(
-			authority_mut.as_authority().user_info().unwrap(),
-			"new_user:new_pass"
-		);
+		for (input_data, range, user_info, expected) in vectors {
+			let mut data = input_data.to_vec();
+			let mut authority_mut = AuthorityMut::new(&mut data, range.clone()).unwrap();
+			let new_user_info = user_info.map(|i| UserInfo::new(i).unwrap());
+			authority_mut.set_user_info(new_user_info);
+			assert_eq!(authority_mut.as_authority().user_info(), new_user_info);
+			assert_eq!(data, expected.to_vec());
+		}
 	}
 
 	#[test]
 	fn set_host() {
-		let mut data = b"http://user:pass@example.com:8080/path".to_vec();
-		let mut authority_mut = AuthorityMut::new(&mut data, 7..33).unwrap();
+		let vectors: &[(&[u8], Range<usize>, &str, &[u8])] = &[
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				"new_host.org",
+				b"http://user:pass@new_host.org:8080/path",
+			),
+			(
+				b"http://user:pass@example.com:8080/path",
+				7..33,
+				"%6Eew.org",
+				b"http://user:pass@%6Eew.org:8080/path",
+			),
+			(
+				b"http://user:pass@%65xample.com:8080/path",
+				7..35,
+				"example.com",
+				b"http://user:pass@example.com:8080/path",
+			),
+		];
 
-		let new_host = Host::new("new_host.org").unwrap();
-		authority_mut.set_host(&new_host);
-		assert_eq!(authority_mut.as_authority().host(), "new_host.org");
+		for (input_data, range, host, expected) in vectors {
+			let mut data = input_data.to_vec();
+			let mut authority_mut = AuthorityMut::new(&mut data, range.clone()).unwrap();
+			let new_host = Host::new(host).unwrap();
+			authority_mut.set_host(&new_host);
+			assert_eq!(authority_mut.as_authority().host(), new_host);
+			assert_eq!(data, expected.to_vec());
+		}
 	}
 
 	#[test]
