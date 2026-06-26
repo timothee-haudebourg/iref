@@ -7,12 +7,24 @@
 )]
 #[cfg_attr(
 	feature = "std",
-	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(QueryBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
+	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(QueryBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Query(str);
 
+impl Default for &Query {
+	fn default() -> Self {
+		Query::EMPTY
+	}
+}
+
 impl Query {
+	/// The empty query.
+	pub const EMPTY: &'static Self = match Self::from_str("") {
+		Ok(v) => v,
+		Err(_) => panic!("empty query should be valid"),
+	};
+
 	/// Returns the query as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &pct_str::PctStr {
