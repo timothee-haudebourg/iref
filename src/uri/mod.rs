@@ -612,12 +612,12 @@ impl UriBuf {
 			Some(new_query) => match crate::common::parse::find_query(self.as_bytes(), 0) {
 				Ok(range) => unsafe { self.replace(range, new_query.as_bytes()) },
 				Err(start) => unsafe {
+					let new_query = new_query.as_bytes();
 					self.allocate(start..start, new_query.len() + 1);
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'?';
-					bytes[delim_end..(delim_end + new_query.len())]
-						.copy_from_slice(new_query.as_bytes())
+					bytes[delim_end..(delim_end + new_query.len())].copy_from_slice(new_query)
 				},
 			},
 			None => {
@@ -666,12 +666,12 @@ impl UriBuf {
 			Some(new_fragment) => match crate::common::parse::find_fragment(self.as_bytes(), 0) {
 				Ok(range) => unsafe { self.replace(range, new_fragment.as_bytes()) },
 				Err(start) => unsafe {
+					let new_fragment = new_fragment.as_bytes();
 					self.allocate(start..start, new_fragment.len() + 1);
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'#';
-					bytes[delim_end..(delim_end + new_fragment.len())]
-						.copy_from_slice(new_fragment.as_bytes())
+					bytes[delim_end..(delim_end + new_fragment.len())].copy_from_slice(new_fragment)
 				},
 			},
 			None => {
@@ -1042,6 +1042,49 @@ mod tests {
 	}
 
 	#[test]
+	fn set_authority() {
+		let vectors: &[(&str, Option<&str>, &str)] = &[
+			(
+				"scheme://authority/path?query#frag",
+				Some("authority"),
+				"scheme://authority/path?query#frag",
+			),
+			(
+				"scheme://authority/path?query#frag",
+				None,
+				"scheme:/path?query#frag",
+			),
+			(
+				"scheme://authority/path?query#frag",
+				Some("bar"),
+				"scheme://bar/path?query#frag",
+			),
+			(
+				"scheme://authority/path?query#frag",
+				Some("%61uthority"),
+				"scheme://%61uthority/path?query#frag",
+			),
+			(
+				"scheme://%61uthority/path?query#frag",
+				Some("bar"),
+				"scheme://bar/path?query#frag",
+			),
+			("scheme:", Some("%61uthority"), "scheme://%61uthority/"),
+		];
+
+		for (input_uri, input_authority, expected) in vectors {
+			let mut uri = UriBuf::new(input_uri.to_string()).unwrap();
+			let authority = input_authority.map(|a| Authority::new(a).unwrap());
+			uri.set_authority(authority);
+			assert_eq!(
+				uri.as_str(),
+				*expected,
+				"input uri: {input_uri}, authority: {input_authority:?}"
+			);
+		}
+	}
+
+	#[test]
 	fn path() {
 		let vectors: &[(&str, &str)] = &[
 			("http://example.org", ""),
@@ -1086,6 +1129,58 @@ mod tests {
 	}
 
 	#[test]
+	fn set_query() {
+		let vectors: &[(&str, Option<&str>, &str)] = &[
+			(
+				"scheme://authority/path#frag",
+				Some("query"),
+				"scheme://authority/path?query#frag",
+			),
+			(
+				"scheme://authority/path?query#frag",
+				None,
+				"scheme://authority/path#frag",
+			),
+			(
+				"scheme://authority/path#frag",
+				Some("%71uery"),
+				"scheme://authority/path?%71uery#frag",
+			),
+			(
+				"scheme://authority/path?%71uery#frag",
+				Some("%71uery=%62ar"),
+				"scheme://authority/path?%71uery=%62ar#frag",
+			),
+			(
+				"scheme://authority/path?%71uery#frag",
+				Some("query"),
+				"scheme://authority/path?query#frag",
+			),
+			(
+				"scheme://authority/path?%71uery#frag",
+				Some("%71uery"),
+				"scheme://authority/path?%71uery#frag",
+			),
+			(
+				"scheme://authority/path?%71uery#frag",
+				None,
+				"scheme://authority/path#frag",
+			),
+		];
+
+		for (input_uri, input_query, expected) in vectors {
+			let mut uri = UriBuf::new(input_uri.to_string()).unwrap();
+			let query = input_query.map(|q| Query::new(q).unwrap());
+			uri.set_query(query);
+			assert_eq!(
+				uri.as_str(),
+				*expected,
+				"input uri: {input_uri}, query: {input_query:?}"
+			);
+		}
+	}
+
+	#[test]
 	fn fragment() {
 		let vectors: &[(&str, Option<&str>)] = &[
 			("http://example.org", None),
@@ -1103,6 +1198,63 @@ mod tests {
 				uri.fragment().map(|f| f.as_str()),
 				*expected,
 				"input: {input}"
+			);
+		}
+	}
+
+	#[test]
+	fn set_fragment() {
+		let vectors: &[(&str, Option<&str>, &str)] = &[
+			(
+				"scheme://authority/path",
+				Some("frag"),
+				"scheme://authority/path#frag",
+			),
+			(
+				"scheme://authority/path#frag",
+				None,
+				"scheme://authority/path",
+			),
+			(
+				"scheme://authority/path",
+				Some("%66rag"),
+				"scheme://authority/path#%66rag",
+			),
+			(
+				"scheme://authority/path#%66rag",
+				Some("%66rag"),
+				"scheme://authority/path#%66rag",
+			),
+			(
+				"scheme://authority/path#%66rag",
+				Some("frag"),
+				"scheme://authority/path#frag",
+			),
+			(
+				"scheme://authority/path#%66rag",
+				None,
+				"scheme://authority/path",
+			),
+			(
+				"scheme://authority/path?q#%66rag",
+				Some("%66rag"),
+				"scheme://authority/path?q#%66rag",
+			),
+			(
+				"scheme://authority/path?q#%66rag",
+				None,
+				"scheme://authority/path?q",
+			),
+		];
+
+		for (input_uri, input_fragment, expected) in vectors {
+			let mut uri = UriBuf::new(input_uri.to_string()).unwrap();
+			let fragment = input_fragment.map(|f| Fragment::new(f).unwrap());
+			uri.set_fragment(fragment);
+			assert_eq!(
+				uri.as_str(),
+				*expected,
+				"input uri: {input_uri}, fragment: {input_fragment:?}"
 			);
 		}
 	}

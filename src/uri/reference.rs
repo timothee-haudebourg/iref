@@ -915,12 +915,12 @@ impl UriRefBuf {
 			Some(new_query) => match crate::common::parse::find_query(self.as_bytes(), 0) {
 				Ok(range) => unsafe { self.replace(range, new_query.as_bytes()) },
 				Err(start) => unsafe {
+					let new_query = new_query.as_bytes();
 					self.allocate(start..start, new_query.len() + 1);
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'?';
-					bytes[delim_end..(delim_end + new_query.len())]
-						.copy_from_slice(new_query.as_bytes())
+					bytes[delim_end..(delim_end + new_query.len())].copy_from_slice(new_query)
 				},
 			},
 			None => {
@@ -969,12 +969,12 @@ impl UriRefBuf {
 			Some(new_fragment) => match crate::common::parse::find_fragment(self.as_bytes(), 0) {
 				Ok(range) => unsafe { self.replace(range, new_fragment.as_bytes()) },
 				Err(start) => unsafe {
+					let new_fragment = new_fragment.as_bytes();
 					self.allocate(start..start, new_fragment.len() + 1);
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'#';
-					bytes[delim_end..(delim_end + new_fragment.len())]
-						.copy_from_slice(new_fragment.as_bytes())
+					bytes[delim_end..(delim_end + new_fragment.len())].copy_from_slice(new_fragment)
 				},
 			},
 			None => {
@@ -1562,11 +1562,112 @@ mod tests {
 	}
 
 	#[test]
+	fn set_query() {
+		let vectors: &[(&[u8], Option<&str>, &[u8])] = &[
+			(
+				b"scheme://authority/path#frag",
+				Some("query"),
+				b"scheme://authority/path?query#frag",
+			),
+			(
+				b"scheme://authority/path?query#frag",
+				None,
+				b"scheme://authority/path#frag",
+			),
+			(
+				b"scheme://authority/path#frag",
+				Some("%71uery"),
+				b"scheme://authority/path?%71uery#frag",
+			),
+			(
+				b"scheme://authority/path?%71uery#frag",
+				Some("%71uery=%62ar"),
+				b"scheme://authority/path?%71uery=%62ar#frag",
+			),
+			(
+				b"scheme://authority/path?%71uery#frag",
+				Some("query"),
+				b"scheme://authority/path?query#frag",
+			),
+			(
+				b"scheme://authority/path?%71uery#frag",
+				Some("%71uery"),
+				b"scheme://authority/path?%71uery#frag",
+			),
+			(
+				b"scheme://authority/path?%71uery#frag",
+				None,
+				b"scheme://authority/path#frag",
+			),
+		];
+
+		for (input_uri, input_query, expected) in vectors {
+			let mut buffer = UriRefBuf::new(input_uri.to_vec()).unwrap();
+			let query = input_query.map(|q| Query::new(q).unwrap());
+			buffer.set_query(query);
+			assert_eq!(buffer.as_bytes(), *expected);
+		}
+	}
+
+	#[test]
 	fn fragment() {
 		for (input, expected) in PARTS {
 			let input = UriRef::new(input).unwrap();
 			// eprintln!("{input}: {expected:?}");
 			assert_eq!(input.fragment().map(Fragment::as_bytes), expected.4)
+		}
+	}
+
+	#[test]
+	fn set_fragment() {
+		let vectors: &[(&[u8], Option<&str>, &[u8])] = &[
+			(
+				b"scheme://authority/path",
+				Some("frag"),
+				b"scheme://authority/path#frag",
+			),
+			(
+				b"scheme://authority/path#frag",
+				None,
+				b"scheme://authority/path",
+			),
+			(
+				b"scheme://authority/path",
+				Some("%66rag"),
+				b"scheme://authority/path#%66rag",
+			),
+			(
+				b"scheme://authority/path#%66rag",
+				Some("%66rag"),
+				b"scheme://authority/path#%66rag",
+			),
+			(
+				b"scheme://authority/path#%66rag",
+				Some("frag"),
+				b"scheme://authority/path#frag",
+			),
+			(
+				b"scheme://authority/path#%66rag",
+				None,
+				b"scheme://authority/path",
+			),
+			(
+				b"scheme://authority/path?q#%66rag",
+				Some("%66rag"),
+				b"scheme://authority/path?q#%66rag",
+			),
+			(
+				b"scheme://authority/path?q#%66rag",
+				None,
+				b"scheme://authority/path?q",
+			),
+		];
+
+		for (input_uri, input_fragment, expected) in vectors {
+			let mut buffer = UriRefBuf::new(input_uri.to_vec()).unwrap();
+			let fragment = input_fragment.map(|f| Fragment::new(f).unwrap());
+			buffer.set_fragment(fragment);
+			assert_eq!(buffer.as_bytes(), *expected);
 		}
 	}
 

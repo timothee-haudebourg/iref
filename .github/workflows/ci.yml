@@ -4,12 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
+    branches: ["**"]
 
 env:
   CARGO_TERM_COLORS: always
