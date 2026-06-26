@@ -920,8 +920,7 @@ impl UriRefBuf {
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'?';
-					bytes[delim_end..(delim_end + new_query.len())]
-						.copy_from_slice(new_query)
+					bytes[delim_end..(delim_end + new_query.len())].copy_from_slice(new_query)
 				},
 			},
 			None => {
@@ -975,8 +974,7 @@ impl UriRefBuf {
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'#';
-					bytes[delim_end..(delim_end + new_fragment.len())]
-						.copy_from_slice(new_fragment)
+					bytes[delim_end..(delim_end + new_fragment.len())].copy_from_slice(new_fragment)
 				},
 			},
 			None => {

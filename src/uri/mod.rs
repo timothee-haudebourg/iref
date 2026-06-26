@@ -617,8 +617,7 @@ impl UriBuf {
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'?';
-					bytes[delim_end..(delim_end + new_query.len())]
-						.copy_from_slice(new_query)
+					bytes[delim_end..(delim_end + new_query.len())].copy_from_slice(new_query)
 				},
 			},
 			None => {
@@ -672,8 +671,7 @@ impl UriBuf {
 					let bytes = self.as_mut_vec();
 					let delim_end = start + 1;
 					bytes[start] = b'#';
-					bytes[delim_end..(delim_end + new_fragment.len())]
-						.copy_from_slice(new_fragment)
+					bytes[delim_end..(delim_end + new_fragment.len())].copy_from_slice(new_fragment)
 				},
 			},
 			None => {
@@ -1071,18 +1069,18 @@ mod tests {
 				Some("bar"),
 				"scheme://bar/path?query#frag",
 			),
-			(
-				"scheme:",
-				Some("%61uthority"),
-				"scheme://%61uthority/",
-			),
+			("scheme:", Some("%61uthority"), "scheme://%61uthority/"),
 		];
 
 		for (input_uri, input_authority, expected) in vectors {
 			let mut uri = UriBuf::new(input_uri.to_string()).unwrap();
 			let authority = input_authority.map(|a| Authority::new(a).unwrap());
 			uri.set_authority(authority);
-			assert_eq!(uri.as_str(), *expected, "input uri: {input_uri}, authority: {input_authority:?}");
+			assert_eq!(
+				uri.as_str(),
+				*expected,
+				"input uri: {input_uri}, authority: {input_authority:?}"
+			);
 		}
 	}
 
@@ -1184,7 +1182,11 @@ mod tests {
 			let mut uri = UriBuf::new(input_uri.to_string()).unwrap();
 			let query = input_query.map(|q| Query::new(q).unwrap());
 			uri.set_query(query);
-			assert_eq!(uri.as_str(), *expected, "input uri: {input_uri}, query: {input_query:?}");
+			assert_eq!(
+				uri.as_str(),
+				*expected,
+				"input uri: {input_uri}, query: {input_query:?}"
+			);
 		}
 	}
 
@@ -1264,7 +1266,11 @@ mod tests {
 			let mut uri = UriBuf::new(input_uri.to_string()).unwrap();
 			let fragment = input_fragment.map(|f| Fragment::new(f).unwrap());
 			uri.set_fragment(fragment);
-			assert_eq!(uri.as_str(), *expected, "input uri: {input_uri}, fragment: {input_fragment:?}");
+			assert_eq!(
+				uri.as_str(),
+				*expected,
+				"input uri: {input_uri}, fragment: {input_fragment:?}"
+			);
 		}
 	}
 
