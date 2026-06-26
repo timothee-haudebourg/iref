@@ -7,12 +7,24 @@
 )]
 #[cfg_attr(
 	feature = "std",
-	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(FragmentBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
+	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(FragmentBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Fragment(str);
 
+impl Default for &Fragment {
+	fn default() -> Self {
+		Fragment::EMPTY
+	}
+}
+
 impl Fragment {
+	/// The empty fragment.
+	pub const EMPTY: &'static Self = match Self::from_str("") {
+		Ok(v) => v,
+		Err(_) => panic!("empty fragment should be valid"),
+	};
+
 	/// Returns the fragment as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &pct_str::PctStr {
