@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT/Apache-2.0"
 edition = "2024"
 rust-version = "1.89.0"
-version = "4.0.0"
+version = "4.0.1"
 
 [features]
 default = ["std"]
