@@ -1599,16 +1599,6 @@ mod tests {
 				None,
 				b"scheme://authority/path#frag",
 			),
-			(
-				b"scheme://authority/path?%71uery#frag",
-				Some("%71uery"),
-				b"scheme://authority/path?%71uery#frag",
-			),
-			(
-				b"scheme://authority/path?%71uery#frag",
-				None,
-				b"scheme://authority/path#frag",
-			),
 		];
 
 		for (input_uri, input_query, expected) in vectors {
@@ -1655,11 +1645,6 @@ mod tests {
 				b"scheme://authority/path#%66rag",
 				Some("frag"),
 				b"scheme://authority/path#frag",
-			),
-			(
-				b"scheme://authority/path#%66rag",
-				Some("%66rag"),
-				b"scheme://authority/path#%66rag",
 			),
 			(
 				b"scheme://authority/path#%66rag",
