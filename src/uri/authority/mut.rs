@@ -323,7 +323,7 @@ mod tests {
 		let mut authority_mut = AuthorityMut::new(&mut data, 7..33).unwrap();
 
 		let new_authority = Authority::new("new_user:new_pass@new_host:9090").unwrap();
-		authority_mut.replace(&new_authority);
+		authority_mut.replace(new_authority);
 
 		assert_eq!(
 			authority_mut.as_authority(),
@@ -333,7 +333,13 @@ mod tests {
 
 	#[test]
 	fn set_user_info() {
-		let vectors: &[(&[u8], Range<usize>, Option<&str>, &[u8])] = &[
+		type Vector = (
+			&'static [u8],
+			Range<usize>,
+			Option<&'static str>,
+			&'static [u8],
+		);
+		let vectors: &[Vector] = &[
 			(
 				b"http://user:pass@example.com:8080/path",
 				7..33,
@@ -372,7 +378,8 @@ mod tests {
 
 	#[test]
 	fn set_host() {
-		let vectors: &[(&[u8], Range<usize>, &str, &[u8])] = &[
+		type Vector = (&'static [u8], Range<usize>, &'static str, &'static [u8]);
+		let vectors: &[Vector] = &[
 			(
 				b"http://user:pass@example.com:8080/path",
 				7..33,
@@ -409,7 +416,7 @@ mod tests {
 			let mut data = input_data.to_vec();
 			let mut authority_mut = AuthorityMut::new(&mut data, range.clone()).unwrap();
 			let new_host = Host::new(host).unwrap();
-			authority_mut.set_host(&new_host);
+			authority_mut.set_host(new_host);
 			assert_eq!(authority_mut.as_authority().host(), new_host);
 			assert_eq!(data, expected.to_vec());
 		}
@@ -421,13 +428,13 @@ mod tests {
 		let mut authority_mut = AuthorityMut::new(&mut data, 7..33).unwrap();
 
 		let new_port = Port::new("9090").unwrap();
-		authority_mut.set_port(Some(&new_port));
+		authority_mut.set_port(Some(new_port));
 		assert_eq!(authority_mut.as_authority().port().unwrap(), "9090");
 
 		authority_mut.set_port(None);
 		assert!(authority_mut.as_authority().port().is_none());
 
-		authority_mut.set_port(Some(&new_port));
+		authority_mut.set_port(Some(new_port));
 		assert_eq!(authority_mut.as_authority().port().unwrap(), "9090");
 	}
 }

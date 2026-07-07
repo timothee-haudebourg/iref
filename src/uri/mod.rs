@@ -1261,7 +1261,15 @@ mod tests {
 
 	#[test]
 	fn parts() {
-		let vectors: &[(&str, &str, Option<&str>, &str, Option<&str>, Option<&str>)] = &[
+		type Vector = (
+			&'static str,
+			&'static str,
+			Option<&'static str>,
+			&'static str,
+			Option<&'static str>,
+			Option<&'static str>,
+		);
+		let vectors: &[Vector] = &[
 			// (uri, scheme, authority, path, query, fragment)
 			(
 				"http://example.org",

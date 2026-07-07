@@ -1195,7 +1195,8 @@ mod tests {
 
 	#[test]
 	fn next_segment() {
-		let vectors: [(&[u8], usize, Option<(&[u8], usize)>); 6] = [
+		type Vector = (&'static [u8], usize, Option<(&'static [u8], usize)>);
+		let vectors: [Vector; 6] = [
 			(b"foo/bar", 0, Some((b"foo", 4))),
 			(b"foo/bar", 4, Some((b"bar", 8))),
 			(b"foo/bar", 8, None),
@@ -1216,7 +1217,8 @@ mod tests {
 
 	#[test]
 	fn previous_segment() {
-		let vectors: [(&[u8], usize, Option<(&[u8], usize)>); 7] = [
+		type Vector = (&'static [u8], usize, Option<(&'static [u8], usize)>);
+		let vectors: [Vector; 7] = [
 			(b"/foo/bar", 1, None),
 			(b"foo/bar", 0, None),
 			(b"foo/bar", 4, Some((b"foo", 0))),
@@ -1305,7 +1307,7 @@ mod tests {
 			assert!(
 				segments
 					.into_iter()
-					.zip(expected.into_iter().rev())
+					.zip(expected.iter().rev())
 					.all(|(a, b)| a.as_bytes() == *b)
 			)
 		}

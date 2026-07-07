@@ -13,9 +13,9 @@ struct Bar<'a> {
 }
 
 fn main() {
-	let foo: Foo = serde_json::from_str("{ \"iri\": \"https://example.org/foo\" }").unwrap();
+	let parsed: Foo = serde_json::from_str("{ \"iri\": \"https://example.org/foo\" }").unwrap();
 	let bar: Bar = serde_json::from_str("{ \"iri_ref\": \"../bar\" }").unwrap();
 
-	eprintln!("{:?}", foo);
+	eprintln!("{:?}", parsed);
 	eprintln!("{:?}", bar);
 }

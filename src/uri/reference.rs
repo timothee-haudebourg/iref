@@ -1297,16 +1297,18 @@ impl PartialOrd<UriBuf> for UriRefBuf {
 mod tests {
 	use super::*;
 
-	const PARTS: [(
-		&[u8],
+	type PartsEntry = (
+		&'static [u8],
 		(
-			Option<&[u8]>,
-			Option<&[u8]>,
-			&[u8],
-			Option<&[u8]>,
-			Option<&[u8]>,
+			Option<&'static [u8]>,
+			Option<&'static [u8]>,
+			&'static [u8],
+			Option<&'static [u8]>,
+			Option<&'static [u8]>,
 		),
-	); 38] = [
+	);
+
+	const PARTS: [PartsEntry; 38] = [
 		// 0 components.
 		(b"", (None, None, b"", None, None)),
 		(b"a/:", (None, None, b"a/:", None, None)),
@@ -1520,7 +1522,8 @@ mod tests {
 
 	#[test]
 	fn set_authority() {
-		let vectors: [(&[u8], Option<&[u8]>, &[u8]); 3] = [
+		type Vector = (&'static [u8], Option<&'static [u8]>, &'static [u8]);
+		let vectors: [Vector; 3] = [
 			(
 				b"scheme:/path",
 				Some(b"authority"),
