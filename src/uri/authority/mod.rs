@@ -378,6 +378,17 @@ impl AuthorityBuf {
 	}
 }
 
+/// Parses a URI authority [`Authority`] at compile time.
+#[macro_export]
+macro_rules! authority {
+	($value:literal) => {
+		match $crate::uri::Authority::from_str($value) {
+			Ok(value) => value,
+			Err(_) => panic!("invalid URI authority"),
+		}
+	};
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::Uri;
