@@ -46,3 +46,10 @@ The `grammar.rs` files (in `src/uri/` and `src/iri/`) are generated from the
 corresponding `grammar.abnf` files by running `cargo build-automata`. These
 files are committed to the repository and must be regenerated whenever the
 ABNF grammars change.
+
+## Release Process
+
+- Bump the version number in `Cargo.toml`;
+- Make a commit with the message `chore(release): Version X.Y.Z`;
+- Publish the crate;
+- On success, add a tag with `git tag -a vX.Y.Z -m "Version X.Y.Z"` and push.
