@@ -33,12 +33,21 @@ pub use userinfo::*;
 #[newtype(ord([u8], &[u8], str, &str))]
 #[cfg_attr(
 	feature = "std",
-	newtype(ord(Vec<u8>, String), owned(AuthorityBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
+	newtype(ord(Vec<u8>, String), owned(AuthorityBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Authority(str);
 
+impl Default for &Authority {
+	fn default() -> Self {
+		Authority::EMPTY
+	}
+}
+
 impl Authority {
+	/// The empty authority.
+	pub const EMPTY: &Self = unsafe { Self::new_unchecked("") };
+
 	/// Returns all the parts of this authority.
 	///
 	/// # Example
