@@ -16,12 +16,21 @@ use pct_str::PctStr;
 )]
 #[cfg_attr(
 	feature = "std",
-	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(HostBuf, derive(PartialEq, Eq, PartialOrd, Ord, Hash)))
+	newtype(ord(Vec<u8>, String, pct_str::PctString), owned(HostBuf, derive(Default, PartialEq, Eq, PartialOrd, Ord, Hash)))
 )]
 #[cfg_attr(feature = "serde", newtype(serde))]
 pub struct Host(str);
 
+impl Default for &Host {
+	fn default() -> Self {
+		Host::EMPTY
+	}
+}
+
 impl Host {
+	/// The empty host.
+	pub const EMPTY: &Self = unsafe { Self::new_unchecked("") };
+
 	/// Returns the host as a percent-encoded string slice.
 	#[inline]
 	pub fn as_pct_str(&self) -> &PctStr {
