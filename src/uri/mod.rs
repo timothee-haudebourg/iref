@@ -449,9 +449,19 @@ impl UriBuf {
 			Some(new_authority) => match crate::common::parse::find_authority(bytes, 0) {
 				Ok(range) => unsafe { self.replace(range, new_authority.as_bytes()) },
 				Err(start) => {
-					if !bytes[start..].starts_with(b"/") {
+					if matches!(bytes[start..].first(), None | Some(b'/' | b'?' | b'#')) {
 						// VALIDITY: When an authority is present, the path must
-						//           be absolute.
+						//           be absolute or empty...
+						unsafe {
+							self.allocate(start..start, new_authority.len() + 2);
+							let bytes = self.as_mut_vec();
+							let delim_end = start + 2;
+							bytes[start..delim_end].copy_from_slice(b"//");
+							bytes[delim_end..(delim_end + new_authority.len())]
+								.copy_from_slice(new_authority.as_bytes())
+						}
+					} else {
+						// ...otherwise we add a `/`, to turn the path absolute.
 						unsafe {
 							self.allocate(start..start, new_authority.len() + 3);
 							let bytes = self.as_mut_vec();
@@ -460,15 +470,6 @@ impl UriBuf {
 							bytes[delim_end..(delim_end + new_authority.len())]
 								.copy_from_slice(new_authority.as_bytes());
 							bytes[delim_end + new_authority.len()] = b'/';
-						}
-					} else {
-						unsafe {
-							self.allocate(start..start, new_authority.len() + 2);
-							let bytes = self.as_mut_vec();
-							let delim_end = start + 2;
-							bytes[start..delim_end].copy_from_slice(b"//");
-							bytes[delim_end..(delim_end + new_authority.len())]
-								.copy_from_slice(new_authority.as_bytes())
 						}
 					}
 				}
@@ -1069,7 +1070,21 @@ mod tests {
 				Some("bar"),
 				"scheme://bar/path?query#frag",
 			),
-			("scheme:", Some("%61uthority"), "scheme://%61uthority/"),
+			("scheme:", Some("%61uthority"), "scheme://%61uthority"),
+			// Relative non-empty path must become absolute.
+			("scheme:path", Some("auth"), "scheme://auth/path"),
+			// Empty path followed immediately by a query is still empty.
+			("scheme:?query", Some("auth"), "scheme://auth?query"),
+			// Empty path followed immediately by a fragment is still empty.
+			("scheme:#frag", Some("auth"), "scheme://auth#frag"),
+			// Relative path followed by a query must become absolute.
+			(
+				"scheme:path?query",
+				Some("auth"),
+				"scheme://auth/path?query",
+			),
+			// Already-absolute path is left untouched.
+			("scheme:/path", Some("auth"), "scheme://auth/path"),
 		];
 
 		for (input_uri, input_authority, expected) in vectors {
@@ -1103,6 +1118,36 @@ mod tests {
 		for (input, expected) in vectors {
 			let uri = Uri::new(input).unwrap();
 			assert_eq!(uri.path().as_str(), *expected, "input: {input}");
+		}
+	}
+
+	#[test]
+	fn set_path() {
+		let vectors: &[(&str, &str, &str)] = &[
+			("http://example.org/path", "/new", "http://example.org/new"),
+			// Authority present, path set to relative: must become absolute.
+			("http://example.org/path", "new", "http://example.org/new"),
+			// Authority present, path set to empty: must stay empty, not
+			// gain a spurious `/`.
+			("http://example.org/path", "", "http://example.org"),
+			// Same as above, but with a query following the path.
+			(
+				"http://example.org/path?query",
+				"",
+				"http://example.org?query",
+			),
+			// No authority, path set to something that looks like an
+			// authority: must be disambiguated.
+			("mailto:old", "//new", "mailto:/.//new"),
+			// No scheme, no authority, path set to something that looks
+			// like a scheme: must be disambiguated.
+			("old/path", "foo:bar", "./foo:bar"),
+		];
+
+		for (input, path, expected) in vectors {
+			let mut uri = UriRefBuf::new(input.to_string()).unwrap();
+			uri.try_set_path(path).unwrap();
+			assert_eq!(uri.as_str(), *expected, "input: {input}, path: {path}");
 		}
 	}
 
