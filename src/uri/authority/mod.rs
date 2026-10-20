@@ -228,10 +228,10 @@ impl AuthorityBuf {
 	/// assert!(authority.try_replace("not valid\0").is_err());
 	/// ```
 	#[inline]
-	pub fn try_replace<'s>(
+	pub fn try_replace<T: AsRef<str>>(
 		&mut self,
-		other: &'s str,
-	) -> Result<&mut Self, InvalidAuthority<&'s str>> {
+		other: T,
+	) -> Result<&mut Self, InvalidAuthority<T>> {
 		self.as_authority_mut().try_replace(other)?;
 		Ok(self)
 	}
@@ -312,7 +312,7 @@ impl AuthorityBuf {
 	/// assert!(authority.try_set_host("invalid/host").is_err());
 	/// ```
 	#[inline]
-	pub fn try_set_host<'s>(&mut self, host: &'s str) -> Result<&mut Self, InvalidHost<&'s str>> {
+	pub fn try_set_host<T: AsRef<str>>(&mut self, host: T) -> Result<&mut Self, InvalidHost<T>> {
 		self.as_authority_mut().try_set_host(host)?;
 		Ok(self)
 	}

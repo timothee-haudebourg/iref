@@ -160,7 +160,7 @@ impl Uri {
 
 	/// Tries to join a string as a URI reference to this URI.
 	///
-	/// Same as [`Self::joined`] but accepts a `&str` instead of a [`&UriRef`](UriRef).
+	/// Same as [`Self::joined`] but accepts a string instead of a [`&UriRef`](UriRef).
 	/// Returns an error if the input string is not a valid URI reference.
 	///
 	/// # Example
@@ -174,8 +174,11 @@ impl Uri {
 	/// assert!(base.try_joined("not a valid uri ref\0").is_err());
 	/// ```
 	#[cfg(feature = "std")]
-	pub fn try_joined<'r>(&self, input: &'r str) -> Result<UriBuf, InvalidUriRef<&'r str>> {
-		UriRef::new(input).map(|r| self.joined(r))
+	pub fn try_joined<T: AsRef<str>>(&self, input: T) -> Result<UriBuf, InvalidUriRef<T>> {
+		match UriRef::new(input.as_ref()) {
+			Ok(input) => Ok(self.joined(input)),
+			Err(_) => Err(InvalidUriRef(input)),
+		}
 	}
 
 	/// Converts this URI into an URI reference.
@@ -576,11 +579,16 @@ impl UriBuf {
 
 	/// Tries to set the path.
 	///
-	/// Same as [`Self::set_path`] but accepts a `&str` instead of
+	/// Same as [`Self::set_path`] but accepts a string instead of
 	/// an [`&Path`](Path).
-	pub fn try_set_path<'s>(&mut self, path: &'s str) -> Result<(), InvalidPath<&'s str>> {
-		self.set_path(path.try_into()?);
-		Ok(())
+	pub fn try_set_path<T: AsRef<str>>(&mut self, path: T) -> Result<(), InvalidPath<T>> {
+		match Path::new(path.as_ref()) {
+			Ok(path) => {
+				self.set_path(path);
+				Ok(())
+			}
+			Err(_) => Err(InvalidPath(path)),
+		}
 	}
 
 	/// Sets and normalizes the path.
@@ -806,7 +814,7 @@ impl UriBuf {
 
 	/// Tries to join a string as a URI reference to this absolute URI.
 	///
-	/// Same as [`Self::join`] but accepts a `&str` instead of a [`&UriRef`](UriRef).
+	/// Same as [`Self::join`] but accepts a string instead of a [`&UriRef`](UriRef).
 	/// Returns an error if the input string is not a valid URI reference.
 	///
 	/// # Example
@@ -819,12 +827,14 @@ impl UriBuf {
 	///
 	/// assert_eq!(uri, "https://example.org/baz");
 	/// ```
-	pub fn try_join<'r>(
-		&mut self,
-		input: &'r str,
-	) -> Result<(), <&'r UriRef as TryFrom<&'r str>>::Error> {
-		self.join(UriRef::new(input)?);
-		Ok(())
+	pub fn try_join<T: AsRef<str>>(&mut self, input: T) -> Result<(), InvalidUriRef<T>> {
+		match UriRef::new(input.as_ref()) {
+			Ok(input) => {
+				self.join(input);
+				Ok(())
+			}
+			Err(_) => Err(InvalidUriRef(input)),
+		}
 	}
 }
 

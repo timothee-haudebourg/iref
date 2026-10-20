@@ -848,7 +848,7 @@ impl PathBuf {
 
 	/// Adds a segment at the end of the path.
 	///
-	/// Same as [`Self::lazy_push`] but accepts a `&str` instead of a
+	/// Same as [`Self::lazy_push`] but accepts a string instead of a
 	/// [`&Segment`](super::Segment). Returns an error if the input
 	/// string is not a valid path segment.
 	///
@@ -861,10 +861,10 @@ impl PathBuf {
 	/// path.try_lazy_push("bar").unwrap();
 	/// assert_eq!(path, "/foo/bar");
 	/// ```
-	pub fn try_lazy_push<'s>(
+	pub fn try_lazy_push<T: AsRef<str>>(
 		&mut self,
-		segment: &'s str,
-	) -> Result<&mut Self, InvalidSegment<&'s str>> {
+		segment: T,
+	) -> Result<&mut Self, InvalidSegment<T>> {
 		self.as_path_mut().try_lazy_push(segment)?;
 		Ok(self)
 	}
@@ -892,7 +892,7 @@ impl PathBuf {
 	/// Pushes the given segment to this path using the `.` and `..` segments
 	/// semantics.
 	///
-	/// Same as [`Self::push`] but accepts a `&str` instead of
+	/// Same as [`Self::push`] but accepts a string instead of
 	/// a [`&Segment`](super::Segment). Returns an error if the input
 	/// string is not a valid path segment.
 	///
@@ -906,7 +906,7 @@ impl PathBuf {
 	/// assert_eq!(path, "/foo/");
 	/// ```
 	#[inline]
-	pub fn try_push<'s>(&mut self, segment: &'s str) -> Result<&mut Self, InvalidSegment<&'s str>> {
+	pub fn try_push<T: AsRef<str>>(&mut self, segment: T) -> Result<&mut Self, InvalidSegment<T>> {
 		self.as_path_mut().try_push(segment)?;
 		Ok(self)
 	}
@@ -982,7 +982,7 @@ impl PathBuf {
 
 	/// Joins this path to the given path.
 	///
-	/// Same as [`Self::join`] but accepts a `&str` instead of a
+	/// Same as [`Self::join`] but accepts a string instead of a
 	/// [`&Path`](Path). Returns an error if the input string is not
 	/// a valid path.
 	///
@@ -999,7 +999,7 @@ impl PathBuf {
 	/// path.try_join("/baz").unwrap();
 	/// assert_eq!(path, "/baz");
 	/// ```
-	pub fn try_join<'s>(&mut self, path: &'s str) -> Result<&mut Self, InvalidPath<&'s str>> {
+	pub fn try_join<T: AsRef<str>>(&mut self, path: T) -> Result<&mut Self, InvalidPath<T>> {
 		self.as_path_mut().try_join(path)?;
 		Ok(self)
 	}
@@ -1101,7 +1101,7 @@ impl PathBuf {
 	/// path.try_replace("/baz/qux").unwrap();
 	/// assert_eq!(path, "/baz/qux");
 	/// ```
-	pub fn try_replace<'p>(&mut self, path: &'p str) -> Result<&mut Self, InvalidPath<&'p str>> {
+	pub fn try_replace<T: AsRef<str>>(&mut self, path: T) -> Result<&mut Self, InvalidPath<T>> {
 		self.as_path_mut().try_replace(path)?;
 		Ok(self)
 	}

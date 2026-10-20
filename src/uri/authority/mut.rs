@@ -99,12 +99,14 @@ impl<'a> AuthorityMut<'a> {
 	/// assert!(authority.try_replace("not valid\0").is_err());
 	/// ```
 	#[inline]
-	pub fn try_replace<'s>(
+	pub fn try_replace<T: AsRef<str>>(
 		&mut self,
-		other: &'s str,
-	) -> Result<&mut Self, InvalidAuthority<&'s str>> {
-		self.replace(Authority::new(other)?);
-		Ok(self)
+		other: T,
+	) -> Result<&mut Self, InvalidAuthority<T>> {
+		match Authority::new(other.as_ref()) {
+			Ok(other) => Ok(self.replace(other)),
+			Err(_) => Err(InvalidAuthority(other)),
+		}
 	}
 
 	/// Sets the user info component.
@@ -221,8 +223,11 @@ impl<'a> AuthorityMut<'a> {
 	/// assert!(authority.try_set_host("invalid/host").is_err());
 	/// ```
 	#[inline]
-	pub fn try_set_host<'s>(&mut self, host: &'s str) -> Result<&mut Self, InvalidHost<&'s str>> {
-		Ok(self.set_host(host.try_into()?))
+	pub fn try_set_host<T: AsRef<str>>(&mut self, host: T) -> Result<&mut Self, InvalidHost<T>> {
+		match Host::new(host.as_ref()) {
+			Ok(host) => Ok(self.set_host(host)),
+			Err(_) => Err(InvalidHost(host)),
+		}
 	}
 
 	/// Sets the port component.

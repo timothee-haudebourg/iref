@@ -533,14 +533,14 @@ impl UriRef {
 
 	/// Resolves the URI reference against the given base URI.
 	///
-	/// Same as [`Self::resolved`] but accepts a `&str` instead of an
+	/// Same as [`Self::resolved`] but accepts a string instead of an
 	/// URI. Returns an error if the input is not a valid URI.
 	#[cfg(feature = "std")]
-	pub fn try_resolved<'r>(
-		&self,
-		base_iri: &'r str,
-	) -> Result<UriBuf, <&'r Uri as TryFrom<&'r str>>::Error> {
-		Uri::new(base_iri).map(|u| self.resolved(u))
+	pub fn try_resolved<T: AsRef<str>>(&self, base_iri: T) -> Result<UriBuf, InvalidUri<T>> {
+		match Uri::new(base_iri.as_ref()) {
+			Ok(base_iri) => Ok(self.resolved(base_iri)),
+			Err(_) => Err(InvalidUri(base_iri)),
+		}
 	}
 
 	/// Returns this URI reference as a URI, if it has a scheme.
@@ -878,11 +878,16 @@ impl UriRefBuf {
 
 	/// Tries to set the path.
 	///
-	/// Same as [`Self::set_path`] but accepts a `&str` instead of
+	/// Same as [`Self::set_path`] but accepts a string instead of
 	/// an [`&Path`](Path).
-	pub fn try_set_path<'s>(&mut self, path: &'s str) -> Result<(), InvalidPath<&'s str>> {
-		self.set_path(path.try_into()?);
-		Ok(())
+	pub fn try_set_path<T: AsRef<str>>(&mut self, path: T) -> Result<(), InvalidPath<T>> {
+		match Path::new(path.as_ref()) {
+			Ok(path) => {
+				self.set_path(path);
+				Ok(())
+			}
+			Err(_) => Err(InvalidPath(path)),
+		}
 	}
 
 	/// Sets and normalizes the path.
@@ -1076,16 +1081,19 @@ impl UriRefBuf {
 	/// Tries to add the given scheme to the reference, turning it into
 	/// an URI.
 	///
-	/// Same [`Self::into_with_scheme`] but accepts an `&str` instead of
+	/// Same [`Self::into_with_scheme`] but accepts a string instead of
 	/// a [`&Scheme`](Scheme). Returns an error if the input string is
 	/// not a valid scheme.
-	pub fn try_into_with_scheme(
+	pub fn try_into_with_scheme<T: AsRef<str>>(
 		mut self,
-		scheme: &str,
-	) -> Result<UriBuf, (Self, super::InvalidScheme<&str>)> {
-		match self.try_set_scheme(Some(scheme)) {
-			Ok(_) => Ok(unsafe { UriBuf::new_unchecked(self.0) }),
-			Err(e) => Err((self, e)),
+		scheme: T,
+	) -> Result<UriBuf, (Self, super::InvalidScheme<T>)> {
+		match Scheme::new(scheme.as_ref()) {
+			Ok(scheme) => {
+				self.set_scheme(Some(scheme));
+				Ok(unsafe { UriBuf::new_unchecked(self.0) })
+			}
+			Err(_) => Err((self, super::InvalidScheme(scheme))),
 		}
 	}
 
@@ -1162,14 +1170,16 @@ impl UriRefBuf {
 
 	/// Tries to resolve this URI reference against the given base URI string.
 	///
-	/// Same as [`Self::resolve`] but accepts a `&str` instead of a [`&Uri`](Uri).
+	/// Same as [`Self::resolve`] but accepts a string instead of a [`&Uri`](Uri).
 	/// Returns an error if the base string is not a valid URI.
-	pub fn try_resolve<'r>(
-		&mut self,
-		base_iri: &'r str,
-	) -> Result<(), <&'r Uri as TryFrom<&'r str>>::Error> {
-		self.resolve(Uri::new(base_iri)?);
-		Ok(())
+	pub fn try_resolve<T: AsRef<str>>(&mut self, base_iri: T) -> Result<(), InvalidUri<T>> {
+		match Uri::new(base_iri.as_ref()) {
+			Ok(base_iri) => {
+				self.resolve(base_iri);
+				Ok(())
+			}
+			Err(_) => Err(InvalidUri(base_iri)),
+		}
 	}
 
 	/// Resolves this URI reference against the given base URI, consuming self.
@@ -1194,12 +1204,12 @@ impl UriRefBuf {
 
 	/// Tries to resolve this URI reference, consuming self.
 	///
-	/// Same as [`Self::into_resolved`] but accepts a `&str` instead of a [`&Uri`](Uri).
+	/// Same as [`Self::into_resolved`] but accepts a string instead of a [`&Uri`](Uri).
 	/// Returns an error if the base string is not a valid URI.
-	pub fn try_into_resolved(
+	pub fn try_into_resolved<T: AsRef<str>>(
 		mut self,
-		base_iri: &str,
-	) -> Result<UriBuf, (Self, <&Uri as TryFrom<&str>>::Error)> {
+		base_iri: T,
+	) -> Result<UriBuf, (Self, InvalidUri<T>)> {
 		match self.try_resolve(base_iri) {
 			Ok(_) => Ok(unsafe { <UriBuf>::new_unchecked(self.into_bytes()) }),
 			Err(e) => Err((self, e)),

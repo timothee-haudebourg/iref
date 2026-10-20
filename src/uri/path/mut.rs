@@ -196,7 +196,7 @@ impl<'a> PathMut<'a> {
 
 	/// Adds a segment at the end of the path.
 	///
-	/// Same as [`Self::lazy_push`] but accepts a `&str` instead of a
+	/// Same as [`Self::lazy_push`] but accepts a string instead of a
 	/// [`&Segment`](super::Segment). Returns an error if the input
 	/// string is not a valid path segment.
 	///
@@ -209,12 +209,14 @@ impl<'a> PathMut<'a> {
 	/// path.as_path_mut().try_lazy_push("bar").unwrap();
 	/// assert_eq!(path, "/foo/bar");
 	/// ```
-	pub fn try_lazy_push<'s>(
+	pub fn try_lazy_push<T: AsRef<str>>(
 		&mut self,
-		segment: &'s str,
-	) -> Result<&mut Self, super::InvalidSegment<&'s str>> {
-		self.lazy_push(segment.try_into()?);
-		Ok(self)
+		segment: T,
+	) -> Result<&mut Self, super::InvalidSegment<T>> {
+		match super::Segment::new(segment.as_ref()) {
+			Ok(segment) => Ok(self.lazy_push(segment)),
+			Err(_) => Err(super::InvalidSegment(segment)),
+		}
 	}
 
 	/// Push the given segment to this path using the `.` and `..` segments
@@ -303,7 +305,7 @@ impl<'a> PathMut<'a> {
 	/// Pushes the given segment to this path using the `.` and `..` segments
 	/// semantics.
 	///
-	/// Same as [`Self::push`] but accepts a `&str` instead of
+	/// Same as [`Self::push`] but accepts a string instead of
 	/// a [`&Segment`](super::Segment). Returns an error if the input
 	/// string is not a valid path segment.
 	///
@@ -317,11 +319,14 @@ impl<'a> PathMut<'a> {
 	/// assert_eq!(path, "/foo/");
 	/// ```
 	#[inline]
-	pub fn try_push<'s>(
+	pub fn try_push<T: AsRef<str>>(
 		&mut self,
-		segment: &'s str,
-	) -> Result<&mut Self, super::InvalidSegment<&'s str>> {
-		Ok(self.push(segment.try_into()?))
+		segment: T,
+	) -> Result<&mut Self, super::InvalidSegment<T>> {
+		match super::Segment::new(segment.as_ref()) {
+			Ok(segment) => Ok(self.push(segment)),
+			Err(_) => Err(super::InvalidSegment(segment)),
+		}
 	}
 
 	/// Appends all segments to this path without interpreting `.` and `..`.
@@ -468,7 +473,7 @@ impl<'a> PathMut<'a> {
 
 	/// Joins this path to the given path.
 	///
-	/// Same as [`Self::join`] but accepts a `&str` instead of a
+	/// Same as [`Self::join`] but accepts a string instead of a
 	/// [`&Path`](Path). Returns an error if the input string is not
 	/// a valid path.
 	///
@@ -485,9 +490,11 @@ impl<'a> PathMut<'a> {
 	/// path.as_path_mut().try_join("/baz").unwrap();
 	/// assert_eq!(path, "/baz");
 	/// ```
-	pub fn try_join<'s>(&mut self, path: &'s str) -> Result<&mut Self, InvalidPath<&'s str>> {
-		self.join(Path::new(path)?);
-		Ok(self)
+	pub fn try_join<T: AsRef<str>>(&mut self, path: T) -> Result<&mut Self, InvalidPath<T>> {
+		match Path::new(path.as_ref()) {
+			Ok(path) => Ok(self.join(path)),
+			Err(_) => Err(InvalidPath(path)),
+		}
 	}
 
 	/// Pop the last non-`..` segment of the path.
@@ -628,9 +635,11 @@ impl<'a> PathMut<'a> {
 	/// path.as_path_mut().try_replace("/baz/qux").unwrap();
 	/// assert_eq!(path, "/baz/qux");
 	/// ```
-	pub fn try_replace<'p>(&mut self, path: &'p str) -> Result<&mut Self, InvalidPath<&'p str>> {
-		self.replace(Path::new(path)?);
-		Ok(self)
+	pub fn try_replace<T: AsRef<str>>(&mut self, path: T) -> Result<&mut Self, InvalidPath<T>> {
+		match Path::new(path.as_ref()) {
+			Ok(path) => Ok(self.replace(path)),
+			Err(_) => Err(InvalidPath(path)),
+		}
 	}
 
 	/// Normalizes the path in place.
