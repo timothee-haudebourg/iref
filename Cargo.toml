@@ -14,20 +14,20 @@ version = "4.3.0"
 
 [features]
 default = ["std"]
-std = ["pct-str/std", "str-newtype/std"]
+std = ["pct-str/std", "str-newtype/std", "thiserror/std"]
 serde = ["dep:serde"]
 url = ["dep:url", "std"]
 
 [dependencies]
 serde = { version = "1.0", optional = true }
 smallvec = "1.14.0"
-thiserror = "2.0.12"
+thiserror = { version = "2.0.12", default-features = false }
 pct-str = { version = "3.0.1", default-features = false }
 url = { version = "2", optional = true }
 
 # Minor dependencies (major version not necessarily synchronized).
 str-newtype = { version = "3.0.0", default-features = false }
-static-automata = "1.0"
+static-automata = "1.1"
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }

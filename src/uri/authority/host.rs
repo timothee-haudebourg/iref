@@ -1,6 +1,5 @@
 use core::{
 	cmp::Ordering,
-	fmt::Write,
 	hash::{Hash, Hasher},
 	ops::Deref,
 };
@@ -377,6 +376,8 @@ impl HostBuf {
 /// longest run of consecutive zero groups.
 #[cfg(feature = "std")]
 fn format_ipv6(addr: u128) -> String {
+	use core::fmt::Write;
+
 	let groups: [u16; 8] = core::array::from_fn(|i| (addr >> (112 - i * 16)) as u16);
 
 	// Find the longest run of consecutive zero groups.
